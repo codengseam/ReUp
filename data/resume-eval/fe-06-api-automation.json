@@ -1,0 +1,8 @@
+{
+  "id": "fe-06-api-automation",
+  "source": "synthesized from data/user-samples/resume/详历.md",
+  "resume": "# 详历 - 邓熊师豪（接口自动化方向）\n\n## 项目经验\n\n### 懂车帝接口自动化测试体系\n\n- 基于 Python + Pytest + Requests 搭建接口自动化体系\n- 覆盖线索、订单、支付、退款等核心交易链路\n- 自动化覆盖率达 90.5%\n- 回归效率提升 60%\n\n### K12 智慧考试接口自动化\n\n- 建设 PyTest 自动化\n- 场景覆盖率从 45% 提升至 91%\n- 累计开发接口自动化用例 90+\n\n### 科大讯飞 AI 教育\n\n- 接口自动化：Python + Requests + Pytest + Allure\n- 累计开发 90+ 接口自动化用例\n- 集成 Jenkins + Git 实现 BVT 自动化流水线\n\n## 核心技能\n\n- 编程语言：Python（精通）、Java（了解）\n- 接口测试：Requests、Pytest、Allure\n- 数据库：MySQL\n- 工具：Linux、Git、JIRA、Jenkins\n- 持续集成：Jenkins + Git + Allure",
+  "jd": "高级接口自动化测试工程师招聘。负责接口测试、自动化测试、白盒测试、性能测试、回归测试、CI/CD、缺陷跟踪、测试体系、版本交付。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — primary scripting language.\nPytest Pytest Pytest Pytest Pytest — fixture, parameterize, plugins.\nMySQL MySQL MySQL MySQL MySQL — data validation, schema review.\nLinux Linux Linux Linux Linux — environment, logs, cron.\nGit Git Git Git Git — version control, code review.\nJIRA JIRA JIRA JIRA JIRA — bug tracking, sprint planning.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Requests、Allure、Jenkins、Docker 等技术。",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

@@ -1,0 +1,8 @@
+{
+  "id": "fe-09-mid-qa",
+  "source": "synthesized from data/user-samples/resume/原简历.md",
+  "resume": "## 个人信息\n\n**姓名**：邓熊师豪  \n**电话**：191-1041-8845  \n**邮箱**：dengxsh2019@foxmail.com  \n**求职意向**：软件测试工程师  \n**工作经验**：3年测试经验\n\n## 专业技能\n\n- Python：自动化测试脚本\n- Pytest：接口测试框架\n- MySQL：熟练 SQL 查询\n- Java：了解常用框架\n- Linux：熟悉常用命令\n- Git：熟练版本控制\n- JIRA：熟练使用\n- Selenium：Web 自动化\n- Jenkins + Git：持续集成\n\n## 工作经历\n\n### 北京字节跳动科技有限公司  \nQA质量保障-教育（2021年04月 - 至今）\n\n- 负责清北售卖教务系统和极课扫描\n- 建设 PyTest 自动化，场景覆盖率 91%\n- 收集 oncall 问题，进行优化专项\n- 使用 MySQL 验证数据，使用 Linux 部署测试\n- 使用 Git 管理代码，JIRA 跟踪 bug\n\n### 科大讯飞  \n系统测试工程师（2020年07月 - 2021年04月）\n\n- 独自负责大数据综合服务平台质量保证\n- 使用 Python + Requests + Pytest 自动化\n- 新增 BVT 测试用例七百多条，接口自动化用例 94 条\n- 集成 Jenkins + Git CI 流水线\n\n## 项目\n\n- 自动化测试：Python + Selenium + Pytest + Jenkins + Git\n- 接口自动化：Python + Requests + Pytest + Allure + MySQL\n- 持续集成：Jenkins + Git + Linux\n- 缺陷管理：JIRA",
+  "jd": "中级测试工程师招聘。负责 Web 测试、APP 测试、接口测试、回归测试、缺陷跟踪、自动化测试。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — basic scripting.\nPytest Pytest Pytest Pytest Pytest — interface tests.\nMySQL MySQL MySQL MySQL MySQL — basic SQL.\nLinux Linux Linux Linux Linux — shell basics.\nGit Git Git Git Git — basic version control.\nJIRA JIRA JIRA JIRA JIRA — basic ticket handling.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Jenkins、Git、JIRA 等工具。2-4 years QA experience required.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

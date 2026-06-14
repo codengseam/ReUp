@@ -1,0 +1,8 @@
+{
+  "id": "fe-02-automation-architect",
+  "source": "synthesized from data/user-samples/resume/简历.md",
+  "resume": "## 个人信息\n\n**姓名**：邓熊师豪\n**电话**：191-1041-8845\n**邮箱**：dengxsh2019@foxmail.com\n**求职意向**：软件测试工程师 / 测试开发工程师\n**工作经验**：5年+ 测试开发经验\n\n## 核心能力\n\n- 质量体系建设：从0到1搭建测试体系，沉淀700+核心用例和300+接口自动化\n- 自动化测试：基于Python+Pytest+Requests搭建接口自动化体系\n- 工具开发：独立开发全链路数据构造工具\n\n## 工作经历\n\n### 字节跳动\n\n懂车帝 - 抖音电商（业务负责人，2022年10月 - 至今）\n\n- 端到端负责二手车商城、新车电商、懂车购等多条业务线质量保障\n- 基于Python+Pytest+Requests搭建接口自动化体系，自动化覆盖率达90.5%\n- 缺陷逃逸率从9.76%降至1.42%\n\n## 项目经历\n\n### 懂车帝二手车商城及电商业务\n\n- 搭建Python+Pytest+Requests接口自动化体系\n- 微服务链路追踪，高并发场景压测\n- 业务价值贡献：自营商详下订转化率提升955%\n\n## 专业技能\n\n- 数据库：MySQL、SQL优化\n- 编程语言：Python（熟悉）\n- 工具：Linux、Git、JIRA",
+  "jd": "高级测试架构师招聘。负责公司测试体系规划、自动化测试平台建设、CI/CD 流水线、接口测试、白盒测试、性能测试、回归测试、测试用例库、缺陷跟踪。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — primary language for tooling.\nPytest Pytest Pytest Pytest Pytest — framework design and extension.\nMySQL MySQL MySQL MySQL MySQL — schema review and SQL tuning.\nLinux Linux Linux Linux Linux — environment setup, shell scripting.\nGit Git Git Git Git — version control and code review.\nJIRA JIRA JIRA JIRA JIRA — project tracking and release management.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Docker、Kubernetes、Jenkins、Prometheus、Grafana 等工具。",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

@@ -1,0 +1,8 @@
+{
+  "id": "fe-07-ecommerce-test",
+  "source": "synthesized from data/user-samples/resume/详历.md",
+  "resume": "# 详历 - 邓熊师豪（电商测试方向）\n\n## 项目经验\n\n### 懂车帝二手车商城及电商业务（业务负责人）\n\n- 端到端负责二手车商城、新车电商、懂车购等多条业务线质量保障\n- 421懂车购大促、抖音生服二手车等 38 个重保项目\n- 业务价值贡献：自营商详下订转化率从 0.04% 提升至 0.43%（+955%）\n- 端外新车电商全年订单量 9.08 万、GMV 达 9538.88 万\n\n#### 资金安全保障\n\n- 梳理全链路资金环节，输出《资金安全白皮书》\n- 识别风险点 111 个，风险关闭率 100%\n- 全年 0 资损\n\n#### 自动化测试\n\n- 基于 Python + Pytest + Requests 搭建接口自动化体系\n- 自动化覆盖率达 90.5%\n- 回归效率提升 60%\n\n#### 性能优化\n\n- 搜推场景接口耗时从 850ms 优化至 583ms\n- 实现双端秒开\n\n## 技能\n\n- 电商业务理解：O2O、二手车、新车电商\n- 接口测试：Python + Pytest + Requests\n- 数据库：MySQL\n- 工具：Linux、Git、JIRA",
+  "jd": "电商业务测试工程师招聘。负责订单链路、支付链路、退款链路、自动化测试、质量保障、缺陷跟踪、CI/CD、回归测试、测试体系。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — scripting for test tooling.\nPytest Pytest Pytest Pytest Pytest — interface test framework.\nMySQL MySQL MySQL MySQL MySQL — query and data validation.\nLinux Linux Linux Linux Linux — environment, logs.\nGit Git Git Git Git — version control.\nJIRA JIRA JIRA JIRA JIRA — bug tracking.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Jenkins、Git、JIRA 等工具。3+ years e-commerce QA preferred. Sale event experience a plus.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

@@ -1,0 +1,8 @@
+{
+  "id": "fe-10-junior-qa",
+  "source": "synthesized from data/user-samples/resume/原简历.md",
+  "resume": "## 个人信息\n\n**姓名**：邓熊师豪  \n**求职意向**：软件测试工程师（初级）  \n**工作经验**：1年测试实习经验\n\n## 专业技能\n\n- Python：基础语法，可写自动化脚本\n- Pytest：入门使用\n- MySQL：了解基本 SQL\n- Java：了解基本语法\n- Linux：了解常用命令\n- Git：了解 clone / commit\n- JIRA：了解工单创建\n- Selenium：了解基础用法\n\n## 工作经历\n\n### 北京字节跳动科技有限公司  \nQA质量保障-教育（2021年04月 - 至今）\n\n- 负责清北售卖教务系统功能测试\n- 极课项目：协助 PyTest 自动化建设\n- 使用 JIRA 提交缺陷，使用 Git 管理脚本\n- 了解 MySQL 数据验证，Linux 环境部署\n\n### 科大讯飞  \n软件测试工程师（实习）（2019年07月 - 2020年07月）\n\n- 负责走班考勤 web 端和 H5 测试\n- 协助智能排课、等级赋分等应用测试\n- 了解 Python、Pytest、MySQL、Git 等工具\n\n## 项目\n\n- 自动化测试入门：Python + Selenium + Pytest\n- 接口自动化入门：Python + Requests + Pytest + MySQL\n- 持续集成入门：Jenkins + Git + Linux\n- 缺陷跟踪：JIRA",
+  "jd": "初级测试工程师招聘。负责 Web 测试、APP 测试、接口测试、回归测试、缺陷跟踪。\n\nRequired basics (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — basic syntax.\nPytest Pytest Pytest Pytest Pytest — introductory.\nMySQL MySQL MySQL MySQL MySQL — SELECT basics.\nLinux Linux Linux Linux Linux — basic commands.\nGit Git Git Git Git — basic clone/commit.\nJIRA JIRA JIRA JIRA JIRA — basic ticket creation.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Jenkins、Git、JIRA 等工具。0-2 years experience. CS degree or equivalent.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 50
+}

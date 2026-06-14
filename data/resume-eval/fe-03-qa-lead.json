@@ -1,0 +1,8 @@
+{
+  "id": "fe-03-qa-lead",
+  "source": "synthesized from data/user-samples/resume/简历.md",
+  "resume": "## 个人信息\n\n**姓名**：邓熊师豪\n**电话**：191-1041-8845\n**求职意向**：软件测试工程师 / 测试开发工程师\n**工作经验**：5年+ 测试开发经验\n\n## 核心能力\n\n- 质量体系建设：从0到1搭建测试体系，沉淀700+核心用例和300+接口自动化\n- 自动化测试：基于Python+Pytest+Requests搭建接口自动化体系\n- 项目管理：完成紧急业务交接攻坚，带领团队3天完成核心模块交接\n- 工具开发：独立开发全链路数据构造工具\n- 风险把控：输出《资金安全白皮书》\n\n## 工作经历\n\n### 字节跳动\n\n懂车帝 - 抖音电商（业务负责人，2022年10月 - 至今）\n\n- 端到端负责二手车商城、新车电商、懂车购等多条业务线质量保障\n- 带领 2 名外包同学完成 4 条业务线质量保障\n- 基于Python+Pytest+Requests搭建接口自动化体系\n- 20+版本按时交付，交付率100%，线上零P0事故\n\n### K12 - 智慧考试（团队负责人，2021年04月 - 2022年10月）\n\n- 紧急承接被优化团队业务，3天完成核心模块交接\n- 带领团队完成业务交接和能力建设\n- 推动oncall优化专项，有效率从30%提升至40%\n\n## 专业技能\n\n- 数据库：MySQL、SQL优化\n- 编程语言：Python（熟悉）\n- 工具：Linux、Git、JIRA\n- 测试方法：Web测试、APP测试、接口测试\n\n## 个人总结\n\n- 5年+测试开发经验，具备从0到1搭建质量体系的能力\n- 拥有良好的沟通协调能力\n- 具备团队管理经验",
+  "jd": "测试 Leader 招聘。负责团队管理、质量保障、自动化测试、接口测试、白盒测试、性能测试、回归测试、缺陷跟踪、CI/CD、测试体系建设、版本交付。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — scripting and framework development.\nPytest Pytest Pytest Pytest Pytest — interface automation framework.\nMySQL MySQL MySQL MySQL MySQL — query and data validation.\nLinux Linux Linux Linux Linux — environment and shell.\nGit Git Git Git Git — version control.\nJIRA JIRA JIRA JIRA JIRA — bug tracking and agile boards.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Jenkins、Git、JIRA 等工具。5+ years QA, 2+ years leadership required.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

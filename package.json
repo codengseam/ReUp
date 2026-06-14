@@ -13,7 +13,8 @@
     "validate": "pnpm run --parallel '/^(ts-check|lint:build)$/'",
     "tokens": "node scripts/count-tokens.mjs",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "benchmark:ats": "vitest run src/lib/resume/ats.benchmark.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
