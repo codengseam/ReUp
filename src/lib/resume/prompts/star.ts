@@ -12,9 +12,12 @@
 //   时 console.warn 而非 throw（保证 B3 仍能跑，只是提示）。
 // - ResumeDocument 类型从 A1 任务创建的 src/lib/resume/types.ts 导入并再导出。
 
-import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+// Static JSON imports (bundled into both server and client) avoid the
+// `fs` import that breaks Turbopack/webpack when the module is reached
+// from a client component. The `import.meta.url`/fs-based loader is kept
+// for non-bundler consumers (vitest under Node, ad-hoc scripts).
+import example1 from '../examples/example-1.json';
+import example2 from '../examples/example-2.json';
 import { loadSkillsSync } from '@/lib/skills-loader';
 import type { ResumeDocument } from '../types';
 
@@ -65,40 +68,26 @@ export const MAX_PROMPT_TOKENS = 12000;
 
 const SECTION_MARKERS = ['【我的分析】', '【STAR改写】', '【底层心法】', '【建议】'] as const;
 
-/** 在 CommonJS / Vitest / Next 各种环境下都能拿到 __dirname */
-function getExamplesDir(): string {
-  // Vitest/Node ESM: fileURLToPath(import.meta.url)
-  // Next / CJS: __dirname
-  // 都尝试一次，fallback 到 process.cwd() 解析
-  const candidates: string[] = [];
-  try {
-    if (typeof __dirname === 'string' && __dirname.length > 0) {
-      candidates.push(join(__dirname, '..', 'examples'));
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.url) {
-      const here = dirname(fileURLToPath(import.meta.url));
-      candidates.push(join(here, '..', 'examples'));
-    }
-  } catch {
-    /* ignore */
-  }
-  for (const p of candidates) {
-    if (existsSync(join(p, 'example-1.json'))) return p;
-  }
-  // 最后兜底：相对 cwd
-  return join(process.cwd(), 'src', 'lib', 'resume', 'examples');
-}
-
-const EXAMPLES_DIR = getExamplesDir();
+/** Bundled few-shot examples indexed by id. */
+const BUNDLED_EXAMPLES: Record<string, StarExample> = {
+  'example-1': example1 as StarExample,
+  'example-2': example2 as StarExample,
+};
 
 function loadExample(id: string): StarExample | null {
-  const p = join(EXAMPLES_DIR, `${id}.json`);
-  if (!existsSync(p)) return null;
+  // Preferred: bundled JSON (works in browser and Node bundlers).
+  const bundled = BUNDLED_EXAMPLES[id];
+  if (bundled) return bundled;
+  // Fallback: filesystem (vitest under Node, ad-hoc scripts). Lazy-loaded
+  // so a `fs`-less browser bundle does not pay the import cost.
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readFileSync, existsSync } = require('node:fs') as typeof import('node:fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { join } = require('node:path') as typeof import('node:path');
+    // Process.cwd()-relative examples dir for ad-hoc scripts.
+    const p = join(process.cwd(), 'src', 'lib', 'resume', 'examples', `${id}.json`);
+    if (!existsSync(p)) return null;
     return JSON.parse(readFileSync(p, 'utf-8')) as StarExample;
   } catch {
     return null;
@@ -207,7 +196,60 @@ function renderUser(resume: ResumeDocument): string {
 }
 
 // ---------------------------------------------------------------------------
-// 入口
+// Section rewrite prompt (Phase 5 E1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a focused single-section rewrite prompt. The LLM is told to output
+ * ONLY the target section, using the current text as a starting point (so
+ * the user can iterate on a specific section without re-running the full
+ * 4-section rewrite).
+ *
+ * Returns { system, user } strings; does NOT call the LLM.
+ */
+export function buildSectionRewritePrompt(
+  resume: ResumeDocument,
+  section: import('../star-rewriter').StarSection,
+  currentText: string,
+): { system: string; user: string } {
+  const compact = JSON.stringify(resume);
+
+  const system = [
+    '你是资深职业顾问，专注简历优化。',
+    '用户已经看过你之前给出的 4 段式输出，现在只想重写其中一段。',
+    '请只输出目标段，不要输出其他 3 段。',
+    '',
+    renderSkillsBlock(),
+    '',
+    OUTPUT_FORMAT_BLOCK,
+  ]
+    .filter((s) => s.length > 0)
+    .join('\n\n');
+
+  const user = [
+    `请只重写【${section}】这一段，把「当前文本」当作起点，按 system 提示的格式输出。`,
+    '要求：',
+    '1) 只输出【' + section + '】这一段，不要附带【下一节】或其他段名',
+    '2) 保持事实、数字、候选人信息与「当前文本」一致，只做表达优化',
+    '3) 长度保持与「当前文本」相当 (±30%)',
+    '4) 不要在输出中再次出现【' + section + '】自身标头 (前端会自动加上)',
+    '',
+    '## 当前文本 (你要优化的起点)',
+    '```text',
+    currentText,
+    '```',
+    '',
+    '## 候选人简历 (供上下文参考, 不用 4 段式全部输出)',
+    '```json',
+    compact,
+    '```',
+  ].join('\n');
+
+  return { system, user };
+}
+
+// ---------------------------------------------------------------------------
+// Entry
 // ---------------------------------------------------------------------------
 
 /**

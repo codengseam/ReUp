@@ -49,11 +49,27 @@ let pipelinePromise: Promise<XfPipeline> | null = null;
 
 async function getPipeline(): Promise<XfPipeline> {
   if (pipelinePromise) return pipelinePromise;
-  // The module specifier is built at runtime so Vite's import-analysis pass
-  // does not try to resolve an optional dependency at transform time. The
-  // vi.mock factory in tests replaces the module at resolution time.
-  const moduleName = '@xenova/' + 'transformers';
-  const mod = (await import(moduleName)) as XfModule;
+  // The module specifier is built at runtime via string concatenation
+  // so Turbopack's static import analysis cannot resolve the optional
+  // dependency at transform time. We also avoid `await import(...)`
+  // because Turbopack's static analyser still flags it; instead we
+  // build an `import()` closure through `new Function` so the literal
+  // never appears in the source.
+  //
+  // Tests (vitest + vi.mock) cannot intercept a Function-built
+  // dynamic import, so the test environment provides a `globalThis`
+  // shim that returns a fake `XfModule` and skips the Function
+  // closure entirely. See `src/lib/reranker.test.ts` for the shim.
+  const shimmed = globalThis as { __reupXenovaShim?: () => Promise<XfModule> };
+  let mod: XfModule;
+  if (typeof shimmed.__reupXenovaShim === 'function') {
+    mod = await shimmed.__reupXenovaShim();
+  } else {
+    const moduleName = '@xenova/' + 'transformers';
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<XfModule>;
+    mod = await dynamicImport(moduleName);
+  }
   const pending = mod.pipeline('text-classification', MODEL_ID);
   pipelinePromise = pending;
   try {

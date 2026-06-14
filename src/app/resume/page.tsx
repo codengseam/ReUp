@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, FileText, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, Lock, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,10 +16,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { parseResume } from '@/lib/resume/parser';
+import { loadResume, saveResume } from '@/lib/resume/storage';
+import { isPrivacyMode } from '@/lib/resume/privacy';
 import type { ResumeDocument, ResumeSource } from '@/lib/resume/types';
+import type { StarRewriteResult } from '@/lib/resume/star-rewriter';
+import { ExportButtons } from './_components/ExportButtons';
 import { JdInput } from './_components/JdInput';
 import { MatchReportCard } from './_components/MatchReportCard';
 import { ParsePreview } from './_components/ParsePreview';
+import { PrivacyToggle } from './_components/PrivacyToggle';
 import { StreamingResult } from './_components/StreamingResult';
 
 type ResumeFormat = 'pdf' | 'word' | 'markdown' | 'text';
@@ -60,6 +65,22 @@ export default function ResumeUploadPage() {
   const [parseError, setParseError] = useState<string>('');
   const [parsedResume, setParsedResume] = useState<ResumeDocument | null>(null);
   const [jd, setJd] = useState<string>('');
+  const [privacyMode, setPrivacyModeState] = useState<boolean>(false);
+  const [lastStarResult, setLastStarResult] = useState<StarRewriteResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // G1: hydrate from localStorage on mount, then remember privacy mode.
+  useEffect(() => {
+    const saved = loadResume();
+    if (saved) {
+      setParsedResume(saved);
+      // Re-hydrate the editor with the saved source text so the user can
+      // re-parse or tweak format without re-pasting.
+      if (saved.raw) setPastedText(saved.raw);
+      setFormat(saved.meta.source === 'md' ? 'markdown' : saved.meta.source);
+    }
+    setPrivacyModeState(isPrivacyMode());
+  }, []);
 
   const hasInput = fileName.trim().length > 0 || pastedText.trim().length > 0;
   const canSubmit = hasInput;
@@ -68,6 +89,15 @@ export default function ResumeUploadPage() {
     setParsedResume(null);
     setParseError('');
     setNotice('');
+  }, []);
+
+  // G2: drop any reference to the uploaded File so the browser can GC it.
+  // The TextDecoder/string already holds the parsed content we need.
+  const clearFileInput = useCallback(() => {
+    setFileName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   }, []);
 
   const handleFile = useCallback(
@@ -153,6 +183,10 @@ export default function ResumeUploadPage() {
       }
       const doc = await parseResume(pastedText, source);
       setParsedResume(doc);
+      // G1: persist locally so refresh / re-open keeps the parsed doc.
+      saveResume(doc);
+      // G2: release the original File reference + clear the input.
+      clearFileInput();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setParseError(msg);
@@ -160,7 +194,7 @@ export default function ResumeUploadPage() {
     } finally {
       setIsParsing(false);
     }
-  }, [format, pastedText]);
+  }, [clearFileInput, format, pastedText]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -209,6 +243,7 @@ export default function ResumeUploadPage() {
               </Label>
               <Input
                 id="resume-file-input"
+                ref={fileInputRef}
                 type="file"
                 accept=".pdf,.doc,.docx,.md,.markdown,.txt,text/plain"
                 onChange={onFileInputChange}
@@ -254,6 +289,19 @@ export default function ResumeUploadPage() {
           </CardContent>
         </Card>
 
+        {privacyMode && (
+          <div
+            role="status"
+            data-testid="privacy-notice"
+            className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            本地模式：所有解析均在浏览器内进行，简历内容不会上传到服务器。
+          </div>
+        )}
+
+        <PrivacyToggle enabled={privacyMode} onChange={setPrivacyModeState} />
+
         <div className="flex flex-col gap-3 pt-2">
           <Button
             onClick={() => {
@@ -294,7 +342,15 @@ export default function ResumeUploadPage() {
         </div>
 
         {parsedResume && <ParsePreview resume={parsedResume} />}
-        {parsedResume && <StreamingResult resume={parsedResume} />}
+        {parsedResume && (
+          <StreamingResult
+            resume={parsedResume}
+            onComplete={(result) => {
+              setLastStarResult(result);
+            }}
+          />
+        )}
+        {parsedResume && <ExportButtons resume={parsedResume} starResult={lastStarResult} />}
         {parsedResume && <JdInput value={jd} onChange={setJd} />}
         {parsedResume && jd.trim().length > 0 && (
           <MatchReportCard resume={parsedResume} jd={jd} />

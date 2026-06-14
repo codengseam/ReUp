@@ -2,21 +2,37 @@
 // Phase 1 R1: Vitest unit tests for src/lib/reranker.ts.
 // All tests use a mocked @xenova/transformers — no real model load.
 //
-// We deliberately avoid a static `import { pipeline } from '@xenova/transformers'`
-// in this test file: the package is not installed in dev dependencies (deferred
-// decision; see return summary). The mock is registered via `vi.mock(...)` and
-// accessed through the hoisted `mockPipeline` reference so that Vite's import
-// analyser never tries to resolve the package from disk.
+// The production reranker loads `@xenova/transformers` via a runtime
+// `new Function('m', 'return import(m)')` closure to defeat
+// Turbopack's static import analyser (the package is intentionally
+// not installed). Vitest's `vi.mock` cannot intercept a closure-built
+// import, so the test shim installs `globalThis.__reupXenovaShim` —
+// the production code checks for it before falling through to the
+// Function closure. We delete the shim in `afterEach` so production
+// code paths remain unchanged.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { mockPipeline } = vi.hoisted(() => ({
   mockPipeline: vi.fn(),
 }));
 
-vi.mock('@xenova/transformers', () => ({
-  pipeline: mockPipeline,
-}));
+interface ShimGlobal {
+  __reupXenovaShim?: () => Promise<{
+    pipeline: (task: 'text-classification', model: string) => Promise<unknown>;
+  }>;
+}
+
+beforeEach(() => {
+  (globalThis as unknown as ShimGlobal).__reupXenovaShim = async () => ({
+    pipeline: mockPipeline,
+  });
+});
+
+afterEach(() => {
+  delete (globalThis as unknown as ShimGlobal).__reupXenovaShim;
+  vi.restoreAllMocks();
+});
 
 import { rerank, _resetForTest, type Chunk } from '@/lib/reranker';
 
