@@ -2,13 +2,16 @@
 // ReUp v2 Phase 3 P0 (A6): resume parser dispatcher.
 //
 // Routes by `source` to the right underlying parser. PDF and Word
-// parsers (A3 / A4) live in parallel sub-agents and are imported
-// lazily; until they exist, the dispatcher throws a clear "not yet
-// implemented" error so callers fail loud rather than silently swallow.
+// parsers (A3 / A4) live in sibling files; text and md are
+// imported statically. Callers running in the browser must NOT
+// pass 'pdf' / 'word' — those need a Node runtime. Use
+// `parseResume(buffer, 'pdf' | 'word')` from server routes only.
 
 import type { ResumeDocument, ResumeSource } from './types';
 import { parseTextResume } from './parser-text';
 import { parseMdResume } from './parser-md';
+import { parsePdfResume } from './parser-pdf';
+import { parseWordResume } from './parser-word';
 
 export interface ParseResumeOptions {
   /** Optional MIME type hint (e.g. for future PDF/Word dispatch). */
@@ -60,15 +63,17 @@ export async function parseResume(
   }
 
   if (source === 'pdf') {
-    throw new Error(
-      'PDF parser not yet implemented in this build; use A3 sub-agent output (see spec §7.A A3).'
-    );
+    if (typeof input === 'string' || !Buffer.isBuffer(input)) {
+      throw new TypeError("parseResume: 'pdf' source requires a Buffer input");
+    }
+    return parsePdfResume(input);
   }
 
   if (source === 'word') {
-    throw new Error(
-      'Word parser not yet implemented in this build; use A4 sub-agent output (see spec §7.A A4).'
-    );
+    if (typeof input === 'string' || !Buffer.isBuffer(input)) {
+      throw new TypeError("parseResume: 'word' source requires a Buffer input");
+    }
+    return parseWordResume(input);
   }
 
   // Exhaustiveness — should be unreachable.
