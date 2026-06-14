@@ -10,7 +10,7 @@
 // `chdir` first, then `vi.resetModules()` and dynamically import the
 // route handler to force a fresh module evaluation under the tmp dir.
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -242,5 +242,235 @@ describe('POST /api/admin/config', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('unknown_key');
+  });
+});
+
+// =====================================================================
+// resume.* keys (Phase 3+ — ReUp v2 resume advisor runtime config)
+// =====================================================================
+
+/**
+ * Reset the on-disk config to an empty object so each resume.* test
+ * starts from a clean state (avoids bleed-through from earlier tests
+ * or sibling cases).
+ */
+async function resetConfigFile(): Promise<void> {
+  const fs = await import('fs/promises');
+  await fs.mkdir(join(tmp, 'data'), { recursive: true });
+  await fs.writeFile(configFile(), '{}', 'utf-8');
+}
+
+describe('GET /api/admin/config — resume.* keys (defaults)', () => {
+  beforeEach(async () => { await resetConfigFile(); });
+
+  it('returns 200 with empty object for key=resume.config when nothing is persisted', async () => {
+    const res = await GET(getRequest('resume.config') as never);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({});
+  });
+
+  it('returns 200 with empty object for key=resume.privacy when nothing is persisted', async () => {
+    const res = await GET(getRequest('resume.privacy') as never);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({});
+  });
+
+  it('returns 200 with { customPrompt: null } for key=resume.starPrompt when nothing is persisted', async () => {
+    const res = await GET(getRequest('resume.starPrompt') as never);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ customPrompt: null });
+  });
+
+  it('returns 400 unknown_key for key=resume.unknown (not in catalogue)', async () => {
+    const res = await GET(getRequest('resume.unknown') as never);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('unknown_key');
+    // validKeys should advertise all 9 keys (3 original + 6 resume.*)
+    expect(body.validKeys).toEqual(expect.arrayContaining([
+      'prompt', 'model', 'rag',
+      'resume.config', 'resume.privacy',
+      'resume.starPrompt', 'resume.starFewShot',
+      'resume.atsPrompt', 'resume.matchPrompt',
+    ]));
+  });
+});
+
+describe('POST /api/admin/config — resume.* keys (round-trip + isolation)', () => {
+  beforeEach(async () => { await resetConfigFile(); });
+
+  it('persists resume.config and round-trips through GET', async () => {
+    const value = {
+      topK: 30,
+      confidenceChars: 2500,
+      fewShotIds: ['example-1', 'example-2'],
+      sectionOrder: ['A', 'B', 'C', 'D'],
+    };
+    const post = await POST(postJson({ key: 'resume.config', value }) as never);
+    expect(post.status).toBe(200);
+    const postBody = await post.json();
+    expect(postBody.ok).toBe(true);
+    expect(postBody.key).toBe('resume.config');
+    expect(typeof postBody.persistedAt).toBe('string');
+
+    // Verify on-disk shape
+    const persisted = readPersisted();
+    const resume = persisted.resume as Record<string, unknown>;
+    const cfg = resume.config as Record<string, unknown>;
+    expect(cfg.topK).toBe(30);
+    expect(cfg.confidenceChars).toBe(2500);
+    expect(cfg.fewShotIds).toEqual(['example-1', 'example-2']);
+    expect(cfg.sectionOrder).toEqual(['A', 'B', 'C', 'D']);
+
+    // Verify GET round-trip
+    const get = await GET(getRequest('resume.config') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.topK).toBe(30);
+    expect(getBody.confidenceChars).toBe(2500);
+    expect(getBody.fewShotIds).toEqual(['example-1', 'example-2']);
+    expect(getBody.sectionOrder).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  it('persists resume.privacy.forcedLocal and round-trips through GET', async () => {
+    const post = await POST(postJson({
+      key: 'resume.privacy',
+      value: { forcedLocal: true },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    const persisted = readPersisted();
+    const resume = persisted.resume as Record<string, unknown>;
+    const privacy = resume.privacy as Record<string, unknown>;
+    expect(privacy.forcedLocal).toBe(true);
+
+    const get = await GET(getRequest('resume.privacy') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.forcedLocal).toBe(true);
+  });
+
+  it('persists resume.starPrompt customPrompt and round-trips through GET', async () => {
+    const post = await POST(postJson({
+      key: 'resume.starPrompt',
+      value: { customPrompt: 'OVERRIDE' },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    const persisted = readPersisted();
+    const resume = persisted.resume as Record<string, unknown>;
+    expect(resume.starPrompt).toBe('OVERRIDE');
+
+    const get = await GET(getRequest('resume.starPrompt') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.customPrompt).toBe('OVERRIDE');
+  });
+
+  it('persists resume.atsPrompt and round-trips through GET', async () => {
+    const post = await POST(postJson({
+      key: 'resume.atsPrompt',
+      value: { customPrompt: 'A' },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    const get = await GET(getRequest('resume.atsPrompt') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.customPrompt).toBe('A');
+  });
+
+  it('persists resume.matchPrompt and round-trips through GET', async () => {
+    const post = await POST(postJson({
+      key: 'resume.matchPrompt',
+      value: { customPrompt: 'M' },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    const get = await GET(getRequest('resume.matchPrompt') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.customPrompt).toBe('M');
+  });
+
+  it('persists resume.starFewShot and round-trips through GET', async () => {
+    const post = await POST(postJson({
+      key: 'resume.starFewShot',
+      value: { customPrompt: 'few-shot text' },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    const get = await GET(getRequest('resume.starFewShot') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.customPrompt).toBe('few-shot text');
+  });
+
+  it('POST resume.config without value → 400 bad_request', async () => {
+    const res = await POST(postJson({ key: 'resume.config' }) as never);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('bad_request');
+  });
+
+  it('POST resume.starPrompt with value: {} (missing customPrompt) → 400', async () => {
+    const res = await POST(postJson({
+      key: 'resume.starPrompt',
+      value: {},
+    }) as never);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('bad_request');
+  });
+
+  it('POST resume.privacy with non-boolean forcedLocal → 400', async () => {
+    const res = await POST(postJson({
+      key: 'resume.privacy',
+      value: { forcedLocal: 'yes' },
+    }) as never);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('bad_request');
+  });
+
+  it('POST resume.config with wrong field types (Zod rejection) → 400', async () => {
+    const res = await POST(postJson({
+      key: 'resume.config',
+      value: { topK: 'not-a-number' },
+    }) as never);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('bad_request');
+  });
+
+  it('isolation: persisting resume.config does not clobber resume.privacy', async () => {
+    // Seed: set resume.privacy first
+    const seed = await POST(postJson({
+      key: 'resume.privacy',
+      value: { forcedLocal: true },
+    }) as never);
+    expect(seed.status).toBe(200);
+
+    // Now write resume.config
+    const post = await POST(postJson({
+      key: 'resume.config',
+      value: { topK: 42 },
+    }) as never);
+    expect(post.status).toBe(200);
+
+    // resume.privacy must still be readable with its original value
+    const get = await GET(getRequest('resume.privacy') as never);
+    expect(get.status).toBe(200);
+    const getBody = await get.json();
+    expect(getBody.forcedLocal).toBe(true);
+
+    // And resume.config is now persisted alongside it
+    const getCfg = await GET(getRequest('resume.config') as never);
+    expect(getCfg.status).toBe(200);
+    const cfgBody = await getCfg.json();
+    expect(cfgBody.topK).toBe(42);
   });
 });
