@@ -1,10 +1,13 @@
 // src/lib/resume/parser.test.ts
 // ReUp v2 Phase 3 P0 (A6): resume parser dispatcher tests.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { parseResume } from './parser';
 import { parseTextResume } from './parser-text';
 import { parseMdResume } from './parser-md';
+import * as parserPdf from './parser-pdf';
+import * as parserWord from './parser-word';
+import type { ResumeDocument } from './types';
 
 describe('parseResume (dispatcher)', () => {
   it('delegates text source to parseTextResume and returns same shape', async () => {
@@ -26,12 +29,48 @@ describe('parseResume (dispatcher)', () => {
     expect(viaDispatch.experience).toEqual(viaDirect.experience);
   });
 
-  it('throws a clear "not yet implemented" error for pdf source', async () => {
-    await expect(parseResume('whatever', 'pdf')).rejects.toThrow(/PDF parser not yet implemented/i);
+  it('delegates pdf source to parsePdfResume (Buffer input)', async () => {
+    const stub: ResumeDocument = {
+      meta: { version: 'reup.v2.phase3', source: 'pdf', createdAt: new Date().toISOString() },
+      basic: {},
+      experience: [],
+      projects: [],
+      skills: [],
+      education: [],
+      raw: '',
+    };
+    const spy = vi.spyOn(parserPdf, 'parsePdfResume').mockResolvedValueOnce(stub);
+    const buf = Buffer.from('fake');
+    const doc = await parseResume(buf, 'pdf');
+    expect(spy).toHaveBeenCalledWith(buf);
+    expect(doc).toBe(stub);
+    spy.mockRestore();
   });
 
-  it('throws a clear "not yet implemented" error for word source', async () => {
-    await expect(parseResume('whatever', 'word')).rejects.toThrow(/Word parser not yet implemented/i);
+  it('delegates word source to parseWordResume (Buffer input)', async () => {
+    const stub: ResumeDocument = {
+      meta: { version: 'reup.v2.phase3', source: 'word', createdAt: new Date().toISOString() },
+      basic: {},
+      experience: [],
+      projects: [],
+      skills: [],
+      education: [],
+      raw: '',
+    };
+    const spy = vi.spyOn(parserWord, 'parseWordResume').mockResolvedValueOnce(stub);
+    const buf = Buffer.from('fake');
+    const doc = await parseResume(buf, 'word');
+    expect(spy).toHaveBeenCalledWith(buf);
+    expect(doc).toBe(stub);
+    spy.mockRestore();
+  });
+
+  it('rejects string input for pdf source with a clear TypeError', async () => {
+    await expect(parseResume('not a buffer', 'pdf')).rejects.toThrow(/pdf.*buffer|Buffer/i);
+  });
+
+  it('rejects string input for word source with a clear TypeError', async () => {
+    await expect(parseResume('not a buffer', 'word')).rejects.toThrow(/word.*buffer|Buffer/i);
   });
 
   it('throws on empty input for text source', async () => {

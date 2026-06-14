@@ -4,36 +4,29 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEv
 import Link from 'next/link';
 import { ArrowLeft, FileText, Loader2, Lock, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { parseResume } from '@/lib/resume/parser';
+import { Switch } from '@/components/ui/switch';
+import { parseTextResume } from '@/lib/resume/parser-text';
+import { parseMdResume } from '@/lib/resume/parser-md';
 import { loadResume, saveResume } from '@/lib/resume/storage';
-import { isPrivacyMode } from '@/lib/resume/privacy';
+import { isPrivacyMode, setPrivacyMode } from '@/lib/resume/privacy';
 import type { ResumeDocument, ResumeSource } from '@/lib/resume/types';
 import type { StarRewriteResult } from '@/lib/resume/star-rewriter';
 import { ExportButtons } from './_components/ExportButtons';
 import { JdInput } from './_components/JdInput';
 import { MatchReportCard } from './_components/MatchReportCard';
 import { ParsePreview } from './_components/ParsePreview';
-import { PrivacyToggle } from './_components/PrivacyToggle';
 import { StreamingResult } from './_components/StreamingResult';
 
 type ResumeFormat = 'pdf' | 'word' | 'markdown' | 'text';
 
 const FORMAT_LABELS: Record<ResumeFormat, string> = {
   pdf: 'PDF',
-  word: 'Word (.docx)',
+  word: 'Word',
   markdown: 'Markdown',
-  text: 'Text',
+  text: '纯文本',
 };
 
 const FORMAT_VALUES: readonly ResumeFormat[] = ['pdf', 'word', 'markdown', 'text'] as const;
@@ -46,15 +39,12 @@ function detectFormat(name: string): ResumeFormat {
   return 'text';
 }
 
-function toResumeSource(format: ResumeFormat): ResumeSource {
-  if (format === 'markdown') return 'md';
-  return format;
+/** Client-side parse: only text/md. PDF/Word go through the API route. */
+async function parseClientSide(text: string, source: ResumeSource): Promise<ResumeDocument> {
+  if (source === 'md') return parseMdResume(text);
+  return parseTextResume(text, source as 'text');
 }
 
-// H2 (upload) + H3 (parse preview) + H4 (streaming result) orchestrator.
-// The page is a client component. PDF/Word parsing is server-only
-// (depends on Buffer + pdf-parse/mammoth), so for now we accept only
-// text/md submissions and surface a friendly error for the other two.
 export default function ResumeUploadPage() {
   const [fileName, setFileName] = useState<string>('');
   const [pastedText, setPastedText] = useState<string>('');
@@ -69,13 +59,10 @@ export default function ResumeUploadPage() {
   const [lastStarResult, setLastStarResult] = useState<StarRewriteResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // G1: hydrate from localStorage on mount, then remember privacy mode.
   useEffect(() => {
     const saved = loadResume();
     if (saved) {
       setParsedResume(saved);
-      // Re-hydrate the editor with the saved source text so the user can
-      // re-parse or tweak format without re-pasting.
       if (saved.raw) setPastedText(saved.raw);
       setFormat(saved.meta.source === 'md' ? 'markdown' : saved.meta.source);
     }
@@ -91,13 +78,9 @@ export default function ResumeUploadPage() {
     setNotice('');
   }, []);
 
-  // G2: drop any reference to the uploaded File so the browser can GC it.
-  // The TextDecoder/string already holds the parsed content we need.
   const clearFileInput = useCallback(() => {
     setFileName('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
   const handleFile = useCallback(
@@ -105,17 +88,15 @@ export default function ResumeUploadPage() {
       setFileName(file.name);
       const detected = detectFormat(file.name);
       setFormat(detected);
-      // 文本/Markdown 顺带把内容读进 textarea，避免重复粘贴
       if (detected === 'text' || detected === 'markdown') {
         const text = await file.text();
         setPastedText(text);
       } else {
-        // PDF / Word 仅占位文件名，二进制内容留给下游解析
         setPastedText('');
       }
       resetDownstream();
     },
-    [resetDownstream]
+    [resetDownstream],
   );
 
   const onDrop = useCallback(
@@ -123,11 +104,9 @@ export default function ResumeUploadPage() {
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (file) {
-        void handleFile(file);
-      }
+      if (file) void handleFile(file);
     },
-    [handleFile]
+    [handleFile],
   );
 
   const onDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -143,11 +122,9 @@ export default function ResumeUploadPage() {
   const onFileInputChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) {
-        void handleFile(file);
-      }
+      if (file) void handleFile(file);
     },
-    [handleFile]
+    [handleFile],
   );
 
   const onTextChange = useCallback(
@@ -155,7 +132,7 @@ export default function ResumeUploadPage() {
       setPastedText(value);
       resetDownstream();
     },
-    [resetDownstream]
+    [resetDownstream],
   );
 
   const onFormatChange = useCallback(
@@ -163,7 +140,7 @@ export default function ResumeUploadPage() {
       setFormat(next);
       resetDownstream();
     },
-    [resetDownstream]
+    [resetDownstream],
   );
 
   const onSubmit = useCallback(async () => {
@@ -171,21 +148,40 @@ export default function ResumeUploadPage() {
     setParseError('');
     setIsParsing(true);
     try {
-      const source = toResumeSource(format);
-      if (source !== 'text' && source !== 'md') {
-        // PDF / Word 解析器尚未集成（A3/A4 子任务待落地），先给用户友好提示。
-        throw new Error(
-          `${FORMAT_LABELS[format]} 解析器尚未接入（等待 A3/A4 子任务落地），请先用 Markdown 或纯文本格式测试。`
-        );
+      if (format === 'pdf' || format === 'word') {
+        const file = fileInputRef.current?.files?.[0];
+        if (!file) throw new Error(`请先选择 ${FORMAT_LABELS[format]} 文件后再开始优化`);
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('source', format);
+        const r = await fetch('/api/resume/parse', { method: 'POST', body: fd });
+        const json = (await r.json()) as {
+          ok: boolean; doc?: ResumeDocument; error?: string; message?: string;
+        };
+        if (!json.ok) {
+          const friendly: Record<string, string> = {
+            missing_file: '文件未上传，请重新选择。',
+            missing_source: '请求参数缺失，请刷新页面重试。',
+            invalid_source: '仅支持 PDF / DOCX 格式。',
+            invalid_mime: '仅支持 PDF / DOCX 文件，请重新选择。',
+            file_too_large: '文件过大（>10MB），请压缩或拆分为单页。',
+          };
+          if (json.error === 'parse_failed') {
+            throw new Error(`${format === 'pdf' ? 'PDF' : 'Word'} 解析失败：${json.message ?? '未知错误'}。请用 Markdown/文本重试。`);
+          }
+          throw new Error(friendly[json.error ?? ''] ?? '上传解析失败，请重试。');
+        }
+        if (!json.doc) throw new Error('服务器未返回解析结果');
+        setParsedResume(json.doc);
+        saveResume(json.doc);
+        clearFileInput();
+        return;
       }
-      if (!pastedText.trim()) {
-        throw new Error('请粘贴简历文本后再开始优化');
-      }
-      const doc = await parseResume(pastedText, source);
+      if (!pastedText.trim()) throw new Error('请粘贴简历文本后再开始优化');
+      const source: ResumeSource = format === 'markdown' ? 'md' : format;
+      const doc = await parseClientSide(pastedText, source);
       setParsedResume(doc);
-      // G1: persist locally so refresh / re-open keeps the parsed doc.
       saveResume(doc);
-      // G2: release the original File reference + clear the input.
       clearFileInput();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -197,49 +193,59 @@ export default function ResumeUploadPage() {
   }, [clearFileInput, format, pastedText]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="h-14 flex items-center justify-between px-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      {/* Nav */}
+      <header className="h-[52px] flex items-center justify-between px-5 border-b border-border shrink-0">
+        <div className="flex items-center gap-2.5">
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground">
             <Link href="/">
-              <ArrowLeft className="w-4 h-4 mr-1" />
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
               返回
             </Link>
           </Button>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight">简历优化</h1>
-            <p className="text-[10px] text-muted-foreground">上传简历，开启 STAR 重写</p>
-          </div>
+          <h1 className="text-sm font-semibold">简历优化</h1>
         </div>
+        <span className="text-[10px] font-medium px-2 py-1 rounded-md bg-primary-container text-accent-foreground">
+          AI Powered
+        </span>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>1. 拖放文件</CardTitle>
-            <CardDescription>支持 PDF / Word / Markdown / 纯文本</CardDescription>
-          </CardHeader>
-          <CardContent>
+      {/* Workspace */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Input */}
+        <aside className="w-[380px] shrink-0 bg-muted/50 border-r border-border overflow-y-auto">
+          <div className="p-5 flex flex-col gap-4">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              上传简历
+            </p>
+
+            {/* Drop zone */}
             <div
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
-              className={`flex flex-col items-center justify-center gap-3 px-6 py-10 rounded-lg border-2 border-dashed transition-colors ${
+              className={`flex flex-col items-center justify-center gap-2 px-4 py-6 rounded-xl border-[1.5px] border-dashed transition-all cursor-pointer ${
                 isDragging
                   ? 'border-primary bg-primary/5'
-                  : 'border-border bg-muted/30'
+                  : 'border-border bg-background hover:border-primary/40'
               }`}
             >
-              <UploadCloud className="w-8 h-8 text-muted-foreground" />
-              <p className="text-sm text-foreground">拖放简历文件到此处</p>
+              <div className="w-9 h-9 rounded-lg bg-primary-container flex items-center justify-center">
+                <UploadCloud className="w-[18px] h-[18px] text-primary" />
+              </div>
+              <p className="text-[13px] font-medium text-foreground">拖放或点击上传</p>
+              <p className="text-[11px] text-muted-foreground">PDF / Word / Markdown / 纯文本</p>
               {fileName && (
-                <p className="text-xs text-muted-foreground">已选择：{fileName}</p>
+                <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-md bg-primary-container text-[11px] text-accent-foreground">
+                  <FileText className="w-3 h-3" />
+                  {fileName}
+                </span>
               )}
               <Label
                 htmlFor="resume-file-input"
-                className="cursor-pointer text-xs text-primary hover:underline"
+                className="cursor-pointer text-[11px] text-primary hover:underline mt-1"
               >
-                或点击选择文件
+                选择文件
               </Label>
               <Input
                 id="resume-file-input"
@@ -250,112 +256,129 @@ export default function ResumeUploadPage() {
                 className="hidden"
               />
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>2. 直接粘贴文本</CardTitle>
-            <CardDescription>没有文件？把简历内容直接粘贴到这里</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              rows={10}
-              value={pastedText}
-              onChange={(e) => onTextChange(e.target.value)}
-              placeholder="把简历内容粘贴到此处…"
-            />
-          </CardContent>
-        </Card>
+            {/* Textarea */}
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                或直接粘贴
+              </p>
+              <Textarea
+                rows={5}
+                value={pastedText}
+                onChange={(e) => onTextChange(e.target.value)}
+                placeholder="把简历内容粘贴到此处…"
+                className="resize-y min-h-[80px] rounded-lg text-[13px]"
+              />
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>3. 简历格式</CardTitle>
-            <CardDescription>选错格式也不会让解析失败，下游会自动归一化</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup
-              value={format}
-              onValueChange={(v) => onFormatChange(v as ResumeFormat)}
-              className="grid grid-cols-2 gap-3"
-            >
-              {FORMAT_VALUES.map((f) => (
-                <div key={f} className="flex items-center gap-2">
-                  <RadioGroupItem value={f} id={`fmt-${f}`} />
-                  <Label htmlFor={`fmt-${f}`}>{FORMAT_LABELS[f]}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </CardContent>
-        </Card>
+            {/* Segmented format control */}
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                格式
+              </p>
+              <div className="flex bg-secondary rounded-lg p-[3px] gap-0.5">
+                {FORMAT_VALUES.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => onFormatChange(f)}
+                    className={`flex-1 text-center py-1.5 text-[11px] font-medium rounded-md transition-all ${
+                      format === f
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {FORMAT_LABELS[f]}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {privacyMode && (
-          <div
-            role="status"
-            data-testid="privacy-notice"
-            className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            本地模式：所有解析均在浏览器内进行，简历内容不会上传到服务器。
-          </div>
-        )}
+            {/* Privacy */}
+            <div className="flex items-center justify-between px-3 py-2.5 bg-background rounded-lg border border-border">
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <Lock className="w-3.5 h-3.5 text-primary" />
+                本地模式
+              </div>
+              <div className="flex items-center gap-2">
+                {privacyMode && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                    本地
+                  </span>
+                )}
+                <Switch
+                  checked={privacyMode}
+                  onCheckedChange={(checked) => {
+                    setPrivacyModeState(checked);
+                    setPrivacyMode(checked);
+                  }}
+                  aria-label="本地优先模式"
+                />
+              </div>
+            </div>
 
-        <PrivacyToggle enabled={privacyMode} onChange={setPrivacyModeState} />
-
-        <div className="flex flex-col gap-3 pt-2">
-          <Button
-            onClick={() => {
-              void onSubmit();
-            }}
-            disabled={!canSubmit || isParsing}
-            className="w-full"
-            size="lg"
-          >
-            {isParsing ? (
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4 mr-1" />
+            {/* Error / notice */}
+            {parseError && (
+              <div role="status" className="text-[11px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                {parseError}
+              </div>
             )}
-            {isParsing ? '解析中…' : '开始优化'}
-          </Button>
-          {parseError && (
-            <div
-              role="status"
-              className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded"
-            >
-              {parseError}
-            </div>
-          )}
-          {notice && (
-            <div
-              role="status"
-              className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded"
-            >
-              {notice}
-            </div>
-          )}
-          {!hasInput && (
-            <p className="text-[11px] text-muted-foreground text-center">
-              请拖放文件或粘贴简历文本后再开始优化
-            </p>
-          )}
-        </div>
+            {notice && (
+              <div role="status" className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                {notice}
+              </div>
+            )}
 
-        {parsedResume && <ParsePreview resume={parsedResume} />}
-        {parsedResume && (
-          <StreamingResult
-            resume={parsedResume}
-            onComplete={(result) => {
-              setLastStarResult(result);
-            }}
-          />
-        )}
-        {parsedResume && <ExportButtons resume={parsedResume} starResult={lastStarResult} />}
-        {parsedResume && <JdInput value={jd} onChange={setJd} />}
-        {parsedResume && jd.trim().length > 0 && (
-          <MatchReportCard resume={parsedResume} jd={jd} />
-        )}
-      </main>
+            {/* CTA */}
+            <Button
+              onClick={() => { void onSubmit(); }}
+              disabled={!canSubmit || isParsing}
+              className="w-full h-11 rounded-lg text-[13px] font-semibold"
+              size="lg"
+            >
+              {isParsing ? (
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4 mr-1.5" />
+              )}
+              {isParsing ? '解析中…' : '开始优化'}
+            </Button>
+            {!hasInput && (
+              <p className="text-[10px] text-muted-foreground text-center -mt-2">
+                请拖放文件或粘贴简历文本后再开始优化
+              </p>
+            )}
+          </div>
+        </aside>
+
+        {/* Right Panel: Results */}
+        <main className="flex-1 overflow-y-auto bg-background">
+          {!parsedResume ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-8">
+              <div className="w-16 h-16 rounded-2xl bg-primary-container flex items-center justify-center mb-4">
+                <FileText className="w-7 h-7 text-primary" />
+              </div>
+              <h2 className="text-base font-semibold text-foreground mb-1">等待上传简历</h2>
+              <p className="text-sm text-muted-foreground max-w-[280px]">
+                在左侧面板上传或粘贴简历，解析结果将在这里展示
+              </p>
+            </div>
+          ) : (
+            <div className="p-5 space-y-5">
+              <ParsePreview resume={parsedResume} />
+              <StreamingResult
+                resume={parsedResume}
+                onComplete={(result) => { setLastStarResult(result); }}
+              />
+              <ExportButtons resume={parsedResume} starResult={lastStarResult} />
+              <JdInput value={jd} onChange={setJd} />
+              {jd.trim().length > 0 && (
+                <MatchReportCard resume={parsedResume} jd={jd} />
+              )}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
