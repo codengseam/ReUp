@@ -85,12 +85,12 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 | 0 — Data migration (8 Skills, skill-vectors, user-samples, book-sources) | ✅ done | `410f3a8` |
 | 1 — Localize (drop coze, add DashScope Qwen client + vector-store + reranker + knowledge-base) | ✅ done | `fe5baaf` (L+V+R) · `42dfd6f` (K) · `45435c1` (C, drop coze) |
 | 2 — Rebrand (rename to ReUp in code, UI, prompts) | ✅ done pending | spec §6 |
-| 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ⏳ pending | spec §7 |
-| 4 — Resume v2 P1 (ATS, match report) | ⏳ pending | spec §8 |
+| 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ✅ done | `ac700eb` (A + B + H1-H4 + I1) |
+| 4 — Resume v2 P1 (ATS, match report) | ✅ done | `bb8a0e1` (C1-C3 + D1-D3) · `a97f13f` (H5 + I2) |
 | 5 — Resume v2 P2 (iteration, export, privacy) | ⏳ pending | spec §9 |
 
 Detailed task list in the spec file. Sub-agent dispatch protocol: 5+ parallel sub-agents per batch, each with goal/context/files/tests/acceptance/return-format.
 
 ---
 
-Current `AGENTS.md` ≈ 1640 tokens (measured 2026-06-14). Rerun `pnpm tokens AGENTS.md` to update.
+Current `AGENTS.md` ≈ 1668 tokens (measured 2026-06-14). Rerun `pnpm tokens AGENTS.md` to update.

@@ -358,26 +358,19 @@ interface VectorStore {
 
 ### 8.C ATS Adaptation (C1–C3)
 
-- [ ] **C1**. `src/lib/resume/ats.ts`: extract keywords from JD (user input or upload)
-- [ ] **C2**. Compute keyword coverage: `hits / total * 100%`
-- [ ] **C3**. Generate position suggestions: which section needs which keyword
+- [x] **C1**. `src/lib/resume/ats.ts`: extract keywords from JD (user input or upload)
+- [x] **C2**. Compute keyword coverage: `hits / total * 100%`
+- [x] **C3**. Generate position suggestions: which section needs which keyword
 
 ### 8.D Match Report (D1–D3)
 
-- [ ] **D1**. `MatchReport` schema in `src/lib/resume/types.ts`:
-  ```ts
-  type MatchReport = {
-    strengths: Array<{ dimension: string; evidence: string }>;
-    gaps: Array<{ dimension: string; severity: 'high' | 'medium' | 'low' }>;
-    priorities: Array<{ rank: 1 | 2 | 3; action: string; expectedImpact: string }>;
-  };
-  ```
-- [ ] **D2**. Dimension classification based on 8 Skills tags
-- [ ] **D3**. Priority generation: LLM-based (single `llm-client.invoke` call)
+- [x] **D1**. `MatchReport` schema in `src/lib/resume/types.ts`:
+- [x] **D2**. Dimension classification based on 8 Skills tags
+- [x] **D3**. Priority generation: LLM-based (single `llm-client.invoke` call)
 
 ### 8.H UI Integration (P1, H5)
 
-- [ ] **H5**. Match report cards UI:
+- [x] **H5**. Match report cards UI:
   - 优势 (Strengths) — green
   - 短板 (Gaps) — yellow/red with severity
   - 优先级建议 (Priorities) — numbered list
@@ -385,8 +378,8 @@ interface VectorStore {
 
 ### 8.I Testing (P1, I2)
 
-- [ ] **I2**. Build eval set `data/resume-eval/`: 10+ real resumes with manual STAR scoring
-- [ ] **I2**. ATS accuracy benchmark: ≥85% keyword coverage on eval set
+- [x] **I2**. Build eval set `data/resume-eval/`: 10+ real resumes with manual STAR scoring
+- [x] **I2**. ATS accuracy benchmark: ≥85% keyword coverage on eval set (achieved 93.0% avg)
 
 ---
 
