@@ -87,7 +87,7 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 | 2 — Rebrand (rename to ReUp in code, UI, prompts) | ✅ done pending | spec §6 |
 | 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ✅ done | `ac700eb` (A + B + H1-H4 + I1) |
 | 4 — Resume v2 P1 (ATS, match report) | ✅ done | `bb8a0e1` (C1-C3 + D1-D3) · `a97f13f` (H5 + I2) |
-| 5 — Resume v2 P2 (iteration, export, privacy) | ✅ done | Phase 5 commit (E1-E3, F1-F3, G1-G3, H6, I4) |
+| 5 — Resume v2 P2 (iteration, export, privacy) | ✅ done | `634e1a8` (E1-E3, F1-F3, G1-G3, H6, I4) |
 
 Detailed task list in the spec file. Sub-agent dispatch protocol: 5+ parallel sub-agents per batch, each with goal/context/files/tests/acceptance/return-format.
 
