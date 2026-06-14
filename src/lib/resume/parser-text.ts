@@ -68,6 +68,38 @@ function classifySection(headerLine: string): SectionKind {
   return 'other';
 }
 
+/**
+ * Plain-text section header patterns (no `##` prefix required).
+ * Matches lines that are ONLY a section title, optionally with decoration
+ * like underlines, colons, or brackets. Used as fallback when the input
+ * has no markdown headers (e.g. PDF-extracted plain text).
+ */
+const PLAINTEXT_HEADER_PATTERNS: Array<{ kind: SectionKind; re: RegExp }> = [
+  { kind: 'basic', re: /^\s*(?:个人信息|基本信息|基本资料|个人简介|联系方式|basic\s*info|contact\s*(?:info)?|profile)\s*[：:]*\s*$/i },
+  { kind: 'experience', re: /^\s*(?:工作与实习经历|实习与工作经历|工作经历|工作经验|职业经历|实习经历|work\s*(?:experience|history)|employment\s*history|professional\s*experience)\s*[：:]*\s*$/i },
+  { kind: 'projects', re: /^\s*(?:项目经历|项目经验|项目介绍|项目概述|参与项目|projects?|personal\s*projects?)\s*[：:]*\s*$/i },
+  { kind: 'skills', re: /^\s*(?:专业技能|技能清单|技术栈|技术能力|掌握的技能|技能|skills?|tech(?:nical)?\s*stack|core\s*(?:competenc(?:ies|y)))\s*[：:]*\s*$/i },
+  { kind: 'education', re: /^\s*(?:教育经历|教育背景|学历|education|academic\s*(?:background)?)\s*[：:]*\s*$/i },
+];
+
+/**
+ * Check if a plain line (without `##`) looks like a section header.
+ * Returns the matched SectionKind, or null if not a header.
+ */
+function classifyPlainTextHeader(line: string): SectionKind | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 20) return null; // section headers are short
+  // Strip Chinese-number / arabic-number prefixes and 【】 brackets
+  const stripped = trimmed
+    .replace(/^[一二三四五六七八九十]+[、.]\s*/, '')
+    .replace(/^\d+(?:\.\d+)*[.、]?\s*/, '')
+    .replace(/^【(.+?)】\s*$/, '$1');
+  for (const { kind, re } of PLAINTEXT_HEADER_PATTERNS) {
+    if (re.test(stripped)) return kind;
+  }
+  return null;
+}
+
 function splitSections(input: string): Array<{ kind: SectionKind; title: string; body: string }> {
   const out: Array<{ kind: SectionKind; title: string; body: string }> = [];
   // Normalise line endings and split on `##` headers
@@ -81,17 +113,56 @@ function splitSections(input: string): Array<{ kind: SectionKind; title: string;
     }
   };
 
+  // First pass: check if there are any `##` headers at all
+  const hasMarkdownHeaders = lines.some((l) => /^\s*##\s+/.test(l));
+
+  // In plain-text mode, lines before the first detected section header are
+  // typically personal info (name, phone, email). Collect them as `basic`.
+  const preludeLines: string[] = [];
+
   for (const rawLine of lines) {
     const line = rawLine.replace(/\s+$/, '');
+
+    // Markdown header (## ...)
     if (/^\s*##\s+/.test(line)) {
       flush();
       const kind = classifySection(line);
       current = { kind, title: line.replace(/^\s*##\s+/, '').trim(), lines: [] };
       continue;
     }
-    if (current) current.lines.push(line);
+
+    // Plain-text header fallback (only when no markdown headers exist)
+    if (!hasMarkdownHeaders) {
+      const cleaned = cleanLine(line);
+      // Skip underline decoration lines (===, ---, ___)
+      if (/^[=\-_~]{3,}\s*$/.test(cleaned)) continue;
+      const plainKind = classifyPlainTextHeader(cleaned);
+      if (plainKind) {
+        // Flush prelude as `basic` if no explicit basic section yet
+        if (preludeLines.length > 0 && !out.some((s) => s.kind === 'basic')) {
+          out.push({ kind: 'basic', title: '', body: preludeLines.join('\n') });
+          preludeLines.length = 0;
+        }
+        flush();
+        current = { kind: plainKind, title: cleaned, lines: [] };
+        continue;
+      }
+    }
+
+    if (current) {
+      current.lines.push(line);
+    } else if (!hasMarkdownHeaders) {
+      preludeLines.push(line);
+    }
   }
   flush();
+
+  // If no sections were found at all, treat the entire input as a single
+  // "experience" block so bullets at least get parsed.
+  if (out.length === 0 && input.trim()) {
+    out.push({ kind: 'experience', title: '', body: input });
+  }
+
   return out;
 }
 
