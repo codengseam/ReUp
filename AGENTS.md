@@ -3,17 +3,22 @@
 > **Spec (master plan)**: [docs/superpowers/specs/2026-06-14-reup-v2-design.md](file:///Users/user/Downloads/reup/docs/superpowers/specs/2026-06-14-reup-v2-design.md) — 6 phases, 50+ tasks
 > **Exec prompt**: [docs/superpowers/specs/2026-06-14-reup-v2-exec-prompt.md](file:///Users/user/Downloads/reup/docs/superpowers/specs/2026-06-14-reup-v2-exec-prompt.md) — sub-agent dispatch protocol
 
-**Brand note**: brand rename complete (Phase 2).
-
 ## Overview
 
 Career advisor with "senior HR + CEO" perspective: promotion coaching, interview prep, resume optimization (v2). Web chat with streaming RAG answers.
 
+## Workflow: Sub-Agent Execution
+
+- 5+ parallel sub-agents per batch (user preference, **multi-step / parallelizable work only**).
+- Each task: goal / context / files / tests / acceptance / return-format.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript 5 strict + Tailwind 4 + shadcn/ui (Radix)
-- **LLM (current)**: coze-coding-dev-sdk · model `doubao-seed-2-0-pro-260215` · **target Phase 1**: DashScope OpenAI-compatible (Qwen / `gui-plus-2026-02-26`), `DASHSCOPE_API_KEY` in `.env.local`
-- **RAG**: Knowledge + Embedding SDK (vector + sparse + HyDE, hybrid)
+- **LLM**: DashScope OpenAI-compatible (Qwen / `gui-plus-2026-02-26`), `DASHSCOPE_API_KEY` in `.env.local`
+- **Embedding**: BGE-M3 local (1024-dim, pre-bundled 608 vectors in `data/skill-vectors.json`)
+- **Rerank**: BGE-reranker-v2-m3 local (lazy load)
+- **RAG**: `src/lib/rag/` (semantic + sparse + HyDE → weighted fusion → doc_id dedup, Top-K=5)
 - **Test**: Vitest 4, ≥80% coverage on new modules
 - **Package mgr**: pnpm 9 only
 
@@ -23,7 +28,7 @@ Career advisor with "senior HR + CEO" perspective: promotion coaching, interview
 src/app/                # Pages + API routes (api/chat/route.ts = SSE entry)
 src/components/ui/      # shadcn/ui library
 src/lib/rag/            # search, route, safety, cache, assess, suggestions, types, _retrieve-internal, index
-src/lib/                # intent-classifier, coze-knowledge-api (→ remove Phase 1), models, prompts/, skills-loader, admin-auth, etc.
+src/lib/                # intent-classifier, llm-client, models, prompts/, skills-loader, admin-auth, vector-store, reranker, knowledge-base, resume/, etc.
 src/lib/rag.ts          # re-export shim
 skills/                 # 8 Skills: SKILL.md + test-prompts.json each
 data/skill-vectors.json # 608 chunks, 1024-dim (BGE-M3) — pre-bundled cosine store
@@ -78,19 +83,6 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 - No dumping spec chapters or large docs into replies
 - No claiming completion before verification (`pnpm ts-check && pnpm lint && pnpm test`)
 
-## Phase Status (ReUp v2)
-
-| Phase | Status | Commit / Note |
-|---|---|---|
-| 0 — Data migration (8 Skills, skill-vectors, user-samples, book-sources) | ✅ done | `410f3a8` |
-| 1 — Localize (drop coze, add DashScope Qwen client + vector-store + reranker + knowledge-base) | ✅ done | `fe5baaf` (L+V+R) · `42dfd6f` (K) · `45435c1` (C, drop coze) |
-| 2 — Rebrand (rename to ReUp in code, UI, prompts) | ✅ done pending | spec §6 |
-| 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ✅ done | `ac700eb` (A + B + H1-H4 + I1) |
-| 4 — Resume v2 P1 (ATS, match report) | ✅ done | `bb8a0e1` (C1-C3 + D1-D3) · `a97f13f` (H5 + I2) |
-| 5 — Resume v2 P2 (iteration, export, privacy) | ✅ done | `634e1a8` (E1-E3, F1-F3, G1-G3, H6, I4) |
-
-Detailed task list in the spec file. Sub-agent dispatch protocol: 5+ parallel sub-agents per batch, each with goal/context/files/tests/acceptance/return-format.
-
 ---
 
-Current `AGENTS.md` ≈ 1690 tokens (measured 2026-06-14). Rerun `pnpm tokens AGENTS.md` to update.
+Current `AGENTS.md` ≈ 1420 tokens (measured 2026-06-14, ±1). Rerun `pnpm tokens AGENTS.md` to update.
