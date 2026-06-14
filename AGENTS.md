@@ -83,7 +83,7 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 | Phase | Status | Commit / Note |
 |---|---|---|
 | 0 — Data migration (8 Skills, skill-vectors, user-samples, book-sources) | ✅ done | `410f3a8` |
-| 1 — Localize (drop coze, add DashScope Qwen client + vector-store + reranker + knowledge-base) | ⏳ pending | spec §5 |
+| 1 — Localize (drop coze, add DashScope Qwen client + vector-store + reranker + knowledge-base) | ✅ done | `fe5baaf` (L+V+R) · `42dfd6f` (K) · `45435c1` (C, drop coze) |
 | 2 — Rebrand (BOSS → ReUp in code, UI, prompts) | ⏳ pending | spec §6 |
 | 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ⏳ pending | spec §7 |
 | 4 — Resume v2 P1 (ATS, match report) | ⏳ pending | spec §8 |
