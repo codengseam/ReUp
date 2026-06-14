@@ -139,3 +139,30 @@ describe('parseTextResume', () => {
     expect(doc).toBeDefined();
   });
 });
+
+describe('plain-text header dictionary', () => {
+  it('classifies "工作与实习经历" as experience', () => {
+    const doc = parseTextResume('工作与实习经历\n字节跳动 2022 - 至今\n做了一些事。');
+    expect(doc.experience.length).toBeGreaterThan(0);
+  });
+  it('classifies "实习与工作经历" as experience', () => {
+    const doc = parseTextResume('实习与工作经历\n字节跳动 2022 - 至今\n做了一些事。');
+    expect(doc.experience.length).toBeGreaterThan(0);
+  });
+  it('classifies "实习经历" as experience', () => {
+    const doc = parseTextResume('实习经历\n字节跳动 2022 - 至今\n做了一些事。');
+    expect(doc.experience.length).toBeGreaterThan(0);
+  });
+  it('classifies "职业经历" as experience', () => {
+    const doc = parseTextResume('职业经历\n字节跳动 2022 - 至今\n做了一些事。');
+    expect(doc.experience.length).toBeGreaterThan(0);
+  });
+  it('strips "一、" prefix before matching', () => {
+    const doc = parseTextResume('一、教育经历\n石河子大学 2016 - 2020\n软件工程');
+    expect(doc.education.length).toBe(1);
+  });
+  it('strips 【】 brackets before matching', () => {
+    const doc = parseTextResume('【专业技能】\n熟悉 Java；\n熟悉 Python；');
+    expect(doc.skills.length).toBeGreaterThan(0);
+  });
+});
