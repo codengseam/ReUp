@@ -27,8 +27,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-// pdfkit ships no .d.ts and there is no @types/pdfkit on npm.
-// @ts-expect-error -- untyped module on purpose
+// pdfkit ships no .d.ts upstream, but our local `pdfkit.d.ts` provides
+// minimal ambient types. No `@ts-expect-error` is needed.
 import PDFDocumentImport from 'pdfkit';
 import * as parserText from './parser-text';
 import { parsePdfResume } from './parser-pdf';
