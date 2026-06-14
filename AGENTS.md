@@ -12,6 +12,11 @@ Career advisor with "senior HR + CEO" perspective: promotion coaching, interview
 - 5+ parallel sub-agents per batch (user preference, **multi-step / parallelizable work only**).
 - Each task: goal / context / files / tests / acceptance / return-format.
 
+## Personal Efficiency Rules
+
+- See `docs/rules/efficiency.md` for the user's personal AI workflow rules
+  (MUST DO 12 / MUST NOT 7 / SUGGESTED 9). Project-wide, applies to every agent.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript 5 strict + Tailwind 4 + shadcn/ui (Radix)
