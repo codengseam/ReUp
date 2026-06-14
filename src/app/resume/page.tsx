@@ -17,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { parseResume } from '@/lib/resume/parser';
 import type { ResumeDocument, ResumeSource } from '@/lib/resume/types';
+import { JdInput } from './_components/JdInput';
+import { MatchReportCard } from './_components/MatchReportCard';
 import { ParsePreview } from './_components/ParsePreview';
 import { StreamingResult } from './_components/StreamingResult';
 
@@ -57,6 +59,7 @@ export default function ResumeUploadPage() {
   const [isParsing, setIsParsing] = useState<boolean>(false);
   const [parseError, setParseError] = useState<string>('');
   const [parsedResume, setParsedResume] = useState<ResumeDocument | null>(null);
+  const [jd, setJd] = useState<string>('');
 
   const hasInput = fileName.trim().length > 0 || pastedText.trim().length > 0;
   const canSubmit = hasInput;
@@ -292,6 +295,10 @@ export default function ResumeUploadPage() {
 
         {parsedResume && <ParsePreview resume={parsedResume} />}
         {parsedResume && <StreamingResult resume={parsedResume} />}
+        {parsedResume && <JdInput value={jd} onChange={setJd} />}
+        {parsedResume && jd.trim().length > 0 && (
+          <MatchReportCard resume={parsedResume} jd={jd} />
+        )}
       </main>
     </div>
   );
