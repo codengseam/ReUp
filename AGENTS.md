@@ -1,9 +1,9 @@
-# ReUp (formerly BOSS Agent) — Career Promotion & Resume Advisor
+# ReUp — Career Promotion & Resume Advisor
 
 > **Spec (master plan)**: [docs/superpowers/specs/2026-06-14-reup-v2-design.md](file:///Users/user/Downloads/reup/docs/superpowers/specs/2026-06-14-reup-v2-design.md) — 6 phases, 50+ tasks
 > **Exec prompt**: [docs/superpowers/specs/2026-06-14-reup-v2-exec-prompt.md](file:///Users/user/Downloads/reup/docs/superpowers/specs/2026-06-14-reup-v2-exec-prompt.md) — sub-agent dispatch protocol
 
-**Brand note**: code is still "BOSS Agent" today; rename happens in Phase 2.
+**Brand note**: brand rename complete (Phase 2).
 
 ## Overview
 
@@ -84,7 +84,7 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 |---|---|---|
 | 0 — Data migration (8 Skills, skill-vectors, user-samples, book-sources) | ✅ done | `410f3a8` |
 | 1 — Localize (drop coze, add DashScope Qwen client + vector-store + reranker + knowledge-base) | ✅ done | `fe5baaf` (L+V+R) · `42dfd6f` (K) · `45435c1` (C, drop coze) |
-| 2 — Rebrand (BOSS → ReUp in code, UI, prompts) | ⏳ pending | spec §6 |
+| 2 — Rebrand (rename to ReUp in code, UI, prompts) | ✅ done pending | spec §6 |
 | 3 — Resume v2 P0 (parser, STAR rewriter, upload UI) | ⏳ pending | spec §7 |
 | 4 — Resume v2 P1 (ATS, match report) | ⏳ pending | spec §8 |
 | 5 — Resume v2 P2 (iteration, export, privacy) | ⏳ pending | spec §9 |
@@ -93,4 +93,4 @@ Detailed task list in the spec file. Sub-agent dispatch protocol: 5+ parallel su
 
 ---
 
-Current `AGENTS.md` ≈ 1604 tokens (measured 2026-06-14). Rerun `pnpm tokens AGENTS.md` to update.
+Current `AGENTS.md` ≈ 1640 tokens (measured 2026-06-14). Rerun `pnpm tokens AGENTS.md` to update.

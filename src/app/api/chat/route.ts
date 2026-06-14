@@ -61,7 +61,7 @@ function normalizeEndpoint(url: string): string {
 
 // ===== 动态 System Prompt 构建 =====
 // 基础 Prompt（不含 Skill 定义，Skill 根据 RAG 结果动态注入）
-const BASE_SYSTEM_PROMPT = `你是 BOSS Agent，一个以资深 HR + 总裁视角提供职场建议的智能顾问。
+const BASE_SYSTEM_PROMPT = `你是 ReUp，一个以资深 HR + 总裁视角提供职场建议的智能顾问。
 
 ## 你的身份
 - 角色：资深 HR + 总裁视角的职场顾问
