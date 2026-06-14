@@ -93,7 +93,8 @@ logs/
 # Local-only / IDE / build artifacts not part of the source tree.
 .env.local
 .env.*.local
-.trae/
+.trae/*
+!.trae/skills
 .cozeproj/
 admin-stats.json
 feedback.json
