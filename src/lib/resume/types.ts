@@ -48,6 +48,36 @@ export interface ResumeDocument {
 
 export const RESUME_SCHEMA_VERSION = 'reup.v2.phase3';
 
+// ---------------------------------------------------------------------------
+// Phase 4 P1 (C1-C3, D1-D3): ATS adaptation + Match Report shapes.
+// ---------------------------------------------------------------------------
+
+/** Section hints for where a missing JD keyword should be inserted. */
+export type ResumeSection = 'basic' | 'experience' | 'projects' | 'skills';
+
+/** Output of the ATS adaptation pipeline. */
+export type ATSResult = {
+  /** Top-K keywords/phrases extracted from the JD, sorted by weight desc. */
+  jdKeywords: Array<{ term: string; weight: number }>;
+  coverage: {
+    /** Sum of weights of keywords that were found in the resume. */
+    hits: number;
+    /** Sum of all keyword weights. */
+    total: number;
+    /** hits / total * 100, rounded to 1 decimal. */
+    percentage: number;
+  };
+  /** JD keywords that did NOT hit, with a suggested section to add them to. */
+  missing: Array<{ term: string; suggestedSection: ResumeSection }>;
+};
+
+/** Output of the Match Report pipeline. */
+export type MatchReport = {
+  strengths: Array<{ dimension: string; evidence: string }>;
+  gaps: Array<{ dimension: string; severity: 'high' | 'medium' | 'low' }>;
+  priorities: Array<{ rank: 1 | 2 | 3; action: string; expectedImpact: string }>;
+};
+
 /**
  * Build a meta block. Centralised so the dispatcher and any future
  * parser can stamp the same shape without drift.
