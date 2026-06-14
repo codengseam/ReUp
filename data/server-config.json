@@ -1,0 +1,14 @@
+{
+  "updatedAt": "2026-06-14T15:37:07.379Z",
+  "defaultModelId": "gui-plus-2026-02-26",
+  "customModels": [],
+  "ragParams": {
+    "topK": 7,
+    "minScore": 0.5,
+    "maxChars": 4000,
+    "semanticWeight": 0.8,
+    "hydeEnabled": true,
+    "rerankEnabled": false,
+    "cacheTTL": 15
+  }
+}
