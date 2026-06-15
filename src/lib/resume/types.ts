@@ -35,6 +35,12 @@ export interface ResumeEducation {
   school: string;
   degree: string;
   period: string;
+  /**
+   * Free-form notes attached to the entry: e.g. "相关课程：数据库原理…",
+   * "专业成绩前 5%". Captured as raw bullet lines under the school/degree/period
+   * header so the UI can surface them without losing information.
+   */
+  notes?: string[];
 }
 
 export interface ResumeDocument {

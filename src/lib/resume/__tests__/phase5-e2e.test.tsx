@@ -203,7 +203,7 @@ describe('resume optimization chain (phase 5 I4)', () => {
     vi.setConfig({ testTimeout: 15000 });
     process.env.DASHSCOPE_API_KEY = 'test-key';
     process.env.DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    process.env.DASHSCOPE_CHAT_MODEL = 'gui-plus-2026-02-26';
+    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
     delete process.env.NEXT_PUBLIC_PRIVACY_MODE;
 
     fetchMock = createFetchMock([]);
@@ -232,6 +232,8 @@ describe('resume optimization chain (phase 5 I4)', () => {
   });
 
   it('full chain: paste -> submit -> 4 sections stream -> copy -> E1 rewrite -> E2 diff -> E3 feedback -> F1-F3 privacy', async () => {
+    // Long-running integration test: generous timeout for mocked LLM streams
+    // and multiple UI interactions.
     render(<ResumeUploadPage />);
     // ----- 1. Paste resume text -----
     const textarea = screen.getByPlaceholderText(/把简历内容粘贴到此处/i) as HTMLTextAreaElement;
@@ -246,7 +248,7 @@ describe('resume optimization chain (phase 5 I4)', () => {
     // ----- 3. Wait for 4/4 sections complete (after pass 1) -----
     await waitFor(
       () => {
-        expect(screen.getByText(/4 \/ 4 sections complete/)).toBeInTheDocument();
+        expect(screen.getByText(/4 \/ 4/)).toBeInTheDocument();
       },
       { timeout: 10000 }
     );
@@ -257,7 +259,7 @@ describe('resume optimization chain (phase 5 I4)', () => {
     }
 
     // ----- 5. Confidence badge appears (waits for pass 2) -----
-    expect(await screen.findByText(/confidence \d+\.\d{2}/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText(/置信度 \d+\.\d{2}/, {}, { timeout: 5000 })).toBeInTheDocument();
 
     // ----- 6. Copy the "我的分析" section to clipboard -----
     const analysisHeading = screen.getByText('【我的分析】');
@@ -329,7 +331,7 @@ describe('resume optimization chain (phase 5 I4)', () => {
     expect(rewriteCall[0]).toMatch(/\/api\/resume\/rewrite/);
     const rewriteBody = JSON.parse(rewriteCall[1].body as string);
     expect(rewriteBody.resume).toBeDefined();
-  });
+  }, 15_000);
 
   it('disables the submit button when input is empty', () => {
     render(<ResumeUploadPage />);

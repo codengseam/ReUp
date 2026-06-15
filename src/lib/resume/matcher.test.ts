@@ -171,8 +171,8 @@ describe('generatePriorities', () => {
     expect(out[0]!.rank).toBe(1);
     expect(out[1]!.rank).toBe(2);
     expect(out[2]!.rank).toBe(3);
-    // Static default text contains "metrics"
-    expect(out[0]!.action.toLowerCase()).toMatch(/metric|quantif/);
+    // Static default text contains "量化" (quantified) — same concept, Chinese.
+    expect(out[0]!.action).toMatch(/量化/);
   });
 
   it('returns the static default when LLM returns invalid JSON', async () => {
@@ -186,7 +186,7 @@ describe('generatePriorities', () => {
     );
     expect(out).toHaveLength(3);
     expect(out[0]!.rank).toBe(1);
-    expect(out[0]!.action.toLowerCase()).toMatch(/metric|quantif/);
+    expect(out[0]!.action).toMatch(/量化/);
   });
 
   it('uses the parsed LLM result when LLM returns valid JSON', async () => {

@@ -1,6 +1,6 @@
 # Checklist — 2026-06-15 Coze Removal & LLM Model Migration
 
-> **Status**: in progress
+> **Status**: completed
 > **Branch**: `local-deploy`
 > **Goal**: 彻底移除 coze / 豆包系列模型；默认 Qwen 3.6 Plus（含自动 fallback 到 Qwen 3.6 Plus 不带后缀版本）+ 智谱 GLM-4.7-Flash；API 密钥通过 `data/.runtime-config.json` 安全存储，env-var 兜底，管理后台可替换；密钥永不出现在代码、log、API 响应中。
 

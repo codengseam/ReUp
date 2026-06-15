@@ -190,8 +190,11 @@ describe('env-var vs runtime-config key resolution', () => {
 // =====================================================================
 
 describe('BUILTIN_MODEL_REGISTRY', () => {
-  it('contains exactly 3 entries: qwen primary, qwen fallback, glm', () => {
+  it('contains expected entries: qwen primary, qwen fallback, glm family', () => {
     expect(Object.keys(BUILTIN_MODEL_REGISTRY).sort()).toEqual([
+      'GLM-4-Flash',
+      'GLM-4-Flash-250414',
+      'GLM-4.5-Flash',
       'GLM-4.7-Flash',
       'qwen3.6-plus',
       'qwen3.6-plus-2026-04-02',
@@ -238,10 +241,11 @@ describe('getModelCandidates', () => {
     expect(cands[0].model).toBe('qwen3.6-plus');
   });
 
-  it('returns [primary] for GLM-4.7-Flash with zhipu endpoint', async () => {
+  it('returns primary + fallbacks for GLM-4.7-Flash with zhipu endpoint', async () => {
     process.env.ZHIPU_API_KEY = 'zhipu-key';
     const cands = await getModelCandidates('GLM-4.7-Flash');
-    expect(cands).toHaveLength(1);
+    // GLM-4.7-Flash fallbackChain = ['GLM-4.5-Flash', 'GLM-4-Flash-250414', 'GLM-4-Flash']
+    expect(cands).toHaveLength(4);
     expect(cands[0].model).toBe('GLM-4.7-Flash');
     expect(cands[0].baseUrl).toBe(DEFAULT_ZHIPU_BASE_URL);
     expect(cands[0].apiKey).toBe('zhipu-key');

@@ -21,6 +21,11 @@ export interface MatchReportCardProps {
   jd: string;
   atsResult?: ATSResult;
   matchReport?: MatchReport;
+  /**
+   * Error message from the match-report API. Rendered as a red banner at
+   * the top of the report. The banner takes priority over strengths/gaps.
+   */
+  error?: string;
 }
 
 const FALLBACK_ATS: ATSResult = {
@@ -29,7 +34,7 @@ const FALLBACK_ATS: ATSResult = {
   missing: [],
 };
 
-export function MatchReportCard({ resume, jd, atsResult, matchReport }: MatchReportCardProps) {
+export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: MatchReportCardProps) {
   const [computedAts, setComputedAts] = useState<ATSResult | null>(atsResult ?? null);
   useEffect(() => {
     if (atsResult) {
@@ -71,10 +76,59 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport }: MatchRep
 
   const ats = computedAts ?? FALLBACK_ATS;
 
+  // C2: when the parent didn't pass a `matchReport` prop (the typical path),
+  // fetch the LLM-driven report from /api/resume/match-report. The report
+  // is built from the FULL structured resume + JD, so the LLM can actually
+  // ground its analysis in resume facts. Parse / invoke failures surface
+  // via the `error` banner; the local heuristic is used as a fallback only
+  // when the API is unavailable or returns an empty body.
+  const [remoteReport, setRemoteReport] = useState<MatchReport | null>(null);
+  const [reportError, setReportError] = useState<string | null>(error ?? null);
+  useEffect(() => {
+    if (error) {
+      setReportError(error);
+      return;
+    }
+    if (matchReport) {
+      setRemoteReport(matchReport);
+      setReportError(null);
+      return;
+    }
+    if (!jd || jd.trim().length === 0) return;
+    let cancelled = false;
+    setReportError(null);
+    void (async () => {
+      try {
+        const res = await fetch('/api/resume/match-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume, jd }),
+        });
+        const json = (await res.json()) as MatchReport & { error?: string; message?: string };
+        if (cancelled) return;
+        if (!res.ok) {
+          setReportError(json.error ?? json.message ?? `HTTP ${res.status}`);
+          return;
+        }
+        setRemoteReport({
+          strengths: json.strengths ?? [],
+          gaps: json.gaps ?? [],
+          priorities: json.priorities ?? DEFAULT_PRIORITIES.map((p) => ({ ...p })),
+        });
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : 'Network error';
+        setReportError(message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resume, jd, matchReport, error]);
+
   const report = useMemo<MatchReport>(() => {
     if (matchReport) return matchReport;
+    if (remoteReport) return remoteReport;
     return buildReportSync(resume);
-  }, [resume, matchReport]);
+  }, [resume, matchReport, remoteReport]);
 
   const tone = coverageTone(ats.coverage.percentage);
   const toneTrackClass = TONE_TRACK_CLASS[tone];
@@ -83,6 +137,24 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport }: MatchRep
 
   return (
     <div className="pt-4 border-t border-border/50">
+      {reportError && (
+        <div
+          role="alert"
+          data-testid="match-report-error"
+          className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-900"
+        >
+          <XCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold">匹配报告生成失败</p>
+            <p className="text-[10px] text-red-700 mt-0.5 leading-relaxed break-all">
+              {reportError}
+            </p>
+            <p className="text-[10px] text-red-600/80 mt-1">
+              请检查简历与 JD 内容后重试，或联系管理员查看后台提示词配置。
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
