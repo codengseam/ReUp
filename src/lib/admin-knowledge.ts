@@ -14,7 +14,7 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { tokenize, type VectorStore } from './vector-store';
-import { getAllSkills } from './skills-loader';
+import { getAllSkills, loadSkillsSync } from './skills-loader';
 
 const PREVIEW_MAX = 200;
 const DATA_DIR = 'data';
@@ -386,6 +386,8 @@ async function tryReadSkillMarkdown(
  * SKILL.md 通过 fs 同步读取（admin 后台走 server runtime）。
  */
 export async function getFrameworkSkills(): Promise<FrameworkSkill[]> {
+  // 确保 skills 缓存被初始化（getAllSkills 不会触发初始化，需要先调 loadSkillsSync）
+  loadSkillsSync();
   const skills = getAllSkills();
   const out: FrameworkSkill[] = [];
   for (const s of skills) {
