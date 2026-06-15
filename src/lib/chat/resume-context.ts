@@ -22,6 +22,9 @@ export function buildResumeContext(resume: ResumeDocument | null): string {
     parts.push(`最近经历: ${latest.company} - ${latest.role} (${latest.period})`);
   }
 
+  // Return empty when resume has no actual content beyond the header.
+  if (parts.length <= 1) return '';
+
   return parts.join('\n');
 }
 

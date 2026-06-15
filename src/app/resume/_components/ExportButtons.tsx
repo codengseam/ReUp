@@ -138,9 +138,7 @@ export function ExportButtons({ resume, starResult }: ExportButtonsProps) {
         document.body.removeChild(ta);
       }
       setCopied(true);
-      setTimeout(() => {
-        setCopied((cur) => (cur ? false : cur));
-      }, 1500);
+      setTimeout(() => setCopied(false), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -158,7 +156,12 @@ export function ExportButtons({ resume, starResult }: ExportButtonsProps) {
           body: JSON.stringify({ format, resume, starResult }),
         });
         if (!res.ok) {
-          throw new Error(`Export failed: ${res.status}`);
+          let detail = `Export failed: ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body?.error) detail = body.error;
+          } catch { /* ignore parse errors */ }
+          throw new Error(detail);
         }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
