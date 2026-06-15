@@ -1,583 +1,412 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText, RefreshCw, Plus, Database, Check, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Database, RefreshCw, Search, BookOpen, FolderTree, Sparkles,
+  Loader2, FileText, ChevronDown, ChevronRight,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-interface DocItem {
-  id: string;
-  name: string;
-  status: 'pending' | 'processing' | 'success' | 'failed';
-  category?: string;
-  tags?: string[];
-  skillName?: string;
-  uploadTime?: string;
+const KNOWLEDGE_API = '/api/admin/knowledge';
+
+interface KnowledgeStats {
+  total: number;
+  dimension: number;
+  byBook: Array<{ name: string; count: number }>;
+  byCategory: Array<{ name: string; count: number }>;
+  bySkill: Array<{ name: string; count: number }>;
 }
 
-interface KnowledgeBaseItem {
+interface ChunkHit {
   id: string;
-  name: string;
-  description: string;
+  preview: string;
+  book: string;
+  category: string;
+  skillName: string;
+  sourcePath: string;
+  docTitle: string;
+  sectionTitle: string;
+  chunkIndex: number;
 }
+
+type GroupTab = 'book' | 'category' | 'skill';
+
+const GROUP_TABS: Array<{ key: GroupTab; label: string; icon: React.ElementType }> = [
+  { key: 'book', label: '按书', icon: BookOpen },
+  { key: 'category', label: '按分类', icon: FolderTree },
+  { key: 'skill', label: '按 Skill', icon: Sparkles },
+];
 
 export default function KnowledgeTab() {
-  const [baseId, setBaseId] = useState('');
-  const [baseName, setBaseName] = useState('');
-  const [docs, setDocs] = useState<DocItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const [stats, setStats] = useState<KnowledgeStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [reloading, setReloading] = useState(false);
+  const [reloadedAt, setReloadedAt] = useState<string | null>(null);
 
-  // 知识库自动发现
-  const [kbList, setKbList] = useState<KnowledgeBaseItem[]>([]);
-  const [kbLoading, setKbLoading] = useState(false);
-  const [showCreateKb, setShowCreateKb] = useState(false);
-  const [newKbName, setNewKbName] = useState('');
-  const [newKbDesc, setNewKbDesc] = useState('');
-  const [creatingKb, setCreatingKb] = useState(false);
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [hits, setHits] = useState<ChunkHit[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const [tags, setTags] = useState('');
-  const [category, setCategory] = useState<'promotion' | 'interview' | 'general'>('general');
-  const [skillName, setSkillName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<GroupTab>('skill');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [groupChunks, setGroupChunks] = useState<ChunkHit[]>([]);
+  const [loadingGroup, setLoadingGroup] = useState(false);
 
-  // 初始化：从服务端加载知识库 ID
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/admin/config?key=knowledge');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.knowledgeBaseId) {
-            setBaseId(data.knowledgeBaseId);
-            setBaseName(data.knowledgeBaseName || '');
-          }
-        }
-      } catch { /* ignore */ }
-    })();
-  }, []);
-
-  // 获取知识库列表
-  const fetchKbList = useCallback(async () => {
-    setKbLoading(true);
+  // 加载 stats
+  const fetchStats = useCallback(async (withToast = false) => {
+    setLoadingStats(true);
     try {
-      const res = await fetch('/api/admin/config?action=list-kb', { method: 'POST' });
+      const res = await fetch(`${KNOWLEDGE_API}?action=stats`);
       const data = await res.json();
-      if (res.ok) {
-        setKbList(data.knowledgeBases || []);
-      } else {
-        toast.error(data.error || '获取知识库列表失败');
-      }
-    } catch {
-      toast.error('获取知识库列表失败');
+      if (!res.ok) throw new Error(data.error || '获取知识库统计失败');
+      setStats(data);
+      if (withToast) toast.success('vectors.json 已重新加载');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '获取知识库统计失败');
     } finally {
-      setKbLoading(false);
+      setLoadingStats(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchKbList();
-  }, [fetchKbList]);
+    fetchStats();
+  }, [fetchStats]);
 
-  // 创建知识库
-  const handleCreateKb = async () => {
-    if (!newKbName.trim()) return;
-    setCreatingKb(true);
+  // 重新加载 vectors.json
+  const handleReload = async () => {
+    setReloading(true);
     try {
-      const res = await fetch('/api/admin/config?action=create-kb', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newKbName.trim(), description: newKbDesc.trim() }),
-      });
+      const res = await fetch(`${KNOWLEDGE_API}?action=reload`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '创建失败');
-
-      setBaseId(data.knowledgeBase.id);
-      setBaseName(data.knowledgeBase.name);
-      setNewKbName('');
-      setNewKbDesc('');
-      setShowCreateKb(false);
-      toast.success(`知识库 "${data.knowledgeBase.name}" 创建成功`);
-      await fetchKbList();
+      if (!res.ok) throw new Error(data.error || '重新加载失败');
+      setReloadedAt(data.reloadedAt);
+      await fetchStats();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '创建失败');
+      toast.error(err instanceof Error ? err.message : '重新加载失败');
     } finally {
-      setCreatingKb(false);
+      setReloading(false);
     }
   };
 
-  // 选择已有知识库
-  const handleSelectKb = async (id: string) => {
-    const kb = kbList.find(k => k.id === id);
-    setBaseId(id);
-    setBaseName(kb?.name || '');
-    // 持久化到服务端
-    try {
-      await fetch('/api/admin/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'knowledge',
-          value: { knowledgeBaseId: id, knowledgeBaseName: kb?.name || '' },
-        }),
-      });
-    } catch { /* ignore */ }
-  };
-
-  const fetchDocs = useCallback(async () => {
-    if (!baseId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(
-        `/api/documents/list?baseId=${encodeURIComponent(baseId)}`
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '获取文档列表失败');
-
-      let localMeta: Record<string, { uploadTime?: string }> = {};
-      try {
-        const raw = localStorage.getItem('boss_doc_local_meta');
-        if (raw) localMeta = JSON.parse(raw);
-      } catch { /* ignore */ }
-
-      const merged: DocItem[] = (data.documents || []).map((d: { id: string; name: string; status?: string; metadata?: { category?: string; tags?: string[]; skillName?: string } }) => ({
-        id: d.id,
-        name: d.name,
-        status: d.status || 'processing',
-        category: d.metadata?.category,
-        tags: d.metadata?.tags,
-        skillName: d.metadata?.skillName,
-        uploadTime: localMeta[d.id]?.uploadTime,
-      }));
-      setDocs(merged);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '获取文档列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [baseId]);
-
-  useEffect(() => {
-    fetchDocs();
-  }, [fetchDocs]);
-
-  const handleFileSelect = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !baseId) return;
-    const file = files[0];
-    const allowed = ['.md', '.pdf', '.txt', '.docx'];
-    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-    if (!allowed.includes(ext)) {
-      toast.error('仅支持 .md, .pdf, .txt, .docx 文件');
+  // 搜索
+  const handleSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const q = query.trim();
+    if (!q) {
+      setHits([]);
+      setHasSearched(false);
       return;
     }
-
-    setUploading(true);
-    setError('');
+    setSearching(true);
+    setHasSearched(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('baseId', baseId);
-      formData.append(
-        'metadata',
-        JSON.stringify({
-          tags: tags
-            .split(/[,，]/)
-            .map((t) => t.trim())
-            .filter(Boolean),
-          category,
-          skillName: skillName || undefined,
-        })
+      const res = await fetch(
+        `${KNOWLEDGE_API}?action=search&q=${encodeURIComponent(q)}&limit=20`
       );
-
-      const res = await fetch('/api/documents/upload', {
-        method: 'POST',
-        body: formData,
-      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '上传失败');
-
-      try {
-        const raw = localStorage.getItem('boss_doc_local_meta');
-        const localMeta = raw ? JSON.parse(raw) : {};
-        localMeta[data.docId] = {
-          uploadTime: new Date().toLocaleString('zh-CN'),
-        };
-        localStorage.setItem('boss_doc_local_meta', JSON.stringify(localMeta));
-      } catch { /* ignore */ }
-
-      toast.success('上传成功，文档将自动向量化');
-      await fetchDocs();
+      if (!res.ok) throw new Error(data.error || '搜索失败');
+      setHits(data.results ?? []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '上传失败';
-      setError(msg);
-      toast.error(msg);
+      toast.error(err instanceof Error ? err.message : '搜索失败');
+      setHits([]);
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSearching(false);
     }
   };
 
-  const handleDelete = async (docId: string) => {
-    if (!confirm('确定要删除这个文档吗？')) return;
-    if (!baseId) return;
-    try {
-      const res = await fetch('/api/documents/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseId, docId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '删除失败');
-      toast.success('删除成功');
-      await fetchDocs();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '删除失败';
-      setError(msg);
-      toast.error(msg);
-    }
-  };
+  // 展开某分组：搜索该 group name 作为 query
+  const handleToggleGroup = useCallback(
+    async (key: string) => {
+      if (expandedKey === key) {
+        setExpandedKey(null);
+        setGroupChunks([]);
+        return;
+      }
+      setExpandedKey(key);
+      setLoadingGroup(true);
+      setGroupChunks([]);
+      try {
+        const res = await fetch(
+          `${KNOWLEDGE_API}?action=search&q=${encodeURIComponent(key)}&limit=10`
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '加载分组 chunk 失败');
+        setGroupChunks(data.results ?? []);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : '加载分组 chunk 失败');
+      } finally {
+        setLoadingGroup(false);
+      }
+    },
+    [expandedKey]
+  );
 
-  const statusBadge = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <Badge variant="default">成功</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">失败</Badge>;
-      case 'processing':
-        return <Badge variant="secondary">处理中</Badge>;
-      default:
-        return <Badge variant="outline">待处理</Badge>;
-    }
-  };
+  const currentGroups = (() => {
+    if (!stats) return [] as Array<{ name: string; count: number }>;
+    if (activeGroup === 'book') return stats.byBook;
+    if (activeGroup === 'category') return stats.byCategory;
+    return stats.bySkill;
+  })();
 
   return (
     <div className="space-y-6">
-      {/* 知识库选择/创建 */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>知识库配置</CardTitle>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchKbList}
-              disabled={kbLoading}
-              className="gap-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${kbLoading ? 'animate-spin' : ''}`} />
-              刷新列表
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowCreateKb(!showCreateKb)}
-              className="gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              新建知识库
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 选择已有知识库 */}
-          <div>
-            <Label>选择知识库</Label>
-            <Select value={baseId} onValueChange={handleSelectKb}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择已有知识库或新建...">
-                  {baseId && baseName ? (
-                    <span className="flex items-center gap-2">
-                      <Database className="w-3.5 h-3.5" />
-                      {baseName}
-                    </span>
-                  ) : (
-                    '选择已有知识库或新建...'
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {kbList.length === 0 && !kbLoading && (
-                  <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                    暂无知识库，请新建
-                  </div>
-                )}
-                {kbList.map((kb) => (
-                  <SelectItem key={kb.id} value={kb.id}>
-                    <span className="flex items-center gap-2">
-                      <Database className="w-3.5 h-3.5 text-muted-foreground" />
-                      {kb.name}
-                      {kb.description && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          - {kb.description}
-                        </span>
-                      )}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {baseId && (
-              <p className="text-xs text-muted-foreground mt-1">
-                知识库 ID: {baseId}
-              </p>
-            )}
-          </div>
+      {/* 顶部：标题 + 重新加载 */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">知识库管理</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            本地向量知识库（基于 data/skill-vectors.json，608 个 chunk），支持搜索、统计、重新加载
+          </p>
+        </div>
+        <Button
+          onClick={handleReload}
+          disabled={reloading}
+          className="gap-1.5"
+        >
+          {reloading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="w-3.5 h-3.5" />
+          )}
+          重新加载 vectors.json
+        </Button>
+      </div>
 
-          {/* 新建知识库表单 */}
-          {showCreateKb && (
-            <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/20">
-              <h4 className="text-sm font-medium">新建知识库</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label>名称 *</Label>
-                  <Input
-                    value={newKbName}
-                    onChange={(e) => setNewKbName(e.target.value)}
-                    placeholder="如：ReUp 知识库"
-                  />
-                </div>
-                <div>
-                  <Label>描述（可选）</Label>
-                  <Input
-                    value={newKbDesc}
-                    onChange={(e) => setNewKbDesc(e.target.value)}
-                    placeholder="如：晋升面试知识库"
-                  />
-                </div>
+      {/* 总览卡片 */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Database className="w-4.5 h-4.5 text-blue-600" />
               </div>
-              <div className="flex gap-2 pt-1">
-                <Button
-                  onClick={handleCreateKb}
-                  disabled={creatingKb || !newKbName.trim()}
-                  className="gap-1.5"
-                >
-                  {creatingKb ? (
-                    <><Loader2 className="w-3.5 h-3.5 animate-spin" />创建中...</>
-                  ) : (
-                    <><Check className="w-3.5 h-3.5" />创建</>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreateKb(false);
-                    setNewKbName('');
-                    setNewKbDesc('');
-                  }}
-                >
-                  取消
-                </Button>
+              <div>
+                <p className="text-xs text-muted-foreground">总 Chunk 数</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {loadingStats ? '-' : (stats?.total ?? 0)}
+                </p>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                通过 Coze API 创建知识库，创建后自动关联到当前项目。
-              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center">
+                <Sparkles className="w-4.5 h-4.5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">向量维度</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {loadingStats ? '-' : (stats?.dimension ?? 0)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <FolderTree className="w-4.5 h-4.5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">最后加载时间</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {reloadedAt
+                    ? new Date(reloadedAt).toLocaleString('zh-CN')
+                    : stats
+                      ? '已加载'
+                      : '-'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 搜索 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>搜索 Chunk</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="输入关键词，如「晋升」「STAR」「项目复盘」..."
+                className="pl-9"
+              />
+            </div>
+            <Button type="submit" disabled={searching || !query.trim()} className="gap-1.5">
+              {searching ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Search className="w-3.5 h-3.5" />
+              )}
+              搜索
+            </Button>
+          </form>
+
+          {hasSearched && (
+            <div className="mt-4">
+              {hits.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  没有匹配的 chunk
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    共 {hits.length} 条结果
+                  </p>
+                  {hits.map((h) => (
+                    <div
+                      key={h.id}
+                      className="border border-border rounded-lg bg-white p-3"
+                    >
+                      <p className="text-xs text-foreground leading-relaxed mb-2">
+                        {h.preview}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        {h.book && <Badge variant="outline">{h.book}</Badge>}
+                        {h.category && <Badge variant="secondary">{h.category}</Badge>}
+                        {h.skillName && <Badge variant="default">{h.skillName}</Badge>}
+                        {typeof h.chunkIndex === 'number' && (
+                          <span className="font-mono">chunk #{h.chunkIndex}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 上传区域 */}
-      {baseId && (
-        <Card>
-          <CardHeader>
-            <CardTitle>上传文档</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {error && (
-              <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">
-                {error}
-              </div>
-            )}
-
-            <div
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-                dragOver
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-muted-foreground/30'
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                handleFileSelect(e.dataTransfer.files);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                点击或拖拽上传文件（.md / .pdf / .txt / .docx）
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                上传后自动分块并向量化，无需手动处理
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".md,.pdf,.txt,.docx"
-                className="hidden"
-                onChange={(e) => handleFileSelect(e.target.files)}
-              />
+      {/* 分组分布 */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Chunk 分布</CardTitle>
+            <div className="flex gap-1 border border-border rounded-lg p-0.5">
+              {GROUP_TABS.map((g) => {
+                const Icon = g.icon;
+                const isActive = activeGroup === g.key;
+                return (
+                  <button
+                    key={g.key}
+                    onClick={() => { setActiveGroup(g.key); setExpandedKey(null); }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {g.label}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* Metadata form */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>标签（用逗号分隔）</Label>
-                <Input
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  placeholder="如：晋升,面试"
-                />
-              </div>
-              <div>
-                <Label>分类</Label>
-                <Select
-                  value={category}
-                  onValueChange={(v: 'promotion' | 'interview' | 'general') =>
-                    setCategory(v)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">通用</SelectItem>
-                    <SelectItem value="promotion">晋升类</SelectItem>
-                    <SelectItem value="interview">面试类</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Skill 关联</Label>
-                <Select value={skillName || "none"} onValueChange={(v) => setSkillName(v === "none" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择 Skill（可选）" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">不关联</SelectItem>
-                    <SelectItem value="jinsheng-dicing-luoji">晋升底层逻辑</SelectItem>
-                    <SelectItem value="jinsheng-san-yuanze">晋升三大原则</SelectItem>
-                    <SelectItem value="nengli-sanzhong-jingjie">能力三重境界</SelectItem>
-                    <SelectItem value="p8-lingyu-zhuanjia">领域专家演进</SelectItem>
-                    <SelectItem value="competency-model-alignment">素质模型对齐</SelectItem>
-                    <SelectItem value="highlight-extractor">亮点挖掘</SelectItem>
-                    <SelectItem value="blind-spot-navigation">盲区导航</SelectItem>
-                    <SelectItem value="reverse-questioning-framework">反问框架</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Document list */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">文档列表</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchDocs}
-                  disabled={loading}
-                  className="gap-1.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                  刷新
-                </Button>
-              </div>
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>文件名</TableHead>
-                      <TableHead>分类</TableHead>
-                      <TableHead>标签</TableHead>
-                      <TableHead>Skill</TableHead>
-                      <TableHead>上传时间</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {docs.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center text-muted-foreground py-8"
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="border-t border-border">
+            {currentGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                {loadingStats ? '加载中...' : '暂无数据'}
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20">
+                    <th className="w-10" />
+                    <th className="text-left px-5 py-3 font-medium text-muted-foreground text-xs">
+                      名称
+                    </th>
+                    <th className="text-right px-5 py-3 font-medium text-muted-foreground text-xs">
+                      Chunk 数
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentGroups.map((g) => {
+                    const isOpen = expandedKey === g.name;
+                    return (
+                      <React.Fragment key={g.name || '(empty)'}>
+                        <tr
+                          className="border-b border-border/50 hover:bg-muted/20 cursor-pointer"
+                          onClick={() => handleToggleGroup(g.name)}
                         >
-                          {loading ? '加载中...' : '暂无文档，请上传'}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      docs.map((doc) => (
-                        <TableRow key={doc.id}>
-                          <TableCell>
-                            <span className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-muted-foreground" />
-                              {doc.name}
-                            </span>
-                          </TableCell>
-                          <TableCell>{doc.category || '-'}</TableCell>
-                          <TableCell>
-                            {doc.tags && doc.tags.length > 0
-                              ? doc.tags.map((t) => (
-                                  <Badge
-                                    key={t}
-                                    variant="outline"
-                                    className="mr-1"
-                                  >
-                                    {t}
-                                  </Badge>
-                                ))
-                              : '-'}
-                          </TableCell>
-                          <TableCell>{doc.skillName || '-'}</TableCell>
-                          <TableCell>{doc.uploadTime || '-'}</TableCell>
-                          <TableCell>{statusBadge(doc.status)}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(doc.id)}
-                              title="删除"
-                            >
-                              <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                          <td className="px-3 py-3 text-muted-foreground">
+                            {isOpen ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-foreground">
+                            {g.name || '(空)'}
+                          </td>
+                          <td className="px-5 py-3 text-right text-sm font-semibold">
+                            {g.count}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="bg-muted/10">
+                            <td colSpan={3} className="px-5 py-4">
+                              {loadingGroup ? (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  加载 chunk 列表...
+                                </div>
+                              ) : groupChunks.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">未找到匹配的 chunk</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {groupChunks.map((c) => (
+                                    <div
+                                      key={c.id}
+                                      className="border border-border rounded-lg bg-white p-3"
+                                    >
+                                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-2">
+                                        <FileText className="w-3 h-3" />
+                                        {c.docTitle || c.sourcePath}
+                                        {c.sectionTitle && (
+                                          <span className="text-foreground">· {c.sectionTitle}</span>
+                                        )}
+                                        {typeof c.chunkIndex === 'number' && (
+                                          <span className="font-mono ml-auto">chunk #{c.chunkIndex}</span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-foreground leading-relaxed">
+                                        {c.preview}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
