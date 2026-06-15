@@ -377,9 +377,6 @@ export async function POST(request: NextRequest) {
     };
   }
 
-  // ReUp v2 Phase 1 (C1): 旧 coze SDK 用 HeaderUtils 转发请求头鉴权。
-  // 新 LLMClient 直接读 process.env.DASHSCOPE_API_KEY，customHeaders 不再需要。
-  const customHeaders: Record<string, string> = {};
   const encoder = new TextEncoder();
 
   // 选择模型（白名单校验 + 用户自定义）
@@ -427,7 +424,6 @@ export async function POST(request: NextRequest) {
             retrieve(
               latestUserMessage,
               5,
-              customHeaders,
               chatHistory,
               ragParams as Record<string, unknown> | undefined,
               precomputed
@@ -630,7 +626,7 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // 内置模型：使用 LLMClient (Phase 1: 替换 coze SDK LLMClient)
+          // 内置模型：使用 LLMClient
           const client = new LLMClient();
 
           const llmStream = client.stream(allMessages, {
@@ -665,7 +661,7 @@ export async function POST(request: NextRequest) {
 
         // ===== 幻觉校验 =====
         if (ragContext) {
-          const hallucinationResult = await hallucinationCheck(fullOutput, ragContext, customHeaders);
+          const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
           if (!hallucinationResult.faithful) {
             console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
             controller.enqueue(

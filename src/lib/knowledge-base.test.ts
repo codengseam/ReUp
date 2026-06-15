@@ -1,6 +1,6 @@
 // src/lib/knowledge-base.test.ts
 // ReUp v2 Phase 1, K1-K2: knowledge-base unit tests with mocked dependencies.
-// All tests mock vector-store and reranker modules; no real data, no real model.
+// All tests mock the vector-store and reranker modules; no real data, no real model.
 //
 // TDD: tests written before implementation.
 
@@ -10,13 +10,14 @@ import type { Chunk, ScoredChunk } from './reranker';
 
 // ---------------- Mocks (hoisted before imports) ----------------
 
-const { mockSearch, mockCreateVectorStore } = vi.hoisted(() => ({
+const { mockSearch, mockEnsureVectorStoreLoaded } = vi.hoisted(() => ({
   mockSearch: vi.fn(),
-  mockCreateVectorStore: vi.fn(),
+  mockEnsureVectorStoreLoaded: vi.fn(),
 }));
 
-vi.mock('./vector-store', () => ({
-  createVectorStore: mockCreateVectorStore,
+vi.mock('./rag-init', () => ({
+  ensureVectorStoreLoaded: mockEnsureVectorStoreLoaded,
+  _resetForTest: vi.fn(),
 }));
 
 const { mockRerank } = vi.hoisted(() => ({
@@ -53,8 +54,8 @@ function makeScoredChunk(
 }
 
 function setupStore(): void {
-  mockCreateVectorStore.mockReset();
-  mockCreateVectorStore.mockReturnValue({ search: mockSearch } as unknown as VectorStore);
+  mockEnsureVectorStoreLoaded.mockReset();
+  mockEnsureVectorStoreLoaded.mockResolvedValue({ search: mockSearch } as unknown as VectorStore);
 }
 
 function setupRerank(): void {

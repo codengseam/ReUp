@@ -1,40 +1,25 @@
 // src/lib/rag/search.ts
 // 1:1 迁移自 rag.ts:113-481
-// ReUp v2 Phase 1 (C3): replaced KnowledgeClient + coze SDK with local knowledge-base + LLMClient.
 
 import { LLMClient, type InvokeOptions } from '@/lib/llm-client';
 import { createKnowledgeBase } from '@/lib/knowledge-base';
+import { createEmbedder } from '@/lib/embedder';
 import type { ScoredChunk } from '@/lib/reranker';
 import type { RAGResult } from './types';
 
-// ========== Embed stub (Phase 1.5: replace with BGE-M3 local) ==========
-// TODO(phase-1.5): replace with BGE-M3 local embedding via @xenova/transformers.
-// For now, we use a deterministic 1024-dim pseudo-vector derived from the text
-// hash so the search pipeline stays stable and tests are deterministic.
-const VECTOR_DIM = 1024;
-const embedStub = async (text: string): Promise<number[]> => {
-  const vec = new Array<number>(VECTOR_DIM).fill(0);
-  let h = 0;
-  for (let i = 0; i < text.length; i++) {
-    h = (h * 31 + text.charCodeAt(i)) | 0;
-  }
-  for (let i = 0; i < VECTOR_DIM; i++) {
-    vec[i] = ((h + i * 7) % 1000) / 1000;
-  }
-  return vec;
-};
-
-const knowledgeBase = createKnowledgeBase({ embed: embedStub });
+// ========== Embedder (Phase 1.5: BGE-M3 local) ==========
+// Lazy singleton backed by @xenova/transformers' Xenova/bge-m3 model.
+// See src/lib/embedder.ts for the load + cache contract.
+const embedder = createEmbedder();
+const knowledgeBase = createKnowledgeBase({ embed: (text) => embedder.embed(text) });
 
 // ========== 1. 语义检索（local knowledge-base） ==========
 async function semanticSearch(
   query: string,
   topK: number = 5,
   minScore: number = 0.2,
-  categoryFilter?: string,
-  customHeaders?: Record<string, string>
+  categoryFilter?: string
 ): Promise<RAGResult[]> {
-  void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
   try {
     const opts: { category?: 'promotion' | 'interview' } = {};
     if (categoryFilter === 'promotion' || categoryFilter === 'interview') {
@@ -85,18 +70,17 @@ function mapChunkToRAGResult(chunk: ScoredChunk): RAGResult {
 async function keywordAugmentedSearch(
   query: string,
   topK: number = 3,
-  minScore: number = 0.15,
-  customHeaders?: Record<string, string>
+  minScore: number = 0.15
 ): Promise<RAGResult[]> {
   try {
-    const keywords = await extractKeywordsViaLLM(query, customHeaders);
+    const keywords = await extractKeywordsViaLLM(query);
     if (!keywords || keywords.length === 0) return [];
 
     // 用关键词组合作为检索query
     const keywordQuery = keywords.join(' ');
     console.log('[RAG] Keyword-augmented search with:', keywordQuery);
 
-    return await semanticSearch(keywordQuery, topK, minScore, undefined, customHeaders);
+    return await semanticSearch(keywordQuery, topK, minScore, undefined);
   } catch (error) {
     console.log('[RAG] Keyword-augmented search failed, skipping:', error instanceof Error ? error.message : String(error));
     return [];
@@ -105,12 +89,10 @@ async function keywordAugmentedSearch(
 
 // ========== 3. LLM关键词提取 ==========
 async function extractKeywordsViaLLM(
-  text: string,
-  customHeaders?: Record<string, string>
+  text: string
 ): Promise<string[]> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const prompt = `从以下文本中提取3-5个最重要的关键词，用于知识库检索。关键词应该是专业术语、核心概念或重要实体。只返回关键词，用逗号分隔，不要其他内容。
 
@@ -181,15 +163,14 @@ async function hybridSearch(
   topK: number = 5,
   minScore: number = 0.2,
   categoryFilter?: string,
-  customHeaders?: Record<string, string>,
   semanticWeight: number = 0.7
 ): Promise<RAGResult[]> {
   console.log('[RAG] Starting hybrid search for:', query);
 
   // 并行执行: 语义检索 + 关键词增强检索
   const [semanticResults, keywordResults] = await Promise.all([
-    semanticSearch(query, topK, minScore, categoryFilter, customHeaders),
-    keywordAugmentedSearch(query, Math.ceil(topK / 2) + 1, minScore, customHeaders),
+    semanticSearch(query, topK, minScore, categoryFilter),
+    keywordAugmentedSearch(query, Math.ceil(topK / 2) + 1, minScore),
   ]);
 
   console.log(`[RAG] Hybrid weighted fusion: semanticWeight=${semanticWeight}, semanticResults=${semanticResults.length}, keywordResults=${keywordResults.length}`);
@@ -245,17 +226,14 @@ async function hybridSearch(
 }
 
 // ========== 5. LLM Rerank ==========
-// 旧 SDK 没有 RerankClient，用 LLM invoke 实现重排序；Phase 1 保留实现
 async function rerankResults(
   results: RAGResult[],
-  query: string,
-  customHeaders?: Record<string, string>
+  query: string
 ): Promise<RAGResult[]> {
   if (results.length <= 2) return results.sort((a, b) => b.score - a.score);
 
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     // 构建文档摘要列表
     const docList = results.map((r, i) =>
@@ -354,12 +332,10 @@ function compressContext(results: RAGResult[], maxChars: number = 3000): RAGResu
 
 // ========== 7. HyDE: 假想文档生成（真实LLM调用） ==========
 async function generateHydeAnswer(
-  query: string,
-  customHeaders?: Record<string, string>
+  query: string
 ): Promise<string | null> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const hydePrompt = `你是一位职场指导书作者。请根据用户的问题，写一段专业的、像教科书一样的回答。
 这段回答将用于从知识库中检索相关文档。

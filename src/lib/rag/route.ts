@@ -1,18 +1,15 @@
 // src/lib/rag/route.ts
 // 1:1 迁移自 rag.ts:484-678
-// ReUp v2 Phase 1 (C4): replaced coze-coding-dev-sdk LLMClient with local OpenAI-compatible client.
 
 import { LLMClient, type InvokeOptions } from '@/lib/llm-client';
 
 // ========== 8. LLM查询路由 ==========
 async function routeQueryViaLLM(
   query: string,
-  chatHistory: Array<{ role: string; content: string }> = [],
-  customHeaders?: Record<string, string>
+  chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<{ strategy: 'direct' | 'multiquery' | 'hyde'; rewrittenQuery: string; subQueries?: string[]; confidence: number }> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const historyStr = chatHistory.length > 0
       ? `\n对话历史：\n${chatHistory.slice(-4).map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content.substring(0, 100)}`).join('\n')}`
@@ -100,12 +97,10 @@ function routeQueryLocal(
 
 // ========== 9. LLM查询类别推断 ==========
 async function inferQueryCategoryViaLLM(
-  query: string,
-  customHeaders?: Record<string, string>
+  query: string
 ): Promise<string> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const prompt = `判断以下用户查询属于哪个类别：
 - promotion: 晋升相关（晋升、升职、绩效、能力提升、技术学习、管理）
@@ -151,12 +146,10 @@ function inferQueryCategoryLocal(query: string): string {
 // ========== 10. LLM查询重写 ==========
 async function rewriteQueryViaLLM(
   query: string,
-  chatHistory: Array<{ role: string; content: string }> = [],
-  customHeaders?: Record<string, string>
+  chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<string> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const historyStr = chatHistory.length > 0
       ? `\n对话历史：\n${chatHistory.slice(-4).map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content.substring(0, 100)}`).join('\n')}`
