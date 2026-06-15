@@ -16,7 +16,10 @@ export type IntentCategory =
   | 'interview'
   | 'general'
   | 'off_topic'
-  | 'jailbreak';
+  | 'jailbreak'
+  | 'resume_qa'
+  | 'match_analysis'
+  | 'gap_analysis';
 
 export type IntentStrategy = 'direct' | 'multiquery' | 'hyde';
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -37,6 +40,9 @@ const VALID_INTENTS: readonly IntentCategory[] = [
   'general',
   'off_topic',
   'jailbreak',
+  'resume_qa',
+  'match_analysis',
+  'gap_analysis',
 ];
 const VALID_STRATEGIES: readonly IntentStrategy[] = ['direct', 'multiquery', 'hyde'];
 const VALID_RISK_LEVELS: readonly RiskLevel[] = ['low', 'medium', 'high'];
@@ -107,7 +113,7 @@ const INTENT_PROMPT = `你是一个查询分析 + 安全审核 AI。一次输出
 
 ## 任务
 分析用户查询，同时完成以下事：
-1. intent: 话题意图（promotion=晋升 / interview=面试 / general=通用职场 / off_topic=非职场 / jailbreak=越狱）
+1. intent: 话题意图（promotion=晋升 / interview=面试 / general=通用职场 / off_topic=非职场 / jailbreak=越狱 / resume_qa=简历问答 / match_analysis=匹配度分析 / gap_analysis=差距分析）
 2. strategy: 检索策略（direct / multiquery / hyde）
 3. rewrittenQuery: 标准化后的查询（口语→正式，补全指代）
 4. subQueries: 多子问题时给 2-3 个子查询；其他策略给 []

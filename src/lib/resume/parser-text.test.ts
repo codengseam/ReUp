@@ -1,10 +1,10 @@
 // src/lib/resume/parser-text.test.ts
 // ReUp v2 Phase 3 P0 (A2): plain-text resume parser tests.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseTextResume } from './parser-text';
+import { parseTextResume, shouldFallback, llmFallbackParse } from './parser-text';
 import type { ResumeDocument } from './types';
 
 const FIXTURE_PATH = join(process.cwd(), 'data/user-samples/resume/简历.md');
@@ -241,5 +241,120 @@ describe('plain-text header dictionary', () => {
   it('strips 【】 brackets before matching', () => {
     const doc = parseTextResume('【专业技能】\n熟悉 Java；\n熟悉 Python；');
     expect(doc.skills.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1 J: LLM Fallback — shouldFallback
+// ---------------------------------------------------------------------------
+
+describe('shouldFallback', () => {
+  const makeDoc = (overrides: Partial<ResumeDocument> = {}): ResumeDocument => ({
+    meta: { version: '1', source: 'text', createdAt: new Date().toISOString() },
+    basic: {},
+    experience: [],
+    projects: [],
+    skills: [],
+    education: [],
+    raw: '',
+    ...overrides,
+  });
+
+  it('returns true when all core fields are empty and raw > 200', () => {
+    const doc = makeDoc({ raw: 'a'.repeat(201) });
+    expect(shouldFallback(doc)).toBe(true);
+  });
+
+  it('returns false when name exists', () => {
+    const doc = makeDoc({ basic: { name: '张三' }, raw: 'a'.repeat(201) });
+    expect(shouldFallback(doc)).toBe(false);
+  });
+
+  it('returns false when experience exists', () => {
+    const doc = makeDoc({
+      experience: [{ company: 'A', role: 'B', period: 'C', bullets: [] }],
+      raw: 'a'.repeat(201),
+    });
+    expect(shouldFallback(doc)).toBe(false);
+  });
+
+  it('returns false when projects exist', () => {
+    const doc = makeDoc({
+      projects: [{ name: 'P', bullets: [] }],
+      raw: 'a'.repeat(201),
+    });
+    expect(shouldFallback(doc)).toBe(false);
+  });
+
+  it('returns false when skills exist', () => {
+    const doc = makeDoc({ skills: ['Java'], raw: 'a'.repeat(201) });
+    expect(shouldFallback(doc)).toBe(false);
+  });
+
+  it('returns false when raw <= 200', () => {
+    const doc = makeDoc({ raw: 'a'.repeat(200) });
+    expect(shouldFallback(doc)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1 J: LLM Fallback — llmFallbackParse
+// ---------------------------------------------------------------------------
+
+describe('llmFallbackParse', () => {
+  const fallback: ResumeDocument = {
+    meta: { version: '1', source: 'text', createdAt: new Date().toISOString() },
+    basic: {},
+    experience: [],
+    projects: [],
+    skills: [],
+    education: [],
+    raw: 'test text',
+  };
+
+  it('returns structured doc when LLM returns valid JSON', async () => {
+    const mockLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify({
+        name: '张三',
+        title: '工程师',
+        city: '北京',
+        contact: { phone: '123' },
+        experience: [{ company: 'A', role: 'B', period: 'C', bullets: ['d'] }],
+        projects: [{ name: 'P', period: 'Q', bullets: ['r'] }],
+        education: [{ school: 'S', degree: 'D', period: 'E', notes: ['f'] }],
+        skills: ['Java'],
+      }),
+    });
+
+    const result = await llmFallbackParse('some long resume text...', mockLLM, fallback);
+
+    expect(result.basic.name).toBe('张三');
+    expect(result.basic.title).toBe('工程师');
+    expect(result.experience).toHaveLength(1);
+    expect(result.experience[0]!.company).toBe('A');
+    expect(result.skills).toEqual(['Java']);
+    expect(result.meta.source).toBe('pdf+llm');
+  });
+
+  it('returns fallback doc when LLM throws', async () => {
+    const mockLLM = vi.fn().mockRejectedValue(new Error('LLM error'));
+    const result = await llmFallbackParse('some text', mockLLM, fallback);
+    expect(result).toBe(fallback);
+  });
+
+  it('returns fallback doc when LLM returns invalid JSON', async () => {
+    const mockLLM = vi.fn().mockResolvedValue({ content: 'not json at all' });
+    const result = await llmFallbackParse('some text', mockLLM, fallback);
+    expect(result).toBe(fallback);
+  });
+
+  it('uses empty defaults when LLM returns partial data', async () => {
+    const mockLLM = vi.fn().mockResolvedValue({
+      content: JSON.stringify({ name: '李四' }),
+    });
+    const result = await llmFallbackParse('some text', mockLLM, fallback);
+    expect(result.basic.name).toBe('李四');
+    expect(result.experience).toEqual([]);
+    expect(result.skills).toEqual([]);
   });
 });
