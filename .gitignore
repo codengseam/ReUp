@@ -100,3 +100,6 @@ admin-stats.json
 feedback.json
 tsconfig.tsbuildinfo
 .vitest-cache
+
+# 运行时 API key 存储（管理后台可改、含明文 key）
+data/.runtime-config.json

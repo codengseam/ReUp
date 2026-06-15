@@ -10,6 +10,7 @@ import {
   Cpu,
   SlidersHorizontal,
   Tags,
+  KeyRound,
   LogOut,
   Lock,
   User,
@@ -21,6 +22,7 @@ import PromptTab from './_components/prompt-tab';
 import ModelTab from './_components/model-tab';
 import RAGTab from './_components/rag-tab';
 import MetadataTab from './_components/metadata-tab';
+import RuntimeConfigTab from './_components/runtime-config-tab';
 import type { TabKey } from './_lib/types';
 
 const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
@@ -31,6 +33,7 @@ const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }>
   { key: 'model', label: '模型配置', icon: Cpu },
   { key: 'rag', label: 'RAG 参数', icon: SlidersHorizontal },
   { key: 'metadata', label: '分类', icon: Tags },
+  { key: 'runtime-config', label: 'API Keys', icon: KeyRound },
 ];
 
 // ===== 阶段 3：鉴权迁后端 =====
@@ -288,6 +291,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="metadata">
             <MetadataTab />
+          </TabsContent>
+          <TabsContent value="runtime-config">
+            <RuntimeConfigTab />
           </TabsContent>
         </Tabs>
       </main>

@@ -63,8 +63,7 @@ async function llmJailbreakCheck(
   try {
     const llmClient = new LLMClient();
     const jailbreakResponse = await llmClient.invoke(
-      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + input }],
-      { model: 'doubao-seed-2-0-pro-260215' }
+      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + input }]
     );
     const jailbreakText = jailbreakResponse.content.trim();
     const jailbreakJsonMatch = jailbreakText.match(/\{[\s\S]*\}/);
@@ -91,8 +90,7 @@ async function llmTopicCheck(
   try {
     const llmClient = new LLMClient();
     const topicResponse = await llmClient.invoke(
-      [{ role: 'user', content: TOPIC_DETECTION_PROMPT + input }],
-      { model: 'doubao-seed-2-0-pro-260215' }
+      [{ role: 'user', content: TOPIC_DETECTION_PROMPT + input }]
     );
     const topicText = topicResponse.content.trim();
     const topicJsonMatch = topicText.match(/\{[\s\S]*\}/);
@@ -185,8 +183,7 @@ export async function outputGuard(
   try {
     const llmClient = new LLMClient();
     const jailbreakResponse = await llmClient.invoke(
-      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + output }],
-      { model: 'doubao-seed-2-0-pro-260215' }
+      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + output }]
     );
     const jailbreakText = jailbreakResponse.content.trim();
     const jailbreakJsonMatch = jailbreakText.match(/\{[\s\S]*\}/);
@@ -208,8 +205,7 @@ export async function outputGuard(
   try {
     const llmClient = new LLMClient();
     const promiseResponse = await llmClient.invoke(
-      [{ role: 'user', content: PROMISE_DETECTION_PROMPT + output }],
-      { model: 'doubao-seed-2-0-pro-260215' }
+      [{ role: 'user', content: PROMISE_DETECTION_PROMPT + output }]
     );
     const promiseText = promiseResponse.content.trim();
     const promiseJsonMatch = promiseText.match(/\{[\s\S]*\}/);
@@ -238,8 +234,7 @@ export async function hallucinationCheck(
   try {
     const llmClient = new LLMClient();
     const response = await llmClient.invoke(
-      [{ role: 'user', content: HALLUCINATION_CHECK_PROMPT.replace('---', context) + '\n' + answer }],
-      { model: 'doubao-seed-2-0-pro-260215' }
+      [{ role: 'user', content: HALLUCINATION_CHECK_PROMPT.replace('---', context) + '\n' + answer }]
     );
     const text = response.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);

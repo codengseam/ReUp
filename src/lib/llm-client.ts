@@ -1,15 +1,12 @@
 // src/lib/llm-client.ts
-// ReUp v2 Phase 1: OpenAI-compatible LLM client for DashScope (Qwen / GUI-Plus).
+// ReUp v2 Phase 1 + Phase 4: OpenAI-compatible LLM client.
 //
-// Design contract (see docs/superpowers/specs/2026-06-14-reup-v2-design.md §5.1):
-// - invoke(): POST {baseUrl}/v1/chat/completions (stream: false), return LLMResponse
-// - stream(): POST same URL with stream: true, parse SSE `data: {...}` lines, yield LLMChunk
-// - Error mapping: 401 -> LLMAuthError, 429 -> LLMRateLimitError, 5xx -> LLMUpstreamError
-// - Timeout: 60s default, configurable per call via opts.timeoutMs
-// - Config: read DASHSCOPE_* from process.env with documented defaults
-//
-// No `any`. Zod is used to validate external response shapes so upstream changes
-// do not silently leak untyped data into the rest of the app.
+// 设计要点：
+// - invoke() / stream() 支持单 model 或多 model 候选（自动 fallback）
+// - 候选链：opts.models (Array<ModelCandidate>)，缺省时退化为单 model 模式
+// - Fallback 规则：401/403 (认证) 中止整个链；其他错误（404/429/5xx）继续下一个候选
+// - 全部失败抛 LLMAllCandidatesFailedError，包含每个候选的最后错误
+// - Config: 读 env-var 作为缺省；显式传入覆盖
 
 import { z } from 'zod';
 
@@ -22,9 +19,20 @@ export interface Message {
   content: string;
 }
 
+export interface ModelCandidate {
+  /** 实际发送给 provider 的 model 名称 */
+  model: string;
+  /** provider 完整 base URL（含 /v1） */
+  baseUrl: string;
+  /** provider 完整 API Key */
+  apiKey: string;
+}
+
 export interface InvokeOptions {
-  /** Override the model id (defaults to the client-level model or DASHSCOPE_CHAT_MODEL). */
+  /** 单 model 模式：指定 model id（baseUrl/apiKey 用构造器配置） */
   model?: string;
+  /** 多 model 候选模式：按顺序尝试，失败自动 fallback */
+  models?: ModelCandidate[];
   /** Sampling temperature. Forwarded as-is to the provider. */
   temperature?: number;
   /** Per-call timeout in ms. Defaults to the client-level default (60_000). */
@@ -103,6 +111,19 @@ export class LLMTimeoutError extends LLMError {
   }
 }
 
+/** 所有候选都失败的聚合错误 */
+export class LLMAllCandidatesFailedError extends LLMError {
+  public readonly attempts: Array<{ model: string; error: Error }>;
+  constructor(attempts: Array<{ model: string; error: Error }>) {
+    const summary = attempts
+      .map(a => `${a.model}: ${a.error.message}`)
+      .join('; ');
+    super(`All LLM candidates failed (${attempts.length}): ${summary}`);
+    this.name = 'LLMAllCandidatesFailedError';
+    this.attempts = attempts;
+  }
+}
+
 // ===== Zod schemas for external responses =====
 
 const MessageSchema = z.object({
@@ -140,7 +161,7 @@ const StreamFrameSchema = z.object({
 
 // ===== Defaults (kept as constants for testability + JSDoc) =====
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-const DEFAULT_CHAT_MODEL = 'gui-plus-2026-02-26';
+const DEFAULT_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 /** Strip a trailing `/v1` or `/v1/` from the base URL. */
@@ -162,7 +183,10 @@ function resolveConfig(config: LLMClientConfig = {}): Required<LLMClientConfig> 
 }
 
 function endpointUrl(baseUrl: string): string {
-  return `${baseUrl}/v1/chat/completions`;
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  // baseUrl 通常形如 `https://.../compatible-mode/v1`，已含 /v1；此时仅追加 /chat/completions
+  if (trimmed.endsWith('/v1')) return `${trimmed}/chat/completions`;
+  return `${trimmed}/v1/chat/completions`;
 }
 
 async function safeReadText(res: Response): Promise<string> {
@@ -241,12 +265,50 @@ export class LLMClient {
   }
 
   /**
+   * Normalize InvokeOptions → ModelCandidate[] 列表。
+   * - opts.models 直接返回
+   * - 否则用 [opts.model ?? this.model, this.baseUrl, this.apiKey] 包装成单元素
+   */
+  private resolveCandidates(opts?: InvokeOptions): ModelCandidate[] {
+    if (opts?.models && opts.models.length > 0) return opts.models;
+    return [{ model: opts?.model ?? this.model, baseUrl: this.baseUrl, apiKey: this.apiKey }];
+  }
+
+  /**
    * Non-streaming chat completion. Returns the assistant text and any usage info.
-   * Throws LLMAuthError / LLMRateLimitError / LLMUpstreamError / LLMTimeoutError on failure.
+   * Throws LLMAllCandidatesFailedError when all candidates fail; LLMAuthError aborts the chain.
+   * Single-candidate mode preserves the original error type (backward compat).
    */
   async invoke(messages: Message[], opts?: InvokeOptions): Promise<LLMResponse> {
+    const candidates = this.resolveCandidates(opts);
+    if (candidates.length === 1) {
+      // Single-candidate: throw underlying error directly (backward compat with single-model tests)
+      return this.invokeOnce(messages, candidates[0]!, opts);
+    }
+    // Multi-candidate: try each, wrap failures in LLMAllCandidatesFailedError
+    const attempts: Array<{ model: string; error: Error }> = [];
+    for (const c of candidates) {
+      try {
+        return await this.invokeOnce(messages, c, opts);
+      } catch (err) {
+        const e = err instanceof Error ? err : new LLMError(String(err));
+        attempts.push({ model: c.model, error: e });
+        // 401/403 认证失败：所有候选都会失败，立即抛出
+        if (e instanceof LLMAuthError) throw e;
+        // 其他错误（404/429/5xx/timeout）继续下一个候选
+      }
+    }
+    throw new LLMAllCandidatesFailedError(attempts);
+  }
+
+  /** 单候选的非流式调用（内部方法） */
+  private async invokeOnce(
+    messages: Message[],
+    candidate: ModelCandidate,
+    opts?: InvokeOptions
+  ): Promise<LLMResponse> {
     const body = {
-      model: opts?.model ?? this.model,
+      model: candidate.model,
       messages,
       stream: false,
       ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -255,11 +317,11 @@ export class LLMClient {
     const aborter = buildAbortSignal(opts, this.defaultTimeoutMs);
     let res: Response;
     try {
-      res = await fetch(endpointUrl(this.baseUrl), {
+      res = await fetch(endpointUrl(candidate.baseUrl), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${candidate.apiKey}`,
         },
         body: JSON.stringify(body),
         signal: aborter.signal,
@@ -319,12 +381,50 @@ export class LLMClient {
    * that contains a non-empty `delta.content`. The `data: [DONE]` sentinel is
    * consumed and does NOT produce a chunk.
    *
-   * Throws LLMAuthError / LLMRateLimitError / LLMUpstreamError / LLMTimeoutError
-   * if the initial HTTP response is not OK or the stream errors out.
+   * 多候选 fallback 行为：
+   * - 候选 N 启动失败（401/403/5xx/timeout/非 OK）：立即尝试候选 N+1
+   * - 候选 N 已 yield 至少一个 chunk 后出错：不再 fallback（让调用方看到错误）
+   * - 401 整个链中止
+   *
+   * Single-candidate mode preserves the original error type (backward compat).
+   * Multi-candidate: throws LLMAllCandidatesFailedError when no candidate produced any chunk.
    */
   async *stream(messages: Message[], opts?: InvokeOptions): AsyncIterable<LLMChunk> {
+    const candidates = this.resolveCandidates(opts);
+    if (candidates.length === 1) {
+      // Single-candidate: yield directly (errors propagate naturally)
+      yield* this.streamOnce(messages, candidates[0]!, opts);
+      return;
+    }
+    // Multi-candidate fallback
+    const attempts: Array<{ model: string; error: Error }> = [];
+    for (const c of candidates) {
+      let yielded = false;
+      try {
+        for await (const chunk of this.streamOnce(messages, c, opts)) {
+          yielded = true;
+          yield chunk;
+        }
+        return; // 第一个成功候选 → 结束链
+      } catch (err) {
+        const e = err instanceof Error ? err : new LLMError(String(err));
+        attempts.push({ model: c.model, error: e });
+        if (e instanceof LLMAuthError) throw e;
+        if (yielded) throw e; // 已 yield 任何 chunk：无法透明切换
+        // 未 yield：继续下一个候选
+      }
+    }
+    throw new LLMAllCandidatesFailedError(attempts);
+  }
+
+  /** 单候选的流式调用（内部方法） */
+  private async *streamOnce(
+    messages: Message[],
+    candidate: ModelCandidate,
+    opts?: InvokeOptions
+  ): AsyncIterable<LLMChunk> {
     const body = {
-      model: opts?.model ?? this.model,
+      model: candidate.model,
       messages,
       stream: true,
       ...(opts?.temperature !== undefined ? { temperature: opts.temperature } : {}),
@@ -333,11 +433,11 @@ export class LLMClient {
     const aborter = buildAbortSignal(opts, this.defaultTimeoutMs);
     let res: Response;
     try {
-      res = await fetch(endpointUrl(this.baseUrl), {
+      res = await fetch(endpointUrl(candidate.baseUrl), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${candidate.apiKey}`,
         },
         body: JSON.stringify(body),
         signal: aborter.signal,
