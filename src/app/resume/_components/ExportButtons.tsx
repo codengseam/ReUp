@@ -14,9 +14,8 @@
 // stays in a sensible state across parse → rewrite → export.
 
 import { useCallback, useState } from 'react';
-import { Check, Copy, FileDown, FileText, FileType } from 'lucide-react';
+import { Check, Copy, FileText, FileType } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ResumeDocument } from '@/lib/resume/types';
 import type { StarRewriteResult } from '@/lib/resume/star-rewriter';
 
@@ -180,61 +179,51 @@ export function ExportButtons({ resume, starResult }: ExportButtonsProps) {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileDown className="w-4 h-4 text-primary" />
-          6. 导出优化后的简历
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void handleCopyMarkdown();
-            }}
-            disabled={disabled}
-            aria-label="复制 Markdown"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            {copied ? '已复制' : 'Copy Markdown'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void handleExportBinary('pdf');
-            }}
-            disabled={disabled || busyFormat !== null}
-            aria-label="导出 PDF"
-          >
-            <FileType className="w-4 h-4" />
-            {busyFormat === 'pdf' ? '导出中…' : 'Export PDF'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void handleExportBinary('docx');
-            }}
-            disabled={disabled || busyFormat !== null}
-            aria-label="导出 DOCX"
-          >
-            <FileText className="w-4 h-4" />
-            {busyFormat === 'docx' ? '导出中…' : 'Export DOCX'}
-          </Button>
-        </div>
-        {error && (
-          <div
-            role="alert"
-            className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded"
-          >
-            {error}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-2 pt-4 border-t border-border/50">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-[11px]"
+        onClick={() => {
+          void handleCopyMarkdown();
+        }}
+        disabled={disabled}
+        aria-label="复制 Markdown"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+        {copied ? '已复制' : 'Copy MD'}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-[11px]"
+        onClick={() => {
+          void handleExportBinary('pdf');
+        }}
+        disabled={disabled || busyFormat !== null}
+        aria-label="导出 PDF"
+      >
+        <FileType className="w-3.5 h-3.5 mr-1" />
+        {busyFormat === 'pdf' ? '导出中…' : 'PDF'}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-[11px]"
+        onClick={() => {
+          void handleExportBinary('docx');
+        }}
+        disabled={disabled || busyFormat !== null}
+        aria-label="导出 DOCX"
+      >
+        <FileText className="w-3.5 h-3.5 mr-1" />
+        {busyFormat === 'docx' ? '导出中…' : 'DOCX'}
+      </Button>
+      {error && (
+        <span role="alert" className="text-[10px] text-red-600 ml-2">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }

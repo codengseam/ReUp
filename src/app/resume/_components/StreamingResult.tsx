@@ -1,18 +1,5 @@
 'use client';
 
-// src/app/resume/_components/StreamingResult.tsx
-// ReUp v2 Phase 3 P0 (H4) + Phase 5 (E1-E3) integration.
-//
-// Streams the 4-section STAR rewrite into per-section cards. The
-// Phase 5 additions wire:
-// - per-section "重写此段" button (E1) — calls rewriteResumeSection
-// - per-section "查看差异" button (E2) — toggles a diff panel that
-//   compares the section's first-streamed text against its current
-//   text using computeLineDiff
-// - per-section 👍/👎 buttons (E3) — POST feedback to /api/feedback
-// - onComplete callback that surfaces the final StarRewriteResult
-//   to the parent for export
-
 import {
   Check,
   Copy,
@@ -24,38 +11,20 @@ import {
   ThumbsUp,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeLineDiff, type DiffLine } from '@/lib/resume/diff';
-import { rewriteResumeSection } from '@/lib/resume/iteration';
 import {
-  rewriteResume,
-  rewriteResumeStream,
   STAR_SECTIONS,
   type StarSection,
   type StarRewriteResult,
 } from '@/lib/resume/star-rewriter';
 import type { ResumeDocument } from '@/lib/resume/types';
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
 interface StreamingResultProps {
   resume: ResumeDocument;
-  /**
-   * Fires once the final non-streaming `rewriteResume` resolves.
-   * Parent uses it to feed the export pipeline. Optional so the
-   * existing call site keeps working.
-   */
   onComplete?: (result: StarRewriteResult) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
   const [sections, setSections] = useState<Record<StarSection, string>>({
@@ -84,10 +53,14 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
     '建议': null,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const sectionsRef = useRef<Record<StarSection, string>>({
+    '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '',
+  });
 
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
+    sectionsRef.current = { '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' };
     setSections({ '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' });
     setOriginals({ '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' });
     setCompleted(new Set());
@@ -98,49 +71,80 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
     setRewriting(new Set());
     setFeedback({ '我的分析': null, 'STAR改写': null, '底层心法': null, '建议': null });
 
-    const onChunk = (chunk: { section: StarSection; delta: string; done: boolean }): void => {
-      setSections((prev) => ({
-        ...prev,
-        [chunk.section]: prev[chunk.section] + chunk.delta,
-      }));
-      if (chunk.done) {
-        setCompleted((prev) => {
-          const next = new Set(prev);
-          next.add(chunk.section);
-          return next;
-        });
-        // Capture the first-streamed text per section so the diff has
-        // a stable baseline even after a "重写此段" round-trip.
-        setOriginals((prev) => {
-          if (prev[chunk.section]) return prev;
-          return { ...prev, [chunk.section]: sectionsRef.current[chunk.section] };
-        });
-      }
-    };
-
-    // Keep a ref of the latest sections map so the chunk handler can
-    // snapshot the "first done" text without re-binding the effect.
-    const sectionsRef = {
-      current: { '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' } as Record<StarSection, string>,
-    };
-
     (async () => {
       try {
-        for await (const chunk of rewriteResumeStream(resume, {
+        const res = await fetch('/api/resume/rewrite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume }),
           signal: controller.signal,
-          onChunk: (c) => {
-            sectionsRef.current[c.section] = sectionsRef.current[c.section] + c.delta;
-            onChunk(c);
-          },
-        })) {
-          // chunks already delivered via onChunk
-          void chunk;
+        });
+
+        if (!res.ok || !res.body) {
+          const text = await res.text().catch(() => '');
+          throw new Error(text || `API error ${res.status}`);
         }
-        if (controller.signal.aborted) return;
-        const result = await rewriteResume(resume, { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        setConfidence(result.confidence);
-        onComplete?.(result);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const dataLine = line.replace(/^data: /, '');
+            if (!dataLine) continue;
+            try {
+              const msg = JSON.parse(dataLine) as {
+                type: string;
+                section?: StarSection;
+                delta?: string;
+                done?: boolean;
+                error?: string;
+              };
+
+              if (msg.type === 'chunk' && msg.section && msg.delta !== undefined) {
+                sectionsRef.current[msg.section] += msg.delta;
+                setSections((prev) => ({
+                  ...prev,
+                  [msg.section!]: prev[msg.section!] + msg.delta!,
+                }));
+                if (msg.done) {
+                  setCompleted((prev) => {
+                    const next = new Set(prev);
+                    next.add(msg.section!);
+                    return next;
+                  });
+                  setOriginals((prev) => {
+                    if (prev[msg.section!]) return prev;
+                    return { ...prev, [msg.section!]: sectionsRef.current[msg.section!] };
+                  });
+                }
+              } else if (msg.type === 'done') {
+                // Calculate confidence: min(1, total chars / 2000)
+                const totalChars = Object.values(sectionsRef.current).reduce(
+                  (sum, t) => sum + t.length, 0,
+                );
+                const conf = Math.min(1, totalChars / 2000);
+                setConfidence(conf);
+                onComplete?.({
+                  sections: { ...sectionsRef.current },
+                  confidence: conf,
+                });
+              } else if (msg.type === 'error') {
+                throw new Error(msg.error ?? 'STAR rewrite failed');
+              }
+            } catch {
+              // skip malformed frames
+            }
+          }
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         setError(err instanceof Error ? err.message : String(err));
@@ -155,8 +159,6 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
       controller.abort();
       abortRef.current = null;
     };
-    // onComplete is intentionally excluded from the deps — we don't
-    // want a parent re-render to restart the entire stream.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume]);
 
@@ -202,9 +204,19 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
         return next;
       });
       try {
-        const result = await rewriteResumeSection(resume, section, currentText);
-        setSections((prev) => ({ ...prev, [section]: result.text }));
-        setConfidence(result.confidence);
+        const res = await fetch('/api/resume/rewrite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resume, section, currentText }),
+        });
+        const json = (await res.json()) as { text?: string; confidence?: number; error?: string };
+        if (json.error) throw new Error(json.error);
+        if (json.text) {
+          setSections((prev) => ({ ...prev, [section]: json.text! }));
+        }
+        if (json.confidence !== undefined) {
+          setConfidence(json.confidence);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
@@ -245,7 +257,6 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
               comment: 'dislike',
               response: currentText,
             };
-      // Optimistic UI
       setFeedback((prev) => ({ ...prev, [section]: vote }));
       try {
         await fetch('/api/feedback', {
@@ -254,7 +265,6 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
           body: JSON.stringify(payload),
         });
       } catch (err) {
-        // best-effort — surface in console, keep optimistic state
         console.warn('[StreamingResult] feedback POST failed:', err);
       }
     },
@@ -262,74 +272,59 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            5. 重写结果（实时流式）
-          </CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            {confidence !== null && (
-              <Badge variant="secondary" className="font-mono">
-                confidence {confidence.toFixed(2)}
-              </Badge>
-            )}
-            <Badge variant="outline" className="font-mono">
-              {completed.size} / 4 sections complete
-            </Badge>
-            {isStreaming && (
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
-                取消
-              </Button>
-            )}
-          </div>
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold text-foreground">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          STAR 重写结果
         </div>
-      </CardHeader>
-      <CardContent>
-        {error && (
-          <div
-            role="alert"
-            className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded mb-3"
-          >
-            {error}
-          </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {STAR_SECTIONS.map((section) => (
-            <SectionCard
-              key={section}
-              section={section}
-              text={sections[section]}
-              originalText={originals[section]}
-              isDone={completed.has(section)}
-              isCopied={copied === section}
-              isDiffOpen={diffOpen.has(section)}
-              isRewriting={rewriting.has(section)}
-              feedbackVote={feedback[section]}
-              onCopy={() => {
-                void handleCopy(section);
-              }}
-              onRewrite={() => {
-                void handleRewrite(section);
-              }}
-              onToggleDiff={() => {
-                toggleDiff(section);
-              }}
-              onFeedback={(vote) => {
-                void sendFeedback(section, vote);
-              }}
-            />
-          ))}
+        <div className="flex items-center gap-1.5">
+          {confidence !== null && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-container text-accent-foreground font-mono">
+              置信度 {confidence.toFixed(2)}
+            </span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-mono">
+            {completed.size} / 4 已完成
+          </span>
+          {isStreaming && (
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={handleCancel}>
+              取消
+            </Button>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {error && (
+        <div role="alert" className="text-[11px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg mb-3">
+          {error}
+        </div>
+      )}
+
+      {/* 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {STAR_SECTIONS.map((section) => (
+          <SectionCard
+            key={section}
+            section={section}
+            text={sections[section]}
+            originalText={originals[section]}
+            isDone={completed.has(section)}
+            isCopied={copied === section}
+            isDiffOpen={diffOpen.has(section)}
+            isRewriting={rewriting.has(section)}
+            feedbackVote={feedback[section]}
+            onCopy={() => { void handleCopy(section); }}
+            onRewrite={() => { void handleRewrite(section); }}
+            onToggleDiff={() => { toggleDiff(section); }}
+            onFeedback={(vote) => { void sendFeedback(section, vote); }}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Section card
-// ---------------------------------------------------------------------------
 
 interface SectionCardProps {
   section: StarSection;
@@ -364,111 +359,108 @@ function SectionCard({
   const diffLines: DiffLine[] = isDiffOpen && originalText ? computeLineDiff(originalText, text) : [];
 
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 min-h-[160px] flex flex-col">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-foreground">【{section}】</span>
+    <div className="border border-border rounded-lg p-3 bg-muted/30 min-h-[130px] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-semibold text-foreground">【{section}】</span>
           {isEmpty || !isDone || isRewriting ? (
-            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+            <Loader2 className="w-2.5 h-2.5 animate-spin text-muted-foreground" />
           ) : (
-            <Badge variant="secondary" className="text-[10px]">
+            <span className="text-[9px] px-1 py-0.5 rounded bg-primary-container text-accent-foreground">
               done
-            </Badge>
+            </span>
           )}
         </div>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="h-5 w-5 p-0"
           onClick={onCopy}
           disabled={isEmpty}
           aria-label={`复制 ${section}`}
           title="复制"
         >
           {isCopied ? (
-            <Check className="w-3.5 h-3.5 text-primary" />
+            <Check className="w-3 h-3 text-primary" />
           ) : (
-            <Copy className="w-3.5 h-3.5" />
+            <Copy className="w-3 h-3" />
           )}
         </Button>
       </div>
+
+      {/* Content */}
       {isEmpty ? (
-        <div className="space-y-2 mt-1">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-5/6" />
-          <Skeleton className="h-3 w-4/6" />
+        <div className="space-y-1.5 mt-1">
+          <Skeleton className="h-2.5 w-full" />
+          <Skeleton className="h-2.5 w-5/6" />
+          <Skeleton className="h-2.5 w-4/6" />
         </div>
       ) : (
-        <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed flex-1">
+        <p className="text-[11px] text-foreground whitespace-pre-wrap leading-relaxed flex-1 line-clamp-6">
           {text}
         </p>
       )}
-      <div className="flex items-center gap-1 pt-1 border-t border-border/50">
+
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 pt-1.5 mt-1.5 border-t border-border/40">
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="h-5 w-5 p-0"
           onClick={onRewrite}
           disabled={isEmpty || isRewriting}
           aria-label={`重写此段 ${section}`}
           title="重写此段"
         >
           {isRewriting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-3 h-3 animate-spin" />
           ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3 h-3" />
           )}
         </Button>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="h-5 w-5 p-0"
           onClick={onToggleDiff}
           disabled={isEmpty || !originalText}
           aria-label={`查看 ${section} 差异`}
           title="查看差异"
           data-state={isDiffOpen ? 'open' : 'closed'}
         >
-          <GitCompare className="w-3.5 h-3.5" />
+          <GitCompare className="w-3 h-3" />
         </Button>
         <div className="flex-1" />
         <Button
           variant="ghost"
-          size="icon-sm"
-          onClick={() => {
-            onFeedback('up');
-          }}
+          size="sm"
+          className="h-5 w-5 p-0"
+          onClick={() => { onFeedback('up'); }}
           disabled={isEmpty}
           aria-label={`点赞 ${section}`}
-          title="赞"
-          data-state={feedbackVote === 'up' ? 'up' : 'none'}
         >
           <ThumbsUp
-            className={`w-3.5 h-3.5 ${
-              feedbackVote === 'up' ? 'text-emerald-600 fill-emerald-600' : ''
-            }`}
+            className={`w-3 h-3 ${feedbackVote === 'up' ? 'text-emerald-600 fill-emerald-600' : ''}`}
           />
         </Button>
         <Button
           variant="ghost"
-          size="icon-sm"
-          onClick={() => {
-            onFeedback('down');
-          }}
+          size="sm"
+          className="h-5 w-5 p-0"
+          onClick={() => { onFeedback('down'); }}
           disabled={isEmpty}
           aria-label={`点踩 ${section}`}
-          title="踩"
-          data-state={feedbackVote === 'down' ? 'down' : 'none'}
         >
           <ThumbsDown
-            className={`w-3.5 h-3.5 ${
-              feedbackVote === 'down' ? 'text-red-600 fill-red-600' : ''
-            }`}
+            className={`w-3 h-3 ${feedbackVote === 'down' ? 'text-red-600 fill-red-600' : ''}`}
           />
         </Button>
       </div>
+
+      {/* Diff panel */}
       {isDiffOpen && originalText && (
-        <div
-          className="rounded border border-border bg-background p-2 text-[11px] font-mono space-y-0.5 max-h-48 overflow-y-auto"
-          aria-label={`${section} 差异`}
-        >
+        <div className="rounded border border-border bg-background p-2 text-[10px] font-mono space-y-0.5 max-h-36 overflow-y-auto mt-1.5">
           {diffLines.length === 0 ? (
             <span className="text-muted-foreground">无差异</span>
           ) : (
@@ -485,15 +477,15 @@ function SectionCard({
 function DiffLineRow({ line }: { line: DiffLine }): ReactNode {
   if (line.type === 'added') {
     return (
-      <div className="bg-emerald-50 text-emerald-900 px-1.5 py-0.5 rounded">+ {line.text}</div>
+      <div className="bg-emerald-50 text-emerald-900 px-1 py-0.5 rounded">+ {line.text}</div>
     );
   }
   if (line.type === 'removed') {
     return (
-      <div className="bg-red-50 text-red-900 line-through px-1.5 py-0.5 rounded">
+      <div className="bg-red-50 text-red-900 line-through px-1 py-0.5 rounded">
         - {line.text}
       </div>
     );
   }
-  return <div className="text-muted-foreground px-1.5 py-0.5">  {line.text}</div>;
+  return <div className="text-muted-foreground px-1 py-0.5">  {line.text}</div>;
 }
