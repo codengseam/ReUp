@@ -99,7 +99,6 @@ async function extractKeywordsViaLLM(
 文本：${text}`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-lite-260215',
       temperature: 0.1,
     };
 
@@ -251,7 +250,6 @@ ${docList}
 不要返回其他内容。`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-pro-260215',
       temperature: 0.0,
     };
 
@@ -348,7 +346,6 @@ async function generateHydeAnswer(
 用户问题：${query}`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-lite-260215',
       temperature: 0.3,
     };
 

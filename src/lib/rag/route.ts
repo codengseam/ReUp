@@ -37,7 +37,6 @@ ${historyStr}
 如果是其他策略，subQueries为空数组。`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-pro-260215',
       temperature: 0.1,
     };
 
@@ -112,7 +111,6 @@ async function inferQueryCategoryViaLLM(
 用户查询：${query}`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-lite-260215',
       temperature: 0.0,
     };
 
@@ -168,7 +166,6 @@ ${historyStr}
 只输出重写后的查询，不要其他内容。`;
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-lite-260215',
       temperature: 0.1,
     };
 

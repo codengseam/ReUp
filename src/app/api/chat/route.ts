@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { LLMClient } from '@/lib/llm-client';
+import { LLMClient, type ModelCandidate } from '@/lib/llm-client';
 import type { RAGResult } from '@/lib/rag';
 import {
   retrieve,
@@ -19,37 +19,22 @@ import {
 } from '@/lib/admin-stats';
 import { isSafeEndpoint } from '@/lib/url-safety';
 import { getCustomPrompt, getRAGParams, getModelConfig } from '@/lib/server-config';
+import { getModelCandidates } from '@/lib/runtime-config';
+import { BUILTIN_MODEL_IDS } from '@/lib/models';
 
 // 模型白名单字面量类型（与 src/lib/models.ts 的 BUILTIN_MODELS 保持一致）
 // 如果新增/删除内置模型，需要同时更新 models.ts 和这里的字面量联合
-type AllowedModelId =
-  | 'doubao-seed-2-0-pro-260215'
-  | 'doubao-seed-2-0-lite-260215'
-  | 'doubao-seed-2-0-mini-260215'
-  | 'deepseek-v3-2-251201'
-  | 'kimi-k2-5-260127'
-  | 'glm-4-7-251222'
-  | 'glm-5-0-260211'
-  | 'minimax-m2-5-260212'
-  | 'qwen-3-5-plus-260215';
+// 实际值从 BUILTIN_MODEL_IDS 派生（编译期常量 union 由 TS 自动收敛）
+type AllowedModelId = (typeof BUILTIN_MODEL_IDS)[number];
 
-const ALLOWED_MODEL_IDS: readonly AllowedModelId[] = [
-  'doubao-seed-2-0-pro-260215',
-  'doubao-seed-2-0-lite-260215',
-  'doubao-seed-2-0-mini-260215',
-  'deepseek-v3-2-251201',
-  'kimi-k2-5-260127',
-  'glm-4-7-251222',
-  'glm-5-0-260211',
-  'minimax-m2-5-260212',
-  'qwen-3-5-plus-260215',
-];
+const ALLOWED_MODEL_IDS = BUILTIN_MODEL_IDS;
+const DEFAULT_MODEL_ID: AllowedModelId = 'qwen3.6-plus-2026-04-02';
 
 function validateModel(modelId: string | undefined): AllowedModelId {
-  if (modelId && ALLOWED_MODEL_IDS.includes(modelId as AllowedModelId)) {
+  if (modelId && (ALLOWED_MODEL_IDS as readonly string[]).includes(modelId)) {
     return modelId as AllowedModelId;
   }
-  return 'doubao-seed-2-0-pro-260215';
+  return DEFAULT_MODEL_ID;
 }
 
 /** 自动补全 endpoint：兼容用户填 base_url 或完整路径 */
@@ -626,11 +611,23 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // 内置模型：使用 LLMClient
+          // 内置模型：使用 LLMClient + 自动 fallback 链
+          // （qwen3.6-plus-2026-04-02 → qwen3.6-plus；GLM 单独走 zhipu 链）
+          const candidates: ModelCandidate[] = await getModelCandidates(selectedModel);
+          if (candidates.length === 0) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ error: `未配置 ${selectedModel} 所需的 API Key，请到管理后台「API Keys」配置` })}\n\n`
+              )
+            );
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+            return;
+          }
           const client = new LLMClient();
 
           const llmStream = client.stream(allMessages, {
-            model: selectedModel,
+            models: candidates,
             temperature: 0.7,
           });
 

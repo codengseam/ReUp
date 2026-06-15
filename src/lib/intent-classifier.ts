@@ -4,7 +4,7 @@
 //
 // 设计要点：
 // 1. 单一 prompt 输出 7 字段 JSON（intent/strategy/rewrittenQuery/subQueries/riskLevel/reason/category）
-// 2. 用轻量模型 doubao-seed-2-0-lite-260215
+// 2. 用 LLMClient 构造器的默认模型 + 自动 fallback（候选链由 src/lib/runtime-config.ts 决定）
 // 3. 解析容错：JSON 在 prose 中也能提取；垃圾输入降级为 general/direct/low
 // 4. 兼容旧版：通过 INTENT_CLASSIFIER_MODE=legacy 走"通用"路径，让调用方自己再走旧链路
 // 5. 不破坏旧 inputGuard 函数（仍 export 在 src/lib/rag/safety.ts，阶段 2 留作 fallback）
@@ -158,7 +158,6 @@ export async function classifyIntent(
     const prompt = INTENT_PROMPT.replace('{CHAT_HISTORY}', historyStr).replace('{QUERY}', query);
 
     const invokeOpts: InvokeOptions = {
-      model: 'doubao-seed-2-0-lite-260215',
       temperature: 0.1,
     };
 

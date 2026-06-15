@@ -1,6 +1,6 @@
 {
   "updatedAt": "2026-06-14T15:37:07.379Z",
-  "defaultModelId": "gui-plus-2026-02-26",
+  "defaultModelId": "qwen3.6-plus-2026-04-02",
   "customModels": [],
   "ragParams": {
     "topK": 7,

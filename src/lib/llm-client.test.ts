@@ -9,6 +9,8 @@ import {
   LLMRateLimitError,
   LLMUpstreamError,
   LLMTimeoutError,
+  LLMAllCandidatesFailedError,
+  type ModelCandidate,
 } from './llm-client';
 
 type FetchMock = ReturnType<typeof vi.fn>;
@@ -53,7 +55,7 @@ describe('LLMClient', () => {
     // Ensure env defaults don't leak between tests
     process.env.DASHSCOPE_API_KEY = 'test-key';
     process.env.DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    process.env.DASHSCOPE_CHAT_MODEL = 'gui-plus-2026-02-26';
+    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
   });
 
   afterEach(() => {
@@ -123,7 +125,7 @@ describe('LLMClient', () => {
       const client = new LLMClient();
       await client.invoke([{ role: 'user', content: 'q' }]);
       const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
-      expect(body.model).toBe('gui-plus-2026-02-26');
+      expect(body.model).toBe('qwen3.6-plus-2026-04-02');
     });
 
     it('throws LLMAuthError on 401 response', async () => {
@@ -357,6 +359,183 @@ describe('LLMClient', () => {
         caught = e;
       }
       expect(caught).toBeInstanceOf(LLMAuthError);
+    });
+  });
+
+  // ================================================================
+  // 多 model 候选 fallback (opts.models)
+  // ================================================================
+  describe('multi-candidate fallback (opts.models)', () => {
+    const candA: ModelCandidate = {
+      model: 'qwen3.6-plus-2026-04-02',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      apiKey: 'sk-A',
+    };
+    const candB: ModelCandidate = {
+      model: 'qwen3.6-plus',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      apiKey: 'sk-A',
+    };
+
+    describe('invoke()', () => {
+      it('uses the first candidate when it succeeds', async () => {
+        fetchMock.mockResolvedValueOnce(
+          jsonResponse({ choices: [{ message: { content: 'first' } }] })
+        );
+        const client = new LLMClient();
+        const r = await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] });
+        expect(r.content).toBe('first');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+        expect(body.model).toBe('qwen3.6-plus-2026-04-02');
+      });
+
+      it('falls back to the next candidate on 5xx', async () => {
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'oops' } }, 503))
+          .mockResolvedValueOnce(jsonResponse({ choices: [{ message: { content: 'second' } }] }));
+        const client = new LLMClient();
+        const r = await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] });
+        expect(r.content).toBe('second');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string).model).toBe('qwen3.6-plus');
+      });
+
+      it('falls back on 404 (model not found)', async () => {
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'no model' } }, 404))
+          .mockResolvedValueOnce(jsonResponse({ choices: [{ message: { content: 'fb' } }] }));
+        const client = new LLMClient();
+        const r = await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] });
+        expect(r.content).toBe('fb');
+      });
+
+      it('falls back on 429 (rate limit)', async () => {
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'rl' } }, 429))
+          .mockResolvedValueOnce(jsonResponse({ choices: [{ message: { content: 'rl-fb' } }] }));
+        const client = new LLMClient();
+        const r = await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] });
+        expect(r.content).toBe('rl-fb');
+      });
+
+      it('throws LLMAllCandidatesFailedError when all candidates fail', async () => {
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'fail-1' } }, 500))
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'fail-2' } }, 500));
+        const client = new LLMClient();
+        let caught: unknown = null;
+        try {
+          await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] });
+        } catch (e) {
+          caught = e;
+        }
+        expect(caught).toBeInstanceOf(LLMAllCandidatesFailedError);
+        const err = caught as LLMAllCandidatesFailedError;
+        expect(err.attempts).toHaveLength(2);
+        expect(err.attempts[0].model).toBe('qwen3.6-plus-2026-04-02');
+        expect(err.attempts[1].model).toBe('qwen3.6-plus');
+      });
+
+      it('throws LLMAuthError immediately on 401 (does NOT try next)', async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse({ error: { message: 'unauth' } }, 401));
+        const client = new LLMClient();
+        await expect(
+          client.invoke([{ role: 'user', content: 'q' }], { models: [candA, candB] })
+        ).rejects.toBeInstanceOf(LLMAuthError);
+        expect(fetchMock).toHaveBeenCalledTimes(1); // 第二候选没尝试
+      });
+
+      it('each candidate uses its own baseUrl + apiKey (cross-provider fallback)', async () => {
+        const glm: ModelCandidate = {
+          model: 'GLM-4.7-Flash',
+          baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+          apiKey: 'glm-key',
+        };
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'dash down' } }, 500))
+          .mockResolvedValueOnce(jsonResponse({ choices: [{ message: { content: 'glm-ok' } }] }));
+        const client = new LLMClient();
+        const r = await client.invoke([{ role: 'user', content: 'q' }], { models: [candA, glm] });
+        expect(r.content).toBe('glm-ok');
+        const [, init1] = fetchMock.mock.calls[0] as [string, RequestInit];
+        const [, init2] = fetchMock.mock.calls[1] as [string, RequestInit];
+        const url1 = (fetchMock.mock.calls[0] as [string, RequestInit])[0];
+        const url2 = (fetchMock.mock.calls[1] as [string, RequestInit])[0];
+        expect(url1).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/v1/chat/completions');
+        expect(url2).toBe('https://open.bigmodel.cn/api/paas/v4/v1/chat/completions');
+        expect((init1.headers as Record<string, string>).Authorization).toBe('Bearer sk-A');
+        expect((init2.headers as Record<string, string>).Authorization).toBe('Bearer glm-key');
+        // suppress unused-var
+        void init1; void init2;
+      });
+    });
+
+    describe('stream()', () => {
+      it('falls back to next candidate when first returns non-OK (no chunks yielded yet)', async () => {
+        // First: 5xx response (no streaming body)
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'upstream' } }, 503))
+          .mockResolvedValueOnce(sseResponse([
+            'data: {"choices":[{"delta":{"content":"fb"}}]}\n\n',
+            'data: [DONE]\n\n',
+          ]));
+        const client = new LLMClient();
+        const collected: string[] = [];
+        for await (const chunk of client.stream([{ role: 'user', content: 'q' }], { models: [candA, candB] })) {
+          collected.push(chunk.content);
+        }
+        expect(collected).toEqual(['fb']);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      });
+
+      it('throws immediately on 401 even for stream()', async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse({ error: { message: 'unauth' } }, 401));
+        const client = new LLMClient();
+        let caught: unknown = null;
+        try {
+          for await (const _ of client.stream([{ role: 'user', content: 'q' }], { models: [candA, candB] })) {
+            void _;
+          }
+        } catch (e) {
+          caught = e;
+        }
+        expect(caught).toBeInstanceOf(LLMAuthError);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('does NOT silently switch models mid-stream (after first chunk, no second call)', async () => {
+        // First candidate: yields one chunk, then stream ends cleanly (no error, just no more data).
+        // Verify the second candidate is NOT called even though the stream completed.
+        fetchMock.mockResolvedValueOnce(sseStreamResponse([
+          'data: {"choices":[{"delta":{"content":"first"}}]}\n\n',
+        ]));
+        // No second mock queued — if second call happens, it will get undefined and fail.
+        const client = new LLMClient();
+        const collected: string[] = [];
+        for await (const chunk of client.stream([{ role: 'user', content: 'q' }], { models: [candA, candB] })) {
+          collected.push(chunk.content);
+        }
+        expect(collected).toEqual(['first']); // first chunk was yielded
+        // Should NOT have called second candidate (first one succeeded → return)
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('throws LLMAllCandidatesFailedError when all candidates fail without yielding', async () => {
+        fetchMock
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'fail-1' } }, 500))
+          .mockResolvedValueOnce(jsonResponse({ error: { message: 'fail-2' } }, 500));
+        const client = new LLMClient();
+        let caught: unknown = null;
+        try {
+          for await (const _ of client.stream([{ role: 'user', content: 'q' }], { models: [candA, candB] })) {
+            void _;
+          }
+        } catch (e) {
+          caught = e;
+        }
+        expect(caught).toBeInstanceOf(LLMAllCandidatesFailedError);
+      });
     });
   });
 });
