@@ -67,8 +67,6 @@ function cleanLine(raw: string): string {
   // Bold / italic
   line = line.replace(/\*\*([^*]+)\*\*/g, '$1');
   line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1');
-  // Strip leading bullet markers so "- **数据库**：MySQL" → "数据库：MySQL"
-  line = line.replace(/^[-*•]\s*/, '');
   // Strip leading blockquote / list decorations leftover
   line = line.replace(/^>\s*/, '');
   return line.trim();
@@ -604,7 +602,7 @@ function parseSkillsSection(body: string): string[] {
   };
   for (const line of lines) {
     const m = BULLET_RE.exec(line);
-    let text = m?.[1]?.trim() ?? line;
+    const text = m?.[1]?.trim() ?? line;
     if (!text) continue;
     // Bug D: if the text is a long sentence without common list separators,
     // AND does not contain a colon (which indicates a category prefix like
