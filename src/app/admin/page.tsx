@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   LayoutDashboard,
   Database,
+  Sparkles,
   PenLine,
   Cpu,
   SlidersHorizontal,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import DashboardTab from './_components/dashboard-tab';
 import KnowledgeTab from './_components/knowledge-tab';
+import FrameworkSkillsTab from './_components/framework-skills-tab';
 import PromptTab from './_components/prompt-tab';
 import ModelTab from './_components/model-tab';
 import RAGTab from './_components/rag-tab';
@@ -24,10 +26,11 @@ import type { TabKey } from './_lib/types';
 const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: 'dashboard', label: '概览', icon: LayoutDashboard },
   { key: 'knowledge', label: '知识库', icon: Database },
+  { key: 'framework-skills', label: 'Skill 框架', icon: Sparkles },
   { key: 'prompt', label: '提示词', icon: PenLine },
   { key: 'model', label: '模型配置', icon: Cpu },
   { key: 'rag', label: 'RAG 参数', icon: SlidersHorizontal },
-  { key: 'metadata', label: '元数据', icon: Tags },
+  { key: 'metadata', label: '分类', icon: Tags },
 ];
 
 // ===== 阶段 3：鉴权迁后端 =====
@@ -270,6 +273,9 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="knowledge">
             <KnowledgeTab />
+          </TabsContent>
+          <TabsContent value="framework-skills">
+            <FrameworkSkillsTab />
           </TabsContent>
           <TabsContent value="prompt">
             <PromptTab />
