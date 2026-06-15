@@ -7,10 +7,20 @@ import type { RAGResult } from './types';
 // 阶段 4：改为线性打分（结果数 + 最高分加权） + 0..1 数值 score。
 // 热门问题（已纳入 HOT_QUERIES / QUICK_ENTRIES / EXAMPLE_QUERIES 的问题）即使 RAG 召回一般，
 // 也能由 LLM 凭借通用知识给出可靠回答，直接给高置信度，避免对常见问题误触发"转人工"。
+export interface ConfidenceThresholds {
+  high: number;
+  medium: number;
+}
+
+const DEFAULT_THRESHOLDS: ConfidenceThresholds = { high: 0.50, medium: 0.25 };
+
 export function assessConfidence(
   results: RAGResult[],
-  query?: string
+  query?: string,
+  thresholds?: ConfidenceThresholds
 ): { level: 'high' | 'medium' | 'low'; reason?: string; score: number } {
+  const t = thresholds ?? DEFAULT_THRESHOLDS;
+
   if (query && isHotQuery(query)) {
     return { level: 'high', score: 0.9 };
   }
@@ -23,10 +33,10 @@ export function assessConfidence(
   // 线性打分：召回数量 (0..1, topK=5 封顶) × 0.5 + 最高分 × 0.5，结果夹紧到 [0,1]
   const score = Math.min(1, (results.length / 5) * 0.5 + top * 0.5);
 
-  if (score >= 0.7) {
+  if (score >= t.high) {
     return { level: 'high', score };
   }
-  if (score >= 0.4) {
+  if (score >= t.medium) {
     return { level: 'medium', score, reason: 'partial_match' };
   }
   return { level: 'low', score, reason: 'weak_match' };

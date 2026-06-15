@@ -30,6 +30,10 @@ export interface RAGParams {
   hydeEnabled: boolean;
   rerankEnabled: boolean;
   cacheTTL: number;
+  /** 置信度阈值：high 等级下限（默认 0.50） */
+  confidenceHighThreshold: number;
+  /** 置信度阈值：medium 等级下限（默认 0.25） */
+  confidenceMediumThreshold: number;
 }
 
 export interface ActivityLog {

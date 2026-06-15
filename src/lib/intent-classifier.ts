@@ -159,6 +159,7 @@ export async function classifyIntent(
 
     const invokeOpts: InvokeOptions = {
       temperature: 0.1,
+      timeoutMs: 3_000,
     };
 
     const response = await llmClient.invoke([{ role: 'user', content: prompt }], invokeOpts);

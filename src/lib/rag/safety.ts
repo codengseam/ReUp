@@ -183,7 +183,8 @@ export async function outputGuard(
   try {
     const llmClient = new LLMClient();
     const jailbreakResponse = await llmClient.invoke(
-      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + output }]
+      [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + output }],
+      { timeoutMs: 2_000 }
     );
     const jailbreakText = jailbreakResponse.content.trim();
     const jailbreakJsonMatch = jailbreakText.match(/\{[\s\S]*\}/);
@@ -205,7 +206,8 @@ export async function outputGuard(
   try {
     const llmClient = new LLMClient();
     const promiseResponse = await llmClient.invoke(
-      [{ role: 'user', content: PROMISE_DETECTION_PROMPT + output }]
+      [{ role: 'user', content: PROMISE_DETECTION_PROMPT + output }],
+      { timeoutMs: 2_000 }
     );
     const promiseText = promiseResponse.content.trim();
     const promiseJsonMatch = promiseText.match(/\{[\s\S]*\}/);
@@ -234,7 +236,8 @@ export async function hallucinationCheck(
   try {
     const llmClient = new LLMClient();
     const response = await llmClient.invoke(
-      [{ role: 'user', content: HALLUCINATION_CHECK_PROMPT.replace('---', context) + '\n' + answer }]
+      [{ role: 'user', content: HALLUCINATION_CHECK_PROMPT.replace('---', context) + '\n' + answer }],
+      { timeoutMs: 2_000 }
     );
     const text = response.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);

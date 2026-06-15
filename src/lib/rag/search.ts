@@ -100,6 +100,7 @@ async function extractKeywordsViaLLM(
 
     const invokeOpts: InvokeOptions = {
       temperature: 0.1,
+      timeoutMs: 2_000,
     };
 
     const response = await llmClient.invoke(
@@ -251,6 +252,7 @@ ${docList}
 
     const invokeOpts: InvokeOptions = {
       temperature: 0.0,
+      timeoutMs: 2_000,
     };
 
     const response = await llmClient.invoke(
@@ -347,6 +349,7 @@ async function generateHydeAnswer(
 
     const invokeOpts: InvokeOptions = {
       temperature: 0.3,
+      timeoutMs: 2_000,
     };
 
     const response = await llmClient.invoke(
