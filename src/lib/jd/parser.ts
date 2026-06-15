@@ -35,13 +35,20 @@ const JD_SCHEMA = z.object({
  */
 function ruleBasedParse(raw: string): JDDocument {
   const titleMatch = raw.match(/(?:招聘|诚聘|急聘)\s*[:：]?\s*([^，,\n、。]+)/);
-  const title = titleMatch?.[1]?.trim() || raw.split('\n')[0]?.trim() || '未知职位';
+  // Fallback: use first non-noise line as title.
+  const firstLine = raw.split('\n').map(l => l.trim()).find(l => l.length > 0) || '';
+  const isNoise = /^[（(]|[）)]$|^[【\[]|^\d+[.、]/.test(firstLine);
+  const title = titleMatch?.[1]?.trim() || (isNoise || !firstLine ? '未知职位' : firstLine);
 
-  const salaryMatch = raw.match(/(\d+)[kK]?\s*[-~]\s*(\d+)[kK]?/);
+  // Salary: only match when preceded by salary keyword OR at least one
+  // number has 'k' suffix (prevents matching "3-5 年经验" as salary).
+  const salaryMatch =
+    raw.match(/(?:薪资|薪水|薪酬|工资|salary)[^\n]{0,30}?(\d+)([kK])?\s*[-~]\s*(\d+)([kK])?/i) ??
+    raw.match(/(\d+)([kK])\s*[-~]\s*(\d+)([kK])?/);
   const salary = salaryMatch
     ? {
-        min: parseInt(salaryMatch[1]!, 10) * 1000,
-        max: parseInt(salaryMatch[2]!, 10) * 1000,
+        min: parseInt(salaryMatch[1]!, 10) * (salaryMatch[2]?.toLowerCase() === 'k' ? 1000 : 1),
+        max: parseInt(salaryMatch[3]!, 10) * (salaryMatch[4]?.toLowerCase() === 'k' ? 1000 : 1),
         currency: 'CNY',
       }
     : undefined;

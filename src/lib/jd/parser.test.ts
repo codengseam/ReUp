@@ -55,6 +55,18 @@ describe('parseJD', () => {
     expect(expReq?.description).toContain('3');
   });
 
+  it('does not match number ranges without salary context', async () => {
+    const jdText = '团队规模 10-20 人，要求 3-5 年经验';
+    const result = await parseJD(jdText);
+    expect(result.salary).toBeUndefined();
+  });
+
+  it('extracts salary range with keyword context', async () => {
+    const jdText = '薪资：20k-35k';
+    const result = await parseJD(jdText);
+    expect(result.salary).toEqual({ min: 20000, max: 35000, currency: 'CNY' });
+  });
+
   it('extracts education requirement from text', async () => {
     const jdText = '本科及以上学历';
     const result = await parseJD(jdText);

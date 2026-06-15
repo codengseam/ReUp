@@ -25,7 +25,7 @@ describe('buildResumeContext', () => {
     expect(ctx).toContain('A - R');
   });
 
-  it('handles resume with missing fields', () => {
+  it('returns empty string when resume has no content', () => {
     const resume: ResumeDocument = {
       meta: { version: '1', source: 'text', createdAt: '' },
       basic: {},
@@ -35,8 +35,22 @@ describe('buildResumeContext', () => {
       education: [],
       raw: '',
     };
+    expect(buildResumeContext(resume)).toBe('');
+  });
+
+  it('handles resume with missing fields', () => {
+    const resume: ResumeDocument = {
+      meta: { version: '1', source: 'text', createdAt: '' },
+      basic: { name: '李四' },  // name exists so context should be non-empty
+      experience: [],
+      projects: [],
+      skills: [],
+      education: [],
+      raw: '',
+    };
     const ctx = buildResumeContext(resume);
-    expect(ctx).toBe('[用户简历摘要]');
+    expect(ctx).toContain('[用户简历摘要]');
+    expect(ctx).toContain('李四');
   });
 
   it('truncates skills to first 10', () => {
