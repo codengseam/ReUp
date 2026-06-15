@@ -121,7 +121,10 @@ export async function getApiKeyForProvider(provider: 'dashscope' | 'zhipu'): Pro
 export type BuiltinModelId =
   | 'qwen3.6-plus-2026-04-02'
   | 'qwen3.6-plus'
-  | 'GLM-4.7-Flash';
+  | 'GLM-4.7-Flash'
+  | 'GLM-4.5-Flash'
+  | 'GLM-4-Flash-250414'
+  | 'GLM-4-Flash';
 
 export interface ModelRegistryEntry {
   provider: 'dashscope' | 'zhipu';
@@ -145,6 +148,21 @@ export const BUILTIN_MODEL_REGISTRY: Record<BuiltinModelId, ModelRegistryEntry> 
   'GLM-4.7-Flash': {
     provider: 'zhipu',
     modelName: 'GLM-4.7-Flash',
+    fallbackChain: ['GLM-4.5-Flash', 'GLM-4-Flash-250414', 'GLM-4-Flash'],
+  },
+  'GLM-4.5-Flash': {
+    provider: 'zhipu',
+    modelName: 'GLM-4.5-Flash',
+    fallbackChain: ['GLM-4-Flash-250414', 'GLM-4-Flash'],
+  },
+  'GLM-4-Flash-250414': {
+    provider: 'zhipu',
+    modelName: 'GLM-4-Flash-250414',
+    fallbackChain: ['GLM-4-Flash'],
+  },
+  'GLM-4-Flash': {
+    provider: 'zhipu',
+    modelName: 'GLM-4-Flash',
     fallbackChain: [],
   },
 };
