@@ -135,6 +135,8 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
   const toneTextClass = TONE_TEXT_CLASS[tone];
   const coverageLabel = `${ats.coverage.percentage.toFixed(1)}%`;
 
+  const resumeEmpty = !resume.experience?.length && !resume.projects?.length && !resume.skills?.length;
+
   return (
     <div className="pt-4 border-t border-border/50">
       {reportError && (
@@ -177,7 +179,7 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
         <StrengthsCard strengths={report.strengths} />
         <GapsCard gaps={report.gaps} />
         <PrioritiesCard priorities={report.priorities} />
-        <MissingKeywordsCard missing={ats.missing} />
+        <MissingKeywordsCard missing={ats.missing} resumeEmpty={resumeEmpty} />
       </div>
     </div>
   );
@@ -229,7 +231,7 @@ function GapsCard({ gaps }: { gaps: MatchReport['gaps'] }) {
             <li key={g.dimension} className="flex items-center justify-between gap-1.5">
               <p className="text-[10px] font-medium text-foreground truncate">{g.dimension}</p>
               <span className={`text-[9px] px-1.5 py-0.5 rounded ${SEVERITY_BADGE_CLASS[g.severity]}`}>
-                {g.severity}
+                {SEVERITY_LABEL[g.severity] ?? g.severity}
               </span>
             </li>
           ))}
@@ -265,14 +267,18 @@ function PrioritiesCard({ priorities }: { priorities: MatchReport['priorities'] 
   );
 }
 
-function MissingKeywordsCard({ missing }: { missing: ATSResult['missing'] }) {
+function MissingKeywordsCard({ missing, resumeEmpty }: { missing: ATSResult['missing']; resumeEmpty?: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-3">
       <div className="flex items-center gap-1 text-[11px] font-semibold text-foreground mb-1.5">
         <XCircle className="w-3 h-3 text-red-600" />
         缺失关键词 ({missing.length})
       </div>
-      {missing.length === 0 ? (
+      {resumeEmpty ? (
+        <p className="text-[10px] text-muted-foreground">
+          简历解析不完整，无法准确评估关键词缺失情况。请先检查简历文件格式。
+        </p>
+      ) : missing.length === 0 ? (
         <p className="text-[10px] text-muted-foreground">所有关键词都已覆盖</p>
       ) : (
         <div className="flex flex-wrap gap-1">
@@ -368,6 +374,12 @@ const IMPACT_LABEL: Record<string, string> = {
   High: '高影响',
   Medium: '中影响',
   Low: '低影响',
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  high: '高',
+  medium: '中',
+  low: '低',
 };
 
 const SECTION_LABEL: Record<ResumeSection, string> = {
