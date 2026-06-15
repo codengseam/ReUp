@@ -48,7 +48,7 @@ export async function parseResume(
   // Future: PDF/Word dispatchers can read `opts.mimeType`; not used yet.
   void opts;
 
-  if (source === 'text') {
+  if (source === 'text' || source === 'pdf+llm') {
     if (typeof input !== 'string') {
       throw new Error("parseResume: 'text' source requires a string input");
     }

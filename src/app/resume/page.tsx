@@ -64,7 +64,7 @@ export default function ResumeUploadPage() {
     if (saved) {
       setParsedResume(saved);
       if (saved.raw) setPastedText(saved.raw);
-      setFormat(saved.meta.source === 'md' ? 'markdown' : saved.meta.source);
+      setFormat(saved.meta.source === 'md' ? 'markdown' : saved.meta.source === 'pdf+llm' ? 'pdf' : saved.meta.source);
     }
     setPrivacyModeState(isPrivacyMode());
   }, []);

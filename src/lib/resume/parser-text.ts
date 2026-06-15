@@ -3,6 +3,8 @@
 // Pure string parsing — no markdown-it, no DOM, runs in Node and Edge.
 // The markdown parser (A5) strips markdown formatting first, then calls this.
 
+import { z } from 'zod';
+import type { Message, LLMResponse } from '@/lib/llm-client';
 import {
   parseResumeMeta,
   type ResumeDocument,
@@ -716,4 +718,117 @@ export function parseTextResume(input: string, source: ResumeSource = 'text'): R
     }
   }
   return doc;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — LLM Fallback (J)
+// ---------------------------------------------------------------------------
+
+const LLM_RESUME_SCHEMA = z.object({
+  name: z.string().optional(),
+  title: z.string().optional(),
+  city: z.string().optional(),
+  contact: z.record(z.string(), z.string()).optional(),
+  experience: z.array(z.object({
+    company: z.string(),
+    role: z.string(),
+    period: z.string(),
+    bullets: z.array(z.string()),
+  })).optional().default([]),
+  projects: z.array(z.object({
+    name: z.string(),
+    period: z.string().optional(),
+    bullets: z.array(z.string()),
+  })).optional().default([]),
+  education: z.array(z.object({
+    school: z.string(),
+    degree: z.string(),
+    period: z.string(),
+    notes: z.array(z.string()).optional(),
+  })).optional().default([]),
+  skills: z.array(z.string()).optional().default([]),
+});
+
+/**
+ * Determine whether the rule-based parser output is too sparse to be useful
+ * and should trigger the LLM fallback path.
+ */
+export function shouldFallback(doc: ResumeDocument): boolean {
+  return (
+    !doc.basic.name &&
+    doc.experience.length === 0 &&
+    doc.projects.length === 0 &&
+    doc.skills.length === 0 &&
+    doc.raw.length > 200
+  );
+}
+
+/**
+ * LLM-based resume parsing fallback. Takes the raw text and an LLM invoke
+ * callback, returns a structured ResumeDocument (or the fallback doc on
+ * error). The caller is responsible for wiring env-var gating and privacy
+ * checks.
+ */
+export async function llmFallbackParse(
+  raw: string,
+  llmInvoke: (messages: Message[]) => Promise<LLMResponse>,
+  fallbackDoc: ResumeDocument,
+): Promise<ResumeDocument> {
+  const prompt = `你是一个简历解析专家。请从以下简历文本中提取结构化信息，输出 JSON。
+
+要求：
+1. 识别姓名、联系方式、工作经历、项目经历、教育经历、专业技能
+2. 工作经历每项包含：公司名、职位、时间段、职责描述列表
+3. 项目经历每项包含：项目名称、时间段、描述列表
+4. 教育经历每项包含：学校、学位、时间段
+5. 专业技能为字符串数组
+6. 如果某字段无法识别，使用空字符串或空数组
+7. 保持原文语言，不要翻译
+
+输出格式（严格 JSON）：
+{
+  "name": "",
+  "title": "",
+  "city": "",
+  "contact": {},
+  "experience": [{"company":"","role":"","period":"","bullets":[]}],
+  "projects": [{"name":"","period":"","bullets":[]}],
+  "education": [{"school":"","degree":"","period":"","notes":[]}],
+  "skills": []
+}
+
+简历文本：
+---
+${raw}
+---`;
+
+  try {
+    const response = await llmInvoke([{ role: 'user', content: prompt }]);
+    const text = typeof response.content === 'string' ? response.content : '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return fallbackDoc;
+
+    const parsed = LLM_RESUME_SCHEMA.parse(JSON.parse(jsonMatch[0]));
+
+    return {
+      meta: {
+        version: 'reup.v2.phase3',
+        source: 'pdf+llm' as ResumeSource,
+        createdAt: new Date().toISOString(),
+      },
+      basic: {
+        name: parsed.name,
+        title: parsed.title,
+        city: parsed.city,
+        contact: (parsed.contact ?? {}) as Record<string, string>,
+      },
+      experience: parsed.experience,
+      projects: parsed.projects,
+      education: parsed.education,
+      skills: parsed.skills,
+      raw,
+    };
+  } catch {
+    return fallbackDoc;
+  }
 }

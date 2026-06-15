@@ -7,6 +7,8 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { parseResume } from '@/lib/resume/parser';
+import { shouldFallback, llmFallbackParse } from '@/lib/resume/parser-text';
+import { LLMClient } from '@/lib/llm-client';
 import type { ResumeSource } from '@/lib/resume/types';
 
 export const runtime = 'nodejs';
@@ -61,6 +63,26 @@ export async function POST(request: NextRequest) {
 
   try {
     const doc = await parseResume(buffer, source as ResumeSource);
+
+    // Phase 1 J: LLM fallback when rule-based parser produces empty structure.
+    const enableLLMFallback = process.env.RESUME_PDF_LLM_FALLBACK === 'true';
+    const privacyMode = process.env.NEXT_PUBLIC_PRIVACY_MODE === 'local-only';
+    if (enableLLMFallback && !privacyMode && shouldFallback(doc)) {
+      try {
+        const llmClient = new LLMClient();
+        const fallbackDoc = await llmFallbackParse(
+          doc.raw,
+          (messages) => llmClient.invoke(messages),
+          doc,
+        );
+        return NextResponse.json({ ok: true, doc: fallbackDoc });
+      } catch (llmErr) {
+        console.warn('[resume/parse] LLM fallback failed, returning rule-based result:',
+          llmErr instanceof Error ? llmErr.message : String(llmErr));
+        // Silently fall through to rule-based result below.
+      }
+    }
+
     return NextResponse.json({ ok: true, doc });
   } catch (e) {
     const msg = truncate(e instanceof Error ? e.message : String(e), MESSAGE_TRUNC);

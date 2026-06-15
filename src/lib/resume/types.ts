@@ -2,7 +2,7 @@
 // ReUp v2 Phase 3 P0 (A1): shared schema for all resume parsers.
 // PDF / Word / Markdown / Text parsers all import from here.
 
-export type ResumeSource = 'pdf' | 'word' | 'md' | 'text';
+export type ResumeSource = 'pdf' | 'word' | 'md' | 'text' | 'pdf+llm';
 
 export interface ResumeMeta {
   version: string;
