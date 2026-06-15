@@ -57,6 +57,13 @@ export interface StarExample {
 export interface BuildStarRewritePromptOptions {
   /** 要注入的 example id 列表；默认 ['example-1']；传 [] 表示不注入 */
   exampleIds?: string[];
+  /**
+   * 完整替换默认 system prompt。常用于后台管理员在 admin UI 中配置的
+   * 自定义提示词（admin runtime config key: `resume.starPrompt`）。当
+   * 传入非空字符串时，默认的 few-shot 注入和 4 段格式说明都会被忽略——
+   * 由调用者负责保证 prompt 自洽。
+   */
+  customSystemPrompt?: string;
 }
 
 /** Token 估算上限：超出仅 warn，不 throw */
@@ -264,6 +271,13 @@ export function buildStarRewritePrompt(
 ): { system: string; user: string } {
   const exampleIds = opts.exampleIds ?? ['example-1'];
 
+  const user = renderUser(resume);
+
+  // Admin-override: replace the default system prompt wholesale.
+  if (opts.customSystemPrompt && opts.customSystemPrompt.trim().length > 0) {
+    return { system: opts.customSystemPrompt, user };
+  }
+
   const fewshots = exampleIds
     .map((id) => loadExample(id))
     .filter((x): x is StarExample => x !== null);
@@ -286,8 +300,6 @@ export function buildStarRewritePrompt(
   ]
     .filter((s) => s.length > 0)
     .join('\n\n');
-
-  const user = renderUser(resume);
 
   // 估算 token：超限 warn（不 throw）
   const total = estimateTokens(system) + estimateTokens(user);

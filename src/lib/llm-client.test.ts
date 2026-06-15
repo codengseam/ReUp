@@ -103,7 +103,7 @@ describe('LLMClient', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/v1/chat/completions');
+      expect(url).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
       expect(init.method).toBe('POST');
       expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
       expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
@@ -462,7 +462,7 @@ describe('LLMClient', () => {
         const [, init2] = fetchMock.mock.calls[1] as [string, RequestInit];
         const url1 = (fetchMock.mock.calls[0] as [string, RequestInit])[0];
         const url2 = (fetchMock.mock.calls[1] as [string, RequestInit])[0];
-        expect(url1).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/v1/chat/completions');
+        expect(url1).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
         expect(url2).toBe('https://open.bigmodel.cn/api/paas/v4/v1/chat/completions');
         expect((init1.headers as Record<string, string>).Authorization).toBe('Bearer sk-A');
         expect((init2.headers as Record<string, string>).Authorization).toBe('Bearer glm-key');

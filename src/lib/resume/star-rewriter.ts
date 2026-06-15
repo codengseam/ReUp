@@ -16,6 +16,7 @@
 import { LLMClient, type Message } from '@/lib/llm-client';
 import { buildStarRewritePrompt } from './prompts/star';
 import type { ResumeDocument } from './types';
+import { getResumePrompt } from './admin-config';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -126,7 +127,12 @@ export async function* rewriteResumeStream(
     return;
   }
 
-  const { system, user } = buildStarRewritePrompt(resume);
+  const { system: defaultSystem, user } = buildStarRewritePrompt(resume);
+  // Phase 6 (C6): read the admin-overridable STAR system prompt. When present
+  // and non-empty, replace the default wholesale so admins can retune the
+  // prompt without code changes.
+  const customSystem = await getResumePrompt('star');
+  const system = customSystem && customSystem.trim().length > 0 ? customSystem : defaultSystem;
 
   for (const section of STAR_SECTIONS) {
     const messages: Message[] = [

@@ -194,14 +194,14 @@ describe('MatchReportCard', () => {
     expect(screen.getByText(/^1\./)).toBeInTheDocument();
     expect(screen.getByText(/^2\./)).toBeInTheDocument();
     expect(screen.getByText(/^3\./)).toBeInTheDocument();
-    // Action text rendered
+    // Action text rendered (English from baseReport.priorities[0])
     expect(
       screen.getByText(/Add quantified metrics to top 3 bullets/),
     ).toBeInTheDocument();
-    // Impact badges rendered
-    expect(screen.getByText('High')).toBeInTheDocument();
-    expect(screen.getByText('Medium')).toBeInTheDocument();
-    expect(screen.getByText('Low')).toBeInTheDocument();
+    // Impact badges: component maps "High"/"Medium"/"Low" → "高/中/低影响"
+    expect(screen.getByText('高影响')).toBeInTheDocument();
+    expect(screen.getByText('中影响')).toBeInTheDocument();
+    expect(screen.getByText('低影响')).toBeInTheDocument();
   });
 
   it('renders Missing Keywords chips with suggestedSection label', () => {
@@ -233,11 +233,11 @@ describe('MatchReportCard', () => {
     // Each chip is rendered
     expect(within(card).getByText('kubernetes')).toBeInTheDocument();
     expect(within(card).getByText('微服务')).toBeInTheDocument();
-    // Section labels (whole-element match)
-    expect(within(card).getByText('skills')).toBeInTheDocument();
-    expect(within(card).getByText('projects')).toBeInTheDocument();
-    expect(within(card).getByText('basic')).toBeInTheDocument();
-    expect(within(card).getByText('experience')).toBeInTheDocument();
+    // Section labels (whole-element match): component maps to Chinese
+    expect(within(card).getByText('技能')).toBeInTheDocument();
+    expect(within(card).getByText('项目经历')).toBeInTheDocument();
+    expect(within(card).getByText('个人信息')).toBeInTheDocument();
+    expect(within(card).getByText('工作经历')).toBeInTheDocument();
   });
 
   it('shows empty-state placeholders when no strengths or no gaps', () => {

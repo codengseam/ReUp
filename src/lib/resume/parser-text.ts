@@ -27,6 +27,8 @@ const SECTION_PATTERNS: Array<{ kind: SectionKind; re: RegExp }> = [
 const SUBSECTION_RE = /^\s*###\s+(.+)$/;
 const BULLET_RE = /^\s*(?:\\[-*•]|(?:[-*•])|\d+\.)\s+(.*)$/;
 // Matches "2022年10月 - 至今", "2021年04月 - 2022年10月", "2020-2023", "2019.6 - 2022.3"
+// and the in-line variant "业务负责人，2022年10月 - 至今，重庆" where a Chinese
+// comma separates the role token from the period.
 const PERIOD_RE =
   /(\d{4}\s*年\s*\d{1,2}\s*月\s*[-—~到]+\s*(?:\d{4}\s*年\s*\d{1,2}\s*月|至今|现在|present|\d{4})|\d{4}[\.\-/年]?\s*\d{0,2}\s*月?\s*[-—~到]+\s*(?:\d{4}|至今|现在|present)|\d{4}\s*[-—~到]+\s*\d{4})/i;
 const BASIC_FIELD_RE = /^\s*\*{0,2}([^：:]+?)\*{0,2}\s*[：:]\s*(.+?)\s*\\?\s*$/;
@@ -174,8 +176,36 @@ function extractPeriod(text: string): { period: string | undefined; rest: string
 
 function parseRoleLine(line: string): { role: string; period: string | undefined } {
   const { period, rest } = extractPeriod(line);
-  // Strip parens that only contained the period info
+  // Strip parens that only contained the period info. We strip:
+  //   - trailing "）" or ")"
+  //   - a trailing "| location" pipe segment
+  //   - any tokens after the period's first split (Chinese or English comma),
+  //     since the trailing tail is almost always a location (e.g. "重庆")
+  //     and not part of the role.
   let role = rest.replace(/[()()（）]+\s*$/g, '').replace(/^[（(]\s*[)）]/g, '').trim();
+  // Collapse double separators (e.g. "（业务负责人，," from a partial paren strip)
+  role = role.replace(/[，,]{2,}/g, '，').replace(/[，,]\s*$/g, '').trim();
+  if (period) {
+    // The role, if any, sits BEFORE the period token. Walk the original
+    // (pre-extract) input up to the period's first character.
+    const idx = line.indexOf(period);
+    if (idx > 0) {
+      const before = line.slice(0, idx).trim();
+      // Strip a leading "）" or ")" that wraps a meta prefix.
+      const m = before.match(/^[（(](.+?)[)）]\s*$/);
+      if (m) {
+        role = m[1]!.trim();
+      } else {
+        // The role prefix may be inside an unclosed paren like
+        // "懂车帝 - 抖音电商（业务负责人，". Strip back to the LAST opening
+        // paren (or comma boundary) so we keep the project/department prefix
+        // but drop the "（role，" tail.
+        const cutAt = Math.max(before.lastIndexOf('（'), before.lastIndexOf('('));
+        if (cutAt > 0) role = before.slice(0, cutAt).trim();
+        else role = before.replace(/[，,]\s*[^，,]*$/, '').trim();
+      }
+    }
+  }
   // Strip a trailing "| location" pipe segment
   role = role.split(PIPE_SPLIT_RE)[0]?.trim() ?? role;
   return { role, period };
@@ -221,10 +251,22 @@ function parseExperienceEntry(headerLine: string, bodyLines: string[]): ResumeEx
     company = rest;
   }
 
+  // If the header is a "Company (meta1, meta2, period, location)" single-line
+  // form (very common in Chinese resumes), split the meta tail so that
+  // `company` becomes the bare company name and `role` is the first meta
+  // token that looks like a job title.
+  if (cleanedHeader.includes('（') || cleanedHeader.includes('(')) {
+    const split = splitHeaderParen(cleanedHeader);
+    if (split) {
+      company = split.company;
+      if (!role && split.role) role = split.role;
+    }
+  }
+
   const firstNonBullet = firstNonBulletLine(bodyLines);
   if (firstNonBullet) {
     const { role: r, period: p } = parseRoleLine(firstNonBullet);
-    if (r) role = r;
+    if (r && !role) role = r;
     if (p && !period) period = p;
   }
 
@@ -253,6 +295,36 @@ function parseExperienceEntry(headerLine: string, bodyLines: string[]): ResumeEx
   if (!company) company = 'Unknown';
   const bullets = extractBullets(bodyLines);
   return { company, role, period: period ?? '', bullets };
+}
+
+/**
+ * Tokens that signal "this is a job title" in the meta tail of a header line.
+ * Chinese resumes commonly use: 负责人, 业务负责人, 团队负责人, 工程师, 测试工程师,
+ * 开发工程师, 经理, 主管, 总监, 实习生.
+ */
+const ROLE_KEYWORDS = /(负责人|工程师|实习生|经理|主管|总监|owner|Owner|lead|Lead|eng|Eng)/;
+
+/**
+ * Split a "Company (meta1, meta2, period, location)" header into
+ * `{ company, role }`. The `role` is the first meta token that matches
+ * `ROLE_KEYWORDS`; if none match, `role` is undefined.
+ *
+ * Returns null if the header doesn't have a paren tail — callers fall back
+ * to their existing logic.
+ */
+function splitHeaderParen(header: string): { company: string; role?: string } | null {
+  // Find the LAST opening paren so the company name can contain dashes.
+  const openIdx = Math.max(header.lastIndexOf('（'), header.lastIndexOf('('));
+  if (openIdx <= 0) return null;
+  const closeIdx = Math.max(header.lastIndexOf('）'), header.lastIndexOf(')'));
+  if (closeIdx <= openIdx) return null;
+  const company = header.slice(0, openIdx).trim();
+  const inside = header.slice(openIdx + 1, closeIdx).trim();
+  if (!company || !inside) return null;
+  const parts = inside.split(/[，,]/).map((p) => p.trim()).filter(Boolean);
+  const roleHit = parts.find((p) => ROLE_KEYWORDS.test(p));
+  if (!roleHit) return null;
+  return { company, role: roleHit };
 }
 
 function parseProjectEntry(headerLine: string, bodyLines: string[]): ResumeProject | null {
@@ -337,10 +409,12 @@ function splitSubBlocks(
 
   if (!options.fanOut) return blocks.map<PublicSubBlock>(({ header, lines: l, headerSource }) => ({ header, lines: l, headerSource }));
 
-  // Fan out sub-blocks that have no `### ` source AND only bullets.
+  // Fan out sub-blocks that have NO header at all (headerSource === 'none')
+  // AND only contain bullets. This protects titled sub-blocks (e.g. "个人 AI
+  // 实践项目") from being shredded into separate entries.
   const expanded: PublicSubBlock[] = [];
   for (const b of blocks) {
-    if (b.headerSource === 'subsection') {
+    if (b.headerSource !== 'none') {
       expanded.push({ header: b.header, lines: b.lines, headerSource: b.headerSource });
       continue;
     }
@@ -403,17 +477,25 @@ function parseSkillsSection(body: string): string[] {
     .map(cleanLine)
     .filter(Boolean);
   const skills: string[] = [];
+  // We treat each bullet line as a "skill group". Within a group we split on
+  // common Chinese / English separators — but NOT on `:` / `：` because
+  // categories like "数据库：MySQL" are intentionally one logical skill entry.
+  const SEP_RE = /[、,;；\/]| and | & /i;
+  const push = (raw: string) => {
+    const cleaned = raw.replace(/^\**\s*/, '').replace(/\**\s*$/, '').trim();
+    if (!cleaned) return;
+    if (skills.includes(cleaned)) return;
+    skills.push(cleaned);
+  };
   for (const line of lines) {
     const m = BULLET_RE.exec(line);
     const text = m?.[1]?.trim() ?? line;
     if (!text) continue;
-    // Split on Chinese / English separators
-    const parts = text
-      .split(/[、,;；\/]| and | & /i)
-      .map((p) => p.replace(/^\**\s*/, '').replace(/\**\s*$/, '').trim())
-      .filter(Boolean);
-    for (const p of parts) {
-      if (!skills.includes(p)) skills.push(p);
+    const parts = text.split(SEP_RE).map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 1) {
+      push(parts[0]!);
+    } else {
+      for (const p of parts) push(p);
     }
   }
   return skills;
@@ -422,16 +504,24 @@ function parseSkillsSection(body: string): string[] {
 function parseEducationSection(body: string): ResumeEducation[] {
   const lines = body.split('\n').map(cleanLine).filter(Boolean);
   const out: ResumeEducation[] = [];
-  // Strategy: collect non-bullet lines and treat them as a single entry;
-  // bullet lines are attached as a `notes` blob, but the schema doesn't
-  // have notes, so we merge them into the degree field if useful.
-  const blockLines: string[] = [];
+  // Strategy: non-bullet lines form a "title block" (school/degree/period).
+  // Bullet lines attached to a title block are collected as `notes`. When
+  // we hit a new title block (a non-bullet line after we've already seen
+  // bullets), we flush the previous entry — including its notes.
+  let blockLines: string[] = [];
+  let blockNotes: string[] = [];
+  let sawBullets = false;
   const consumeBlock = (): void => {
-    if (blockLines.length === 0) return;
+    if (blockLines.length === 0 && blockNotes.length === 0) return;
+    if (blockLines.length === 0) {
+      // Pure notes without a title — skip (orphaned).
+      blockLines = [];
+      blockNotes = [];
+      sawBullets = false;
+      return;
+    }
     const joined = blockLines.join(' ');
-    // Look for the period
     const { period } = extractPeriod(joined);
-    // School is usually the first bold-ish token before the first `|`
     const tokens = joined.split(PIPE_SPLIT_RE).map((t) => t.trim()).filter(Boolean);
     let school = '';
     let degree = '';
@@ -441,11 +531,25 @@ function parseEducationSection(body: string): ResumeEducation[] {
     } else {
       school = tokens[0] ?? joined;
     }
-    out.push({ school, degree, period: period ?? '' });
-    blockLines.length = 0;
+    const entry: ResumeEducation = { school, degree, period: period ?? '' };
+    if (blockNotes.length > 0) entry.notes = blockNotes;
+    out.push(entry);
+    blockLines = [];
+    blockNotes = [];
+    sawBullets = false;
   };
   for (const line of lines) {
-    if (isBulletLine(line)) continue; // skip bullet lines (notes)
+    if (isBulletLine(line)) {
+      const m = BULLET_RE.exec(line);
+      const text = m?.[1]?.trim();
+      if (text) blockNotes.push(text);
+      sawBullets = true;
+      continue;
+    }
+    if (sawBullets) {
+      // New title line after bullets — flush previous block first.
+      consumeBlock();
+    }
     blockLines.push(line);
   }
   consumeBlock();

@@ -1,10 +1,15 @@
 // src/app/api/resume/jd-keywords/route.ts
 // Server-side JD keyword extraction using LLMClient
 // Client POST { jd } → { keywords: [{term, weight}] }
+//
+// Phase 6 (C5): the LLM system prompt is read from the admin runtime
+// config (key: `resume.atsPrompt`) so admins can tune extraction behavior
+// without code changes. Falls back to the default built into `ats.ts`.
 
 import { type NextRequest } from 'next/server';
 import { extractJdKeywords } from '@/lib/resume/ats';
 import { LLMClient } from '@/lib/llm-client';
+import { getResumePrompt } from '@/lib/resume/admin-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,9 +29,12 @@ export async function POST(request: NextRequest) {
       // LLM not configured — will fall back to TF
     }
 
+    const customSystemPrompt = await getResumePrompt('ats');
+
     const keywords = await extractJdKeywords(jd, {
       llmClient,
       topK: 20,
+      customSystemPrompt: customSystemPrompt ?? undefined,
     });
 
     return new Response(JSON.stringify({ keywords }), {

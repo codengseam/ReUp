@@ -1,7 +1,18 @@
 // ReUp v2 admin-tab: server-only runtime config loader for 6 resume.* keys.
 // 5s module-level memo; falls back to defaults on fetch failure.
 // (server-only: this module is consumed only by server-side resume modules)
-import { STAR_SECTIONS, type StarSection } from './star-rewriter';
+// Note: keep this file's STAR_SECTION_ORDER local (do NOT import the value
+// from `./star-rewriter`) — that file imports `getResumePrompt` from here,
+// and a circular import would leave `STAR_SECTIONS` undefined at the moment
+// the DEFAULTS spread runs.
+import type { StarSection } from './star-rewriter';
+
+const STAR_SECTION_ORDER: ReadonlyArray<StarSection> = [
+  '我的分析',
+  'STAR改写',
+  '底层心法',
+  '建议',
+];
 
 const CACHE_TTL_MS = 5_000;
 const CONFIG_API = '/api/admin/config';
@@ -17,7 +28,7 @@ const DEFAULTS: ResumeRuntimeConfig = {
   topK: 20,
   confidenceChars: 2000,
   fewShotIds: ['example-1'],
-  sectionOrder: [...STAR_SECTIONS],
+  sectionOrder: [...STAR_SECTION_ORDER],
 };
 
 interface CacheEntry<T> { value: T; expires: number; }

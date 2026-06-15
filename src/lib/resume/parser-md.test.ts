@@ -28,7 +28,7 @@ describe('parseMdResume', () => {
     expect(md.experience.length).toBe(txt.experience.length);
     expect(md.projects.length).toBe(txt.projects.length);
     expect(md.experience.length).toBeGreaterThanOrEqual(3);
-    expect(md.projects.length).toBeGreaterThanOrEqual(5);
+    expect(md.projects.length).toBeGreaterThanOrEqual(3);
   });
 
   it('stamps meta.source as md', () => {
@@ -81,9 +81,18 @@ describe('parseMdResume', () => {
     expect(allBullets.some((b) => b.includes('real bullet'))).toBe(true);
   });
 
-  it('produces ≥5 projects from the real fixture', () => {
+  it('produces 3 titled projects from the real fixture (Phase 6: A3 fix)', () => {
     const input = loadFixture();
     const doc = parseMdResume(input);
-    expect(doc.projects.length).toBeGreaterThanOrEqual(5);
+    // Pre-fix: 5 entries (3 titled + 3 fan-out empties from "个人 AI 实践项目"
+    // bullets being misread as sub-projects). Post-fix: 3 titled sub-blocks
+    // — "懂车帝二手车商城及电商业务", "进校智慧考试和阅卷系统",
+    // "个人 AI 实践项目" — preserved by parseProjectEntry.
+    expect(doc.projects).toHaveLength(3);
+    expect(doc.projects.map((p) => p.name)).toEqual([
+      '懂车帝二手车商城及电商业务',
+      '进校智慧考试和阅卷系统',
+      '个人 AI 实践项目',
+    ]);
   });
 });
