@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Database, RefreshCw, Search, BookOpen, FolderTree, Sparkles,
-  Loader2, FileText, ChevronDown, ChevronRight,
+  Loader2, FileText, ChevronDown, ChevronRight, BookText, Heading2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 const KNOWLEDGE_API = '/api/admin/knowledge';
-
 interface KnowledgeStats {
   total: number;
   dimension: number;
   byBook: Array<{ name: string; count: number }>;
   byCategory: Array<{ name: string; count: number }>;
   bySkill: Array<{ name: string; count: number }>;
+  byChapter: Array<{ name: string; count: number }>;
+  bySection: Array<{ name: string; count: number }>;
 }
 
 interface ChunkHit {
@@ -27,19 +28,40 @@ interface ChunkHit {
   book: string;
   category: string;
   skillName: string;
+  /** L3 节级一句话主题（来自 metadata.topic，Phase 2A 注入）。 */
+  topic: string;
   sourcePath: string;
   docTitle: string;
   sectionTitle: string;
   chunkIndex: number;
 }
 
-type GroupTab = 'book' | 'category' | 'skill';
+/** 知识库 tab 的分组维度。Phase 2F 改为 4 维度：
+ * - book         ：按书（2 本）
+ * - category     ：按 L2 细分类（19 业务类 + 通用）
+ * - docTitle     ：按章（doc_title，章级）
+ * - sectionTitle ：按节（section_title，节级）
+ * 框架 Skill 已拆出到 framework-skills tab（Phase 2D），本 tab 不再展示。
+ */
+type GroupTab = 'book' | 'category' | 'docTitle' | 'sectionTitle';
 
 const GROUP_TABS: Array<{ key: GroupTab; label: string; icon: React.ElementType }> = [
   { key: 'book', label: '按书', icon: BookOpen },
   { key: 'category', label: '按分类', icon: FolderTree },
-  { key: 'skill', label: '按 Skill', icon: Sparkles },
+  { key: 'docTitle', label: '按章', icon: BookText },
+  { key: 'sectionTitle', label: '按节', icon: Heading2 },
 ];
+
+/** 把 stats 归一化为当前 active tab 所需的 group 列表（4 维度分支）。 */
+function pickGroups(stats: KnowledgeStats | null, key: GroupTab): Array<{ name: string; count: number }> {
+  if (!stats) return [];
+  switch (key) {
+    case 'book': return stats.byBook;
+    case 'category': return stats.byCategory;
+    case 'docTitle': return stats.byChapter ?? [];
+    case 'sectionTitle': return stats.bySection ?? [];
+  }
+}
 
 export default function KnowledgeTab() {
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
@@ -51,8 +73,8 @@ export default function KnowledgeTab() {
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<ChunkHit[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-
-  const [activeGroup, setActiveGroup] = useState<GroupTab>('skill');
+  // 默认按章（docTitle）：多数场景下 chunk 数量落在 50 个左右，最适合浏览
+  const [activeGroup, setActiveGroup] = useState<GroupTab>('docTitle');
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [groupChunks, setGroupChunks] = useState<ChunkHit[]>([]);
   const [loadingGroup, setLoadingGroup] = useState(false);
@@ -119,7 +141,7 @@ export default function KnowledgeTab() {
     }
   };
 
-  // 展开某分组：搜索该 group name 作为 query
+  // 展开某分组：搜索该 group name 作为 query（与旧实现保持一致）
   const handleToggleGroup = useCallback(
     async (key: string) => {
       if (expandedKey === key) {
@@ -146,12 +168,7 @@ export default function KnowledgeTab() {
     [expandedKey]
   );
 
-  const currentGroups = (() => {
-    if (!stats) return [] as Array<{ name: string; count: number }>;
-    if (activeGroup === 'book') return stats.byBook;
-    if (activeGroup === 'category') return stats.byCategory;
-    return stats.bySkill;
-  })();
+  const currentGroups = pickGroups(stats, activeGroup);
 
   return (
     <div className="space-y-6">
@@ -270,17 +287,37 @@ export default function KnowledgeTab() {
                   {hits.map((h) => (
                     <div
                       key={h.id}
+                      data-testid="search-hit"
                       className="border border-border rounded-lg bg-white p-3"
                     >
+                      {/* 主题行：book / doc_title（mono 字体，让用户一眼看清 chunk 来自哪本书哪章） */}
+                      <p
+                        data-testid="search-hit-topic"
+                        className="text-[11px] font-mono text-muted-foreground mb-1"
+                      >
+                        {h.book || '(未知书)'}
+                        <span className="mx-1.5 opacity-50">/</span>
+                        {h.docTitle || '(未知章)'}
+                      </p>
+                      {/* topic 副标题：节级一句话（来自 metadata.topic） */}
+                      {h.topic && (
+                        <p
+                          data-testid="search-hit-subtitle"
+                          className="text-xs font-medium text-foreground mb-2"
+                        >
+                          {h.topic}
+                        </p>
+                      )}
                       <p className="text-xs text-foreground leading-relaxed mb-2">
                         {h.preview}
                       </p>
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        {h.book && <Badge variant="outline">{h.book}</Badge>}
                         {h.category && <Badge variant="secondary">{h.category}</Badge>}
-                        {h.skillName && <Badge variant="default">{h.skillName}</Badge>}
+                        {h.sectionTitle && (
+                          <span className="text-foreground">· {h.sectionTitle}</span>
+                        )}
                         {typeof h.chunkIndex === 'number' && (
-                          <span className="font-mono">chunk #{h.chunkIndex}</span>
+                          <span className="font-mono ml-auto">chunk #{h.chunkIndex}</span>
                         )}
                       </div>
                     </div>
@@ -304,6 +341,7 @@ export default function KnowledgeTab() {
                 return (
                   <button
                     key={g.key}
+                    data-testid={`group-tab-${g.key}`}
                     onClick={() => { setActiveGroup(g.key); setExpandedKey(null); }}
                     className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md transition-colors ${
                       isActive
