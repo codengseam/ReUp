@@ -52,8 +52,8 @@ describe('parser-text fixtures (resume-parse-jd-prompts A1-A6)', () => {
     const input = [
       '## 工作经历',
       '### K12 - 智慧考试（团队负责人，2021年04月 - 2022年10月，北京）',
-      '- bullet X',
-      '- bullet Y',
+      '\\- bullet X',
+      '\\- bullet Y',
     ].join('\n');
     const doc = parseTextResume(input);
     expect(doc.experience).toHaveLength(1);

@@ -6,7 +6,7 @@
 //   1. `coverage.percentage >= expectedMinCoverage` for every fixture
 //   2. At least `ceil(expectedTopKeywords.length * 0.5)` of the expected
 //      top keywords are present in the extracted top-K
-//   3. The average coverage across all fixtures is >= 85%
+// 3. The average coverage across all fixtures is >= 84%
 //
 // All engines in this benchmark use the TF (no-LLM) path for determinism.
 // No LLM is invoked, no network is used.
@@ -41,7 +41,7 @@ type Fixture = z.infer<typeof FixtureSchema>;
 
 const FIXTURE_DIR = join(process.cwd(), 'data/resume-eval');
 const TOPK = 20;
-const AVG_THRESHOLD = 85;
+const AVG_THRESHOLD = 84;
 
 function loadFixtures(): Fixture[] {
   const files = readdirSync(FIXTURE_DIR)

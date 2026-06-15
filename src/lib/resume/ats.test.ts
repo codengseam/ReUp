@@ -134,6 +134,20 @@ describe('extractJdKeywords', () => {
     // We just need it to not throw; TF should produce entries
     expect(out[0]!.term).toBeTruthy();
   });
+
+  it('filters out single-character CJK tokens in TF fallback', async () => {
+    const jd = '高并发 高并发 熟悉 熟悉 熟悉';
+    const out = await extractJdKeywords(jd, { topK: 10 });
+    for (const k of out) {
+      expect(k.term.length).toBeGreaterThan(1);
+    }
+    // '熟悉' appears 3 times → should be top
+    const top = out[0]!;
+    expect(top.term).toBe('熟悉');
+    expect(top.weight).toBe(1);
+    // '高并' or '并发' bigrams from 高并发 should be present (not the single chars)
+    expect(out.some((k) => k.term.includes('高') || k.term.includes('并') || k.term.includes('发'))).toBe(true);
+  });
 });
 
 describe('computeAtsCoverage', () => {

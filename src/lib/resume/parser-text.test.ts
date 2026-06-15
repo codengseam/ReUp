@@ -138,6 +138,83 @@ describe('parseTextResume', () => {
     const doc: ResumeDocument = parseTextResume('## 技能\n- x');
     expect(doc).toBeDefined();
   });
+
+  // Bug B: trailing info block at end of file should be recognised as basic
+  it('recognises tail info block as basic section', () => {
+    const input = [
+      '## 工作经历',
+      '### 字节跳动',
+      '测试开发工程师 2020-2022',
+      '- 负责质量保障',
+      '',
+      '姓名：张三',
+      '电话：138-0000-0000',
+      '邮箱：zhangsan@example.com',
+      '微信：zhangsan_wx',
+    ].join('\n');
+    const doc = parseTextResume(input);
+    expect(doc.basic.name).toBe('张三');
+    expect(doc.basic.contact?.phone).toBe('138-0000-0000');
+    expect(doc.basic.contact?.email).toBe('zhangsan@example.com');
+    expect(doc.basic.contact?.wechat).toBe('zhangsan_wx');
+  });
+
+  // Bug B variant: tail info block in plain-text mode (no ## headers)
+  it('recognises tail info block when no sections detected', () => {
+    const input = [
+      '姓名：张三',
+      '电话：138-0000-0000',
+      '邮箱：zhangsan@example.com',
+    ].join('\n');
+    const doc = parseTextResume(input);
+    expect(doc.basic.name).toBe('张三');
+    expect(doc.basic.contact?.phone).toBe('138-0000-0000');
+    expect(doc.basic.contact?.email).toBe('zhangsan@example.com');
+  });
+
+  // Bug C: pipe-separated key:value pairs in basic section
+  it('parses pipe-separated basic fields', () => {
+    const input = [
+      '## 个人信息',
+      '电话：000-0000-0000 | 邮箱：example@example.com | 现居城市：重庆',
+    ].join('\n');
+    const doc = parseTextResume(input);
+    expect(doc.basic.contact?.phone).toBe('000-0000-0000');
+    expect(doc.basic.contact?.email).toBe('example@example.com');
+    expect(doc.basic.contact?.['现居城市']).toBe('重庆');
+  });
+
+  // Bug D: long sentence skills without bullets should be split by sentence terminators
+  it('splits long sentence skills by semicolons / periods', () => {
+    const input = [
+      '## 专业技能',
+      '熟悉Java编程。掌握Spring Boot框架。了解MySQL数据库。熟悉Redis缓存技术',
+    ].join('\n');
+    const doc = parseTextResume(input);
+    expect(doc.skills.length).toBeGreaterThanOrEqual(4);
+    expect(doc.skills.some((s) => s.includes('Java'))).toBe(true);
+    expect(doc.skills.some((s) => s.includes('Spring Boot'))).toBe(true);
+    expect(doc.skills.some((s) => s.includes('MySQL'))).toBe(true);
+    expect(doc.skills.some((s) => s.includes('Redis'))).toBe(true);
+  });
+
+  // Bug E: paragraph-style experience split by standalone period lines
+  it('splits paragraph-style experience by period lines', () => {
+    const input = [
+      '## 工作经历',
+      '2020年 - 2022年',
+      '字节跳动 测试开发工程师',
+      '负责质量保障体系建设',
+      '',
+      '2022年 - 至今',
+      '腾讯 高级测试开发工程师',
+      '负责自动化测试平台',
+    ].join('\n');
+    const doc = parseTextResume(input);
+    expect(doc.experience.length).toBe(2);
+    expect(doc.experience[0].period).toMatch(/2020/);
+    expect(doc.experience[1].period).toMatch(/2022/);
+  });
 });
 
 describe('plain-text header dictionary', () => {

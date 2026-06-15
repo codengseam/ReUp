@@ -20,17 +20,26 @@ const SECTION_PATTERNS: Array<{ kind: SectionKind; re: RegExp }> = [
   { kind: 'basic', re: /^\s*##\s*(个人信息|基本(?:信息|资料)?|个人简介|basic|contact|profile)(?:\s|$)/i },
   { kind: 'experience', re: /^\s*##\s*(工作经历|工作经验|experience|work\s*history|employment)(?:\s|$)/i },
   { kind: 'projects', re: /^\s*##\s*(项目经历|项目经验|projects?|personal\s*projects?)(?:\s|$)/i },
-  { kind: 'skills', re: /^\s*##\s*(技能|专业技能|skills?|技术栈|tech\s*stack)(?:\s|$)/i },
+  { kind: 'skills', re: /^\s*##\s*(专业技能|技能清单|技术栈|技术能力|掌握的技能|技能|skills?|tech(?:nical)?\s*stack|core\s*(?:competenc(?:ies|y)))(?:\s|$)/i },
   { kind: 'education', re: /^\s*##\s*(教育经历|教育|学历|education|academic(?:\s*background)?)(?:\s|$)/i },
 ];
 
 const SUBSECTION_RE = /^\s*###\s+(.+)$/;
-const BULLET_RE = /^\s*(?:\\[-*•]|(?:[-*•])|\d+\.)\s+(.*)$/;
+const BULLET_RE = /^\s*(?:\\[-*•]|[-*•]|\d+\.)\s*(.*)$/;
 // Matches "2022年10月 - 至今", "2021年04月 - 2022年10月", "2020-2023", "2019.6 - 2022.3"
 // and the in-line variant "业务负责人，2022年10月 - 至今，重庆" where a Chinese
 // comma separates the role token from the period.
 const PERIOD_RE =
   /(\d{4}\s*年\s*\d{1,2}\s*月\s*[-—~到]+\s*(?:\d{4}\s*年\s*\d{1,2}\s*月|至今|现在|present|\d{4})|\d{4}[\.\-/年]?\s*\d{0,2}\s*月?\s*[-—~到]+\s*(?:\d{4}|至今|现在|present)|\d{4}\s*[-—~到]+\s*\d{4})/i;
+// Bug E: standalone period line used to split paragraph-style experience entries.
+// Matches: "2020年-2022年", "2020年 - 2022年", "2020.03-2022.05", "2022年-至今", "2020-2023"
+// These patterns match the FULL line being only a date range.
+const PERIOD_LINE_RE =
+  /^\d{4}\s*[\.\-/年]?\s*(?:至今|今|present|now|\d{4}\s*[\.\-/年]?)\s*$/i;
+const PERIOD_LINE_RE_2 =
+  /^\d{4}\s*[\.\-/年]?\s*[-—~到]+\s*(?:至今|今|present|now|\d{4}\s*[\.\-/年]?)\s*$/i;
+const PERIOD_LINE_RE_3 =
+  /^\d{4}\s*[\.\-/年]?\s*\d{1,2}\s*月?\s*[-—~到]+\s*(?:至今|今|present|now|\d{4}\s*[\.\-/年]?)\s*$/i;
 const BASIC_FIELD_RE = /^\s*\*{0,2}([^：:]+?)\*{0,2}\s*[：:]\s*(.+?)\s*\\?\s*$/;
 
 const PIPE_SPLIT_RE = /\s*\|\s*/;
@@ -58,6 +67,8 @@ function cleanLine(raw: string): string {
   // Bold / italic
   line = line.replace(/\*\*([^*]+)\*\*/g, '$1');
   line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1');
+  // Strip leading bullet markers so "- **数据库**：MySQL" → "数据库：MySQL"
+  line = line.replace(/^[-*•]\s*/, '');
   // Strip leading blockquote / list decorations leftover
   line = line.replace(/^>\s*/, '');
   return line.trim();
@@ -90,7 +101,7 @@ const PLAINTEXT_HEADER_PATTERNS: Array<{ kind: SectionKind; re: RegExp }> = [
  */
 function classifyPlainTextHeader(line: string): SectionKind | null {
   const trimmed = line.trim();
-  if (!trimmed || trimmed.length > 20) return null; // section headers are short
+  if (!trimmed) return null;
   // Strip Chinese-number / arabic-number prefixes and 【】 brackets
   const stripped = trimmed
     .replace(/^[一二三四五六七八九十]+[、.]\s*/, '')
@@ -133,6 +144,23 @@ function splitSections(input: string): Array<{ kind: SectionKind; title: string;
       continue;
     }
 
+    // In markdown mode, also treat lines that look like plain-text headers
+    // as section boundaries (e.g. "专业技能" without ## in mixed-mode docs).
+    // Only trigger when the line is NOT a bullet and NOT a subsection.
+    // Disabled: this causes bullet lines like "- **数据库**：MySQL" to be
+    // mis-classified as section headers because "数据库" matches skills pattern.
+    // if (hasMarkdownHeaders && current && line.trim()) {
+    //   const cleaned = cleanLine(line);
+    //   if (!SUBSECTION_RE.test(cleaned) && !BULLET_RE.test(cleaned)) {
+    //     const plainKind = classifyPlainTextHeader(cleaned);
+    //     if (plainKind && plainKind !== current.kind) {
+    //       flush();
+    //       current = { kind: plainKind, title: cleaned, lines: [] };
+    //       continue;
+    //     }
+    //   }
+    // }
+
     // Plain-text header fallback (only when no markdown headers exist)
     if (!hasMarkdownHeaders) {
       const cleaned = cleanLine(line);
@@ -152,9 +180,9 @@ function splitSections(input: string): Array<{ kind: SectionKind; title: string;
     }
 
     if (current) {
-      current.lines.push(line);
+      current.lines.push(rawLine);
     } else if (!hasMarkdownHeaders) {
-      preludeLines.push(line);
+      preludeLines.push(rawLine);
     }
   }
   flush();
@@ -163,6 +191,53 @@ function splitSections(input: string): Array<{ kind: SectionKind; title: string;
   // "experience" block so bullets at least get parsed.
   if (out.length === 0 && input.trim()) {
     out.push({ kind: 'experience', title: '', body: input });
+  }
+
+  // Bug B: detect trailing info block (tail info block) — if the last lines
+  // of the input are plain key:value pairs (NOT bullet lines), treat them as
+  // a `basic` section. We only consider lines that:
+  //   1. contain `:` or `：`
+  //   2. do NOT start with a bullet marker (`- `, `* `, etc.)
+  // This prevents "- **数据库**：MySQL" from being mis-classified as tail KV.
+  const allLines = input.replace(/\r\n?/g, '\n').split('\n');
+  const nonEmptyLines = allLines.map((l, i) => ({ line: l, idx: i })).filter(({ line }) => line.trim() !== '');
+  // Find contiguous kv lines at the end
+  let tailKvStart = -1;
+  for (let i = nonEmptyLines.length - 1; i >= 0; i--) {
+    const raw = nonEmptyLines[i]!.line;
+    // Skip bullet lines — they belong to sections like skills, not tail info
+    if (/^\s*(?:[-*•]|\d+\.)\s+/.test(raw)) break;
+    if (/[：:]/.test(raw)) {
+      tailKvStart = i;
+    } else {
+      break;
+    }
+  }
+  if (tailKvStart >= 0) {
+    const tailKvLines = nonEmptyLines.slice(tailKvStart).map(({ line }) => line.trim());
+    // Also include any empty lines between the last non-kv line and the kv block
+    const firstKvIdx = nonEmptyLines[tailKvStart]!.idx;
+    const lastNonKvIdx = tailKvStart > 0 ? nonEmptyLines[tailKvStart - 1]!.idx : -1;
+    const gapLines = lastNonKvIdx >= 0 && firstKvIdx > lastNonKvIdx + 1
+      ? allLines.slice(lastNonKvIdx + 1, firstKvIdx).filter((l) => l.trim() === '')
+      : [];
+    const kvLines = [...gapLines, ...tailKvLines];
+    // Remove tail kv lines from the last section's body
+    const lastSec = out[out.length - 1];
+    if (lastSec) {
+      const lastBodyLines = lastSec.body.split('\n');
+      const trimmed = lastBodyLines.filter((l) => {
+        const trimmed = l.trim();
+        return trimmed !== '' && !kvLines.includes(trimmed);
+      });
+      lastSec.body = trimmed.join('\n');
+    }
+    const existingBasic = out.find((s) => s.kind === 'basic');
+    if (existingBasic) {
+      existingBasic.body += '\n' + kvLines.join('\n');
+    } else {
+      out.push({ kind: 'basic', title: '', body: kvLines.join('\n') });
+    }
   }
 
   return out;
@@ -297,6 +372,25 @@ function parseExperienceEntry(headerLine: string, bodyLines: string[]): ResumeEx
   return { company, role, period: period ?? '', bullets };
 }
 
+function parseExperienceEntryFromBlock(headerLine: string, bodyLines: string[]): ResumeExperience | null {
+  const cleanedHeader = cleanLine(headerLine);
+  // If the header itself is a standalone period line, use the period as the
+  // period field and the first body line as the header (company+role).
+  const isStandalonePeriod = PERIOD_LINE_RE.test(cleanedHeader) || PERIOD_LINE_RE_2.test(cleanedHeader) || PERIOD_LINE_RE_3.test(cleanedHeader);
+  if (isStandalonePeriod && bodyLines.length > 0) {
+    const firstBody = cleanLine(bodyLines[0] ?? '');
+    if (firstBody) {
+      // Parse first body line as company+role, use header as period
+      const entry = parseExperienceEntry(firstBody, bodyLines.slice(1));
+      if (entry) {
+        entry.period = cleanedHeader;
+      }
+      return entry;
+    }
+  }
+  return parseExperienceEntry(headerLine, bodyLines);
+}
+
 /**
  * Tokens that signal "this is a job title" in the meta tail of a header line.
  * Chinese resumes commonly use: 负责人, 业务负责人, 团队负责人, 工程师, 测试工程师,
@@ -390,6 +484,22 @@ function splitSubBlocks(
       continue;
     }
     if (!cleaned) continue; // skip empty
+    // Bug E: paragraph-style experience — a standalone period line starts a new entry.
+    // A "standalone" period line means the line is ONLY a date range.
+    const isStandalonePeriodLine = PERIOD_LINE_RE.test(cleaned) || PERIOD_LINE_RE_2.test(cleaned) || PERIOD_LINE_RE_3.test(cleaned);
+    if (isStandalonePeriodLine) {
+      if (current && (current.lines.length > 0 || current.header)) {
+        flush();
+      }
+      if (!current) {
+        current = { header: cleaned, lines: [], hasBullet: false, headerSource: 'title-line' };
+      } else {
+        // current exists but has no content yet (header-only), just update header
+        current.header = cleaned;
+        current.headerSource = 'title-line';
+      }
+      continue;
+    }
     if (current) {
       const isBullet = isBulletLine(cleaned);
       if (!isBullet && current.hasBullet) {
@@ -440,29 +550,33 @@ function parseBasicSection(body: string, headerTitle: string): {
   const basic: ResumeDocument['basic'] = {};
   const contact: Record<string, string> = {};
   for (const line of lines) {
-    const m = line.match(BASIC_FIELD_RE);
-    if (!m) continue;
-    const key = (m[1] ?? '').trim();
-    const value = (m[2] ?? '').trim();
-    if (!key || !value) continue;
-    const keyLower = key.toLowerCase();
-    if (keyLower.includes('姓名') || keyLower === 'name') {
-      basic.name = value;
-    } else if (keyLower.includes('电话') || keyLower === 'phone' || keyLower === 'mobile') {
-      contact.phone = value;
-    } else if (keyLower.includes('邮箱') || keyLower === 'email') {
-      contact.email = value;
-    } else if (keyLower.includes('微信') || keyLower === 'wechat') {
-      contact.wechat = value;
-    } else if (keyLower.includes('网站') || keyLower === 'website' || keyLower === 'blog') {
-      contact.website = value;
-    } else if (keyLower.includes('求职意向') || keyLower === '意向岗位' || keyLower === 'title') {
-      basic.title = value;
-    } else if (keyLower.includes('工作经验') || keyLower.includes('工作年限') || keyLower === 'experience') {
-      const years = parseInt(value.match(/\d+/)?.[0] ?? '', 10);
-      if (!Number.isNaN(years)) basic.yearsOfExperience = years;
-    } else {
-      contact[key] = value;
+    // Bug C: split on pipes first so "电话：x | 邮箱：y" yields two k:v pairs.
+    const fragments = line.split(PIPE_SPLIT_RE).map((f) => f.trim()).filter(Boolean);
+    for (const frag of fragments) {
+      const m = frag.match(BASIC_FIELD_RE);
+      if (!m) continue;
+      const key = (m[1] ?? '').trim();
+      const value = (m[2] ?? '').trim();
+      if (!key || !value) continue;
+      const keyLower = key.toLowerCase();
+      if (keyLower.includes('姓名') || keyLower === 'name') {
+        basic.name = value;
+      } else if (keyLower.includes('电话') || keyLower === 'phone' || keyLower === 'mobile') {
+        contact.phone = value;
+      } else if (keyLower.includes('邮箱') || keyLower === 'email') {
+        contact.email = value;
+      } else if (keyLower.includes('微信') || keyLower === 'wechat') {
+        contact.wechat = value;
+      } else if (keyLower.includes('网站') || keyLower === 'website' || keyLower === 'blog') {
+        contact.website = value;
+      } else if (keyLower.includes('求职意向') || keyLower === '意向岗位' || keyLower === 'title') {
+        basic.title = value;
+      } else if (keyLower.includes('工作经验') || keyLower.includes('工作年限') || keyLower === 'experience') {
+        const years = parseInt(value.match(/\d+/)?.[0] ?? '', 10);
+        if (!Number.isNaN(years)) basic.yearsOfExperience = years;
+      } else {
+        contact[key] = value;
+      }
     }
   }
   if (Object.keys(contact).length > 0) basic.contact = contact;
@@ -481,22 +595,29 @@ function parseSkillsSection(body: string): string[] {
   // common Chinese / English separators — but NOT on `:` / `：` because
   // categories like "数据库：MySQL" are intentionally one logical skill entry.
   const SEP_RE = /[、,;；\/]| and | & /i;
+  const SENTENCE_RE = /[;；。]/;
   const push = (raw: string) => {
-    const cleaned = raw.replace(/^\**\s*/, '').replace(/\**\s*$/, '').trim();
+    const cleaned = raw.replace(/^\*+\s*/, '').replace(/\*+\s*$/, '').trim();
     if (!cleaned) return;
     if (skills.includes(cleaned)) return;
     skills.push(cleaned);
   };
   for (const line of lines) {
     const m = BULLET_RE.exec(line);
-    const text = m?.[1]?.trim() ?? line;
+    let text = m?.[1]?.trim() ?? line;
     if (!text) continue;
-    const parts = text.split(SEP_RE).map((p) => p.trim()).filter(Boolean);
-    if (parts.length === 1) {
-      push(parts[0]!);
-    } else {
-      for (const p of parts) push(p);
+    // Bug D: if the text is a long sentence without common list separators,
+    // AND does not contain a colon (which indicates a category prefix like
+    // "数据库：MySQL"), try splitting by sentence terminators.
+    if (text.length > 20 && ![...text].some((c) => /[、,;；\/]/.test(c)) && !/[：:]/.test(text)) {
+      const sentences = text.split(SENTENCE_RE).map((s) => s.trim()).filter(Boolean);
+      if (sentences.length > 1) {
+        for (const s of sentences) push(s);
+        continue;
+      }
     }
+    const parts = text.split(SEP_RE).map((p) => p.trim()).filter(Boolean);
+    for (const p of parts) push(p);
   }
   return skills;
 }
@@ -581,7 +702,7 @@ export function parseTextResume(input: string, source: ResumeSource = 'text'): R
     } else if (sec.kind === 'experience') {
       const blocks = splitSubBlocks(sec.body, { fanOut: false });
       for (const b of blocks) {
-        const entry = parseExperienceEntry(b.header, b.lines);
+        const entry = parseExperienceEntryFromBlock(b.header, b.lines);
         if (entry) doc.experience.push(entry);
       }
     } else if (sec.kind === 'projects') {

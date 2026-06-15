@@ -177,8 +177,8 @@ describe('MatchReportCard', () => {
     );
     // The Gaps heading is present
     expect(screen.getByText(/短板|Gaps/)).toBeInTheDocument();
-    // The severity "high" badge is rendered
-    expect(screen.getByText(/^high$/)).toBeInTheDocument();
+    // The severity "high" badge is rendered as Chinese "高"
+    expect(screen.getByText(/^高$/)).toBeInTheDocument();
   });
 
   it('renders Priorities as a numbered 1./2./3. list with action + impact badges', () => {
@@ -351,7 +351,45 @@ describe('MatchReportCard', () => {
     );
     expect(gapCards.length).toBeGreaterThan(0);
     const card = gapCards[0] as HTMLElement;
-    const badges = within(card).getAllByText(/^(high|medium|low)$/);
+    const badges = within(card).getAllByText(/^(高|中|低)$/);
     expect(badges.length).toBe(3);
+  });
+
+  it('shows a fallback message in MissingKeywordsCard when resume is empty', () => {
+    const emptyResume: ResumeDocument = {
+      meta: { version: 'reup.v2.phase3', source: 'text', createdAt: '2026-01-15T00:00:00.000Z' },
+      basic: { name: '', title: '' },
+      experience: [],
+      projects: [],
+      skills: [],
+      education: [],
+      raw: '',
+    };
+    const atsWithMissing: ATSResult = {
+      ...baseAts,
+      missing: [
+        { term: 'kubernetes', suggestedSection: 'skills' },
+        { term: '微服务', suggestedSection: 'projects' },
+      ],
+    };
+    const { container } = render(
+      <MatchReportCard
+        resume={emptyResume}
+        jd={jd}
+        atsResult={atsWithMissing}
+        matchReport={emptyReport}
+      />,
+    );
+    const missingCards = Array.from(container.querySelectorAll('div')).filter((el) =>
+      /缺失关键词|Missing Keywords/.test(el.textContent ?? ''),
+    );
+    expect(missingCards.length).toBeGreaterThan(0);
+    const card = missingCards[0] as HTMLElement;
+    expect(
+      within(card).getByText(/简历解析不完整/),
+    ).toBeInTheDocument();
+    // The actual missing keyword chips should NOT appear
+    expect(within(card).queryByText('kubernetes')).not.toBeInTheDocument();
+    expect(within(card).queryByText('微服务')).not.toBeInTheDocument();
   });
 });

@@ -133,9 +133,21 @@ function tokenize(text: string): string[] {
   return tokens.slice(0, TF_MAX_TOKENS);
 }
 
+/** Return true if the token is a CJK bigram that overlaps a longer CJK run. */
+function isCjkBigramNoise(t: string, text: string): boolean {
+  if (t.length !== 2) return false;
+  if (!/[\u4e00-\u9fff]{2}/.test(t)) return false;
+  // Require at least one non-CJK char (space/punct) between the two chars
+  // in the original text, meaning the bigram was artificially stitched.
+  const re = new RegExp(t[0] + '[^\u4e00-\u9fff]+' + t[1]);
+  return re.test(text);
+}
+
 function tfExtract(text: string, topK: number): JdKeyword[] {
   const counts = new Map<string, number>();
   for (const t of tokenize(text)) {
+    if (t.length === 1 && /[\u4e00-\u9fff]/.test(t)) continue;
+    if (isCjkBigramNoise(t, text)) continue;
     counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   if (counts.size === 0) return [];
