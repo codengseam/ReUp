@@ -295,6 +295,16 @@ export default function ResumeUploadPage() {
             </div>
 
             {/* Privacy */}
+            {privacyMode && (
+              <div
+                role="status"
+                data-testid="privacy-notice"
+                className="flex items-center gap-2 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                本地模式：简历不会上传到服务器
+              </div>
+            )}
             <div className="flex items-center justify-between px-3 py-2.5 bg-background rounded-lg border border-border">
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <Lock className="w-3.5 h-3.5 text-primary" />
