@@ -13,6 +13,7 @@ export interface ResumeMeta {
 export interface ResumeBasic {
   name?: string;
   title?: string;
+  city?: string;
   yearsOfExperience?: number;
   contact?: Record<string, string>;
 }
