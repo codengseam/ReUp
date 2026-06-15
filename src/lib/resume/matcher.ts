@@ -40,9 +40,9 @@ export interface GeneratePrioritiesOptions {
 
 /** Static default priorities (per spec): used when LLM is unavailable or returns invalid JSON. */
 export const DEFAULT_PRIORITIES: ReadonlyArray<MatchReport['priorities'][number]> = [
-  { rank: 1, action: 'Add quantified metrics to your top 3 bullets', expectedImpact: 'High' },
-  { rank: 2, action: 'Highlight relevant skills from the JD', expectedImpact: 'Medium' },
-  { rank: 3, action: 'Add a 1-line summary at the top', expectedImpact: 'Low' },
+  { rank: 1, action: '在 Top 3 工作描述中添加量化数据（如：提升性能 30%、覆盖用户 100W+）', expectedImpact: 'High' },
+  { rank: 2, action: '将 JD 中的核心技术栈明确写入技能列表和项目描述', expectedImpact: 'Medium' },
+  { rank: 3, action: '在简历顶部添加 1 行个人亮点总结', expectedImpact: 'Low' },
 ];
 
 const PRIORITY_PROMPT_SYSTEM =
