@@ -41,6 +41,8 @@ export interface ServerConfig {
     hydeEnabled: boolean;
     rerankEnabled: boolean;
     cacheTTL: number;
+    confidenceHighThreshold?: number;
+    confidenceMediumThreshold?: number;
   };
   /** 知识库 ID（自动发现或手动设置） */
   knowledgeBaseId?: string;

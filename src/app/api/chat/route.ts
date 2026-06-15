@@ -242,6 +242,11 @@ function mapIntentToCategory(intent: IntentCategory): 'promotion' | 'interview' 
 
 export async function POST(request: NextRequest) {
   const chatStartTime = Date.now();
+  const timer = (label: string, since?: number) => {
+    const t = Date.now() - (since ?? chatStartTime);
+    console.log(`[ChatTimer] ${label}: ${t}ms`);
+    return Date.now();
+  };
 
   let body: { messages?: unknown; model?: string; customProvider?: { providerType?: string; endpoint?: string; apiKey?: string; modelId?: string }; ragParams?: Record<string, unknown>; customPrompt?: string };
   try {
@@ -344,7 +349,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 单次 LLM：意图 + 风险 + 重写 query + 策略 + 子查询
+    const t0 = Date.now();
     intentResult = await classifyIntent(latestUserMessage, chatHistoryForGate);
+    timer('classifyIntent', t0);
     if (intentResult.intent === 'jailbreak') {
       void recordInputGuardBlocked();
       return new Response(
@@ -405,6 +412,7 @@ export async function POST(request: NextRequest) {
             : undefined;
 
           // 总 10s 兜底超时（避免上游 LLM / Knowledge 长时间挂起）
+          const tRetrieve = Date.now();
           const ragResponse = await withTimeout(
             retrieve(
               latestUserMessage,
@@ -421,6 +429,7 @@ export async function POST(request: NextRequest) {
           ragResults = ragResponse.results;
           rewrittenQuery = ragResponse.rewrittenQuery;
           strategy = ragResponse.strategy;
+          timer('retrieve', tRetrieve);
 
           console.log(`[Chat] RAG: strategy=${strategy}, results=${ragResults.length}, rewritten=${rewrittenQuery || 'none'}, intent=${intentResult?.intent ?? 'legacy'}`);
 
@@ -546,6 +555,8 @@ export async function POST(request: NextRequest) {
         ];
 
         let fullOutput = '';
+        const tGenerate = Date.now();
+        let firstToken = true;
 
         if (customProvider?.endpoint && customProvider?.apiKey && customProvider?.modelId) {
           // 阶段 3：SSRF 防护 — 拒绝内网 / 元数据端点
@@ -600,6 +611,7 @@ export async function POST(request: NextRequest) {
                     const parsed = JSON.parse(data);
                     const text = parsed.choices?.[0]?.delta?.content || '';
                     if (text) {
+                      if (firstToken) { timer('TTFT-custom', tGenerate); firstToken = false; }
                       fullOutput += text;
                       controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`)
@@ -633,6 +645,7 @@ export async function POST(request: NextRequest) {
 
           for await (const chunk of llmStream) {
             if (chunk.content) {
+              if (firstToken) { timer('TTFT', tGenerate); firstToken = false; }
               const text = chunk.content.toString();
               fullOutput += text;
               controller.enqueue(
@@ -642,34 +655,34 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // ===== 输出门禁 =====
-        const outputSafety = await outputGuard(fullOutput);
-        if (!outputSafety.safe) {
-          console.warn('[Chat] Output safety check failed:', outputSafety.reason);
-          void recordOutputGuardBlocked();
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({
-              safetyWarning: '⚠️ 回复内容已触发安全审核，已替换为安全提示',
-              replaceContent: `抱歉，生成的内容涉及${outputSafety.category || '敏感'}话题，已自动替换。请重新提问。`
-            })}
-\n\n`)
-          );
-        }
+        timer('llm-generate', tGenerate);
 
-        // ===== 幻觉校验 =====
-        if (ragContext) {
-          const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
-          if (!hallucinationResult.faithful) {
-            console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ hallucinationDetected: true, hallucinationDetails: hallucinationResult.ungroundedParts })}\n\n`)
-            );
+        // ===== 输出门禁 + 幻觉校验改为后台异步（不阻塞 SSE 关闭） =====
+        void (async () => {
+          try {
+            const [outputSafety, hallucinationResult] = await Promise.all([
+              outputGuard(fullOutput),
+              ragContext ? hallucinationCheck(fullOutput, ragContext) : Promise.resolve(null),
+            ]);
+            if (!outputSafety.safe) {
+              console.warn('[Chat] Output safety check failed:', outputSafety.reason);
+              void recordOutputGuardBlocked();
+            }
+            if (hallucinationResult && !hallucinationResult.faithful) {
+              console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
+            }
+          } catch (e) {
+            console.warn('[Chat] Background safety check error:', e instanceof Error ? e.message : String(e));
           }
-        }
+        })();
 
         // ===== 置信度评估 & 转人工 =====
         // 传入 latestUserMessage 让热门问题（已收录在 HOT_QUERIES 中的问题及其变体）直接拿高置信度
-        const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage);
+        const confidenceThresholds = {
+          high: typeof ragParams?.confidenceHighThreshold === 'number' ? ragParams.confidenceHighThreshold : 0.50,
+          medium: typeof ragParams?.confidenceMediumThreshold === 'number' ? ragParams.confidenceMediumThreshold : 0.25,
+        };
+        const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage, confidenceThresholds);
         const shouldTransferToHuman = confidence.level === 'low';
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({
@@ -685,9 +698,11 @@ export async function POST(request: NextRequest) {
         );
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        timer('total');
         void recordChatAPICall(Date.now() - streamStartTime);
         controller.close();
       } catch (error) {
+        timer('total-error');
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
         controller.enqueue(

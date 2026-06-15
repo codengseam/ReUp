@@ -66,6 +66,8 @@ const ragParamsSchema = z.object({
   hydeEnabled: z.boolean(),
   rerankEnabled: z.boolean(),
   cacheTTL: z.number(),
+  confidenceHighThreshold: z.number().min(0).max(1).optional(),
+  confidenceMediumThreshold: z.number().min(0).max(1).optional(),
 });
 
 const customModelSchema = z.object({
