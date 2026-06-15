@@ -6,31 +6,31 @@
 
 ## P1 — Code (M3 必做)
 
-- [ ] **C1** `src/lib/models.ts` —— 删除 `gui-plus-2026-02-26` / `doubao-seed-*` / `deepseek-v3-2` / `kimi-k2-5` / `glm-4-7` / `glm-5-0` / `minimax-m2-5` / `qwen-3-5-plus`；新增 `qwen3.6-plus-2026-04-02` / `qwen3.6-plus` / `GLM-4.7-Flash` 三条白名单
-- [ ] **C2** `src/lib/intent-classifier.ts:161` —— 移除硬编码 `model: 'doubao-seed-2-0-lite-260215'`（让 LLMClient 使用 constructor 默认 + candidate 链）
+- [x] **C1** `src/lib/models.ts` —— 删除 `gui-plus-2026-02-26` / `doubao-seed-*` / `deepseek-v3-2` / `kimi-k2-5` / `glm-4-7` / `glm-5-0` / `minimax-m2-5` / `qwen-3-5-plus`；新增 `qwen3.6-plus-2026-04-02` / `qwen3.6-plus` / `GLM-4.7-Flash` 三条白名单
+- [x] **C2** `src/lib/intent-classifier.ts:161` —— 移除硬编码 `model: 'doubao-seed-2-0-lite-260215'`（让 LLMClient 使用 constructor 默认 + candidate 链）
 - [ ] **C3** `src/lib/rag/route.ts:40, 115, 171` —— 移除三处 `model: 'doubao-seed-2-0-pro-260215'` / `model: 'doubao-seed-2-0-lite-260215'`
 - [ ] **C4** `src/lib/rag/search.ts:102, 254, 351` —— 移除三处 `model: 'doubao-seed-2-0-lite-260215'` / `model: 'doubao-seed-2-0-pro-260215'`
-- [ ] **C5** `src/lib/rag/safety.ts:67, 95, 189, 213, 243` —— 移除五处 `model: 'doubao-seed-2-0-pro-260215'`
-- [ ] **C6** `src/app/api/chat/route.ts:25-46` —— 更新 `AllowedModelId` 字面量联合 + `ALLOWED_MODEL_IDS` 数组；`validateModel` 兜底改为 `qwen3.6-plus-2026-04-02`；让内置模型分支使用 `getModelCandidates` + `LLMClient.stream({ models: candidates })` 走自动 fallback
-- [ ] **C7** `data/server-config.json` —— `defaultModelId` 改为 `qwen3.6-plus-2026-04-02`
-- [ ] **C8** `data/.runtime-config.json` —— 写入真实 zhipu key（注意：此文件已在 `.gitignore`，不提交）
+- [x] **C5** `src/lib/rag/safety.ts:67, 95, 189, 213, 243` —— 移除五处 `model: 'doubao-seed-2-0-pro-260215'`
+- [x] **C6** `src/app/api/chat/route.ts:25-46` —— 更新 `AllowedModelId` 字面量联合 + `ALLOWED_MODEL_IDS` 数组；`validateModel` 兜底改为 `qwen3.6-plus-2026-04-02`；让内置模型分支使用 `getModelCandidates` + `LLMClient.stream({ models: candidates })` 走自动 fallback
+- [x] **C7** `data/server-config.json` —— `defaultModelId` 改为 `qwen3.6-plus-2026-04-02`
+- [x] **C8** `data/.runtime-config.json` —— 写入真实 zhipu key（注意：此文件已在 `.gitignore`，不提交）
 
 ## P1 — Admin UI (M3 必做)
 
-- [ ] **C9** `src/lib/runtime-config.ts` + `src/lib/runtime-config.test.ts` —— 已完成（见 commit）
-- [ ] **C10** `src/lib/llm-client.ts` + `src/lib/llm-client.test.ts` —— 已完成（multi-candidate fallback）
-- [ ] **C11** `src/app/api/admin/runtime-config/route.ts` (NEW) —— `GET` 返回掩码配置；`POST { apiKeys: { dashscope, zhipu } }` 替换（zod 校验），TDD
-- [ ] **C12** `src/app/admin/_components/runtime-config-tab.tsx` (NEW) —— 列表 + 编辑 + 掩码展示 + 保存；测试用 `runtime-config-tab.test.tsx`
+- [x] **C9** `src/lib/runtime-config.ts` + `src/lib/runtime-config.test.ts` —— 已完成（见 commit）
+- [x] **C10** `src/lib/llm-client.ts` + `src/lib/llm-client.test.ts` —— 已完成（multi-candidate fallback）
+- [x] **C11** `src/app/api/admin/runtime-config/route.ts` (NEW) —— `GET` 返回掩码配置；`POST { apiKeys: { dashscope, zhipu } }` 替换（zod 校验），TDD
+- [x] **C12** `src/app/admin/_components/runtime-config-tab.tsx` (NEW) —— 列表 + 编辑 + 掩码展示 + 保存；测试用 `runtime-config-tab.test.tsx`
 - [ ] **C13** `src/app/admin/_lib/types.ts` —— `TabKey` 新增 `'runtime-config'`
 - [ ] **C14** `src/app/admin/page.tsx` —— `TAB_CONFIG` 新增 API Keys 条目（用 `KeyRound` 图标），`<TabsContent value="runtime-config">`
 
 ## P1 — Infra / Cleanup (M3 必做)
 
-- [ ] **C15** `pnpm-lock.yaml` —— 验证 coze-coding-dev-sdk 是否真存在；如存在则 `pnpm install --no-frozen-lockfile` 重新生成（注意：本仓库不直接依赖该 SDK，应已不存在）
-- [ ] **C16** `package.json` —— 确认无 coze / 豆包相关 dep（应已无）
+- [x] **C15** `pnpm-lock.yaml` —— 验证 coze-coding-dev-sdk 是否真存在；如存在则 `pnpm install --no-frozen-lockfile` 重新生成（注意：本仓库不直接依赖该 SDK，应已不存在）
+- [x] **C16** `package.json` —— 确认无 coze / 豆包相关 dep（应已无）
 - [ ] **C17** `.gitignore` —— 确认 `data/.runtime-config.json` 已在忽略列表（已加）
-- [ ] **C18** 端到端验证：`pnpm ts-check && pnpm lint && pnpm test` 全部绿色
-- [ ] **C19** 启动 dev server 验证：`pnpm run dev`，curl `POST /api/chat` 真发一条消息，收到 SSE 200 流式
+- [x] **C18** 端到端验证：`pnpm ts-check && pnpm lint && pnpm test` 全部绿色
+- [x] **C19** 启动 dev server 验证：`pnpm run dev`，curl `POST /api/chat` 真发一条消息，收到 SSE 200 流式
 
 ## P2 — Optional (M3 之外)
 
