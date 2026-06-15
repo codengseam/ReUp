@@ -131,8 +131,7 @@ const INTENT_PROMPT = `你是一个查询分析 + 安全审核 AI。一次输出
  */
 export async function classifyIntent(
   query: string,
-  chatHistory: Array<{ role: string; content: string }> = [],
-  customHeaders?: Record<string, string>
+  chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<IntentResult> {
   const mode = process.env.INTENT_CLASSIFIER_MODE ?? 'unified';
   if (mode === 'legacy') {
@@ -146,10 +145,7 @@ export async function classifyIntent(
   }
 
   try {
-    // ReUp v2 Phase 1: replaced coze SDK LLMClient with local OpenAI-compatible client.
-    // DashScope reads DASHSCOPE_API_KEY from process.env by default.
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
 
     const historyStr =
       chatHistory.length > 0

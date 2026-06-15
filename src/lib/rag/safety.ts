@@ -1,6 +1,5 @@
 // src/lib/rag/safety.ts
 // 安全门禁：inputGuard / outputGuard / hallucinationCheck + 4 个 prompt 常量
-// ReUp v2 Phase 1 (C5): replaced coze-coding-dev-sdk LLMClient with local OpenAI-compatible client.
 
 import { LLMClient } from '@/lib/llm-client';
 import type { SafetyCheckResult } from './types';
@@ -59,12 +58,10 @@ AI回复：
 
 // 辅助: LLM越狱检测（可并行独立调用）
 async function llmJailbreakCheck(
-  input: string,
-  customHeaders?: Record<string, string>
+  input: string
 ): Promise<SafetyCheckResult | null> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
     const jailbreakResponse = await llmClient.invoke(
       [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + input }],
       { model: 'doubao-seed-2-0-pro-260215' }
@@ -89,12 +86,10 @@ async function llmJailbreakCheck(
 
 // 辅助: LLM话题越界检测（可并行独立调用）
 async function llmTopicCheck(
-  input: string,
-  customHeaders?: Record<string, string>
+  input: string
 ): Promise<SafetyCheckResult | null> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
     const topicResponse = await llmClient.invoke(
       [{ role: 'user', content: TOPIC_DETECTION_PROMPT + input }],
       { model: 'doubao-seed-2-0-pro-260215' }
@@ -129,8 +124,7 @@ async function llmTopicCheck(
 
 // 输入门禁（异步 - LLM增强检测）
 export async function inputGuard(
-  input: string,
-  customHeaders?: Record<string, string>
+  input: string
 ): Promise<SafetyCheckResult> {
   // 第一层: 正则快速拦截明显高危内容（使用词组匹配避免误杀合法职场内容）
   const highRiskPatterns: Array<{ pattern: RegExp; category: string }> = [
@@ -161,8 +155,8 @@ export async function inputGuard(
 
   // 第3层: LLM越狱检测和话题越界检测并行执行
   const [jailbreakResult, topicResult] = await Promise.all([
-    llmJailbreakCheck(input, customHeaders),
-    llmTopicCheck(input, customHeaders),
+    llmJailbreakCheck(input),
+    llmTopicCheck(input),
   ]);
 
   if (jailbreakResult) return jailbreakResult;
@@ -173,8 +167,7 @@ export async function inputGuard(
 
 // 输出门禁（异步 - LLM增强检测）
 export async function outputGuard(
-  output: string,
-  customHeaders?: Record<string, string>
+  output: string
 ): Promise<SafetyCheckResult> {
   // 第一层: 正则快速拦截高危内容
   const highRiskPatterns: Array<{ pattern: RegExp; category: string }> = [
@@ -191,7 +184,6 @@ export async function outputGuard(
   // 第二层: LLM越狱检测（检测输出是否泄露系统指令）
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
     const jailbreakResponse = await llmClient.invoke(
       [{ role: 'user', content: JAILBREAK_DETECTION_PROMPT + output }],
       { model: 'doubao-seed-2-0-pro-260215' }
@@ -215,7 +207,6 @@ export async function outputGuard(
   // 第三层: LLM不当承诺检测
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
     const promiseResponse = await llmClient.invoke(
       [{ role: 'user', content: PROMISE_DETECTION_PROMPT + output }],
       { model: 'doubao-seed-2-0-pro-260215' }
@@ -242,12 +233,10 @@ export async function outputGuard(
 // 幻觉校验（LLM调用）
 export async function hallucinationCheck(
   answer: string,
-  context: string,
-  customHeaders?: Record<string, string>
+  context: string
 ): Promise<{ hasHallucination: boolean; faithful: boolean; details?: string; ungroundedParts?: string[] }> {
   try {
     const llmClient = new LLMClient();
-    void customHeaders; // 旧 coze SDK 通过 HeaderUtils 转发请求头；新 LLMClient 用 env 直接鉴权
     const response = await llmClient.invoke(
       [{ role: 'user', content: HALLUCINATION_CHECK_PROMPT.replace('---', context) + '\n' + answer }],
       { model: 'doubao-seed-2-0-pro-260215' }
@@ -271,12 +260,12 @@ export async function hallucinationCheck(
 }
 
 // ========== 兼容旧接口 ==========
-export async function contentSafetyCheck(input: string, customHeaders?: Record<string, string>): Promise<{ safe: boolean; reason?: string }> {
-  const result = await inputGuard(input, customHeaders);
+export async function contentSafetyCheck(input: string): Promise<{ safe: boolean; reason?: string }> {
+  const result = await inputGuard(input);
   return { safe: result.safe, reason: result.reason };
 }
 
-export async function outputSafetyCheck(output: string, customHeaders?: Record<string, string>): Promise<{ safe: boolean; reason?: string }> {
-  const result = await outputGuard(output, customHeaders);
+export async function outputSafetyCheck(output: string): Promise<{ safe: boolean; reason?: string }> {
+  const result = await outputGuard(output);
   return { safe: result.safe, reason: result.reason };
 }
