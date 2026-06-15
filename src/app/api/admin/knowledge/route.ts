@@ -3,10 +3,13 @@
 //
 // Local architecture has no upload/delete — chunks are pre-bundled in
 // `data/skill-vectors.json`. This endpoint surfaces:
-//   - action=stats                 → high-level counts + group breakdowns
-//   - action=search&q=...&limit=N  → free-text search over chunk text
-//   - action=by-book|category|skill → chunk groups by metadata key
-//   - action=reload                → re-runs ensureVectorStoreLoaded()
+//   - action=stats                          → high-level counts + group breakdowns
+//   - action=search&q=...&limit=N           → free-text search over chunk text
+//   - action=by-book|category|skill         → chunk groups by metadata key
+//   - action=by-chapter|by-section|by-topic → chunk groups by L3 metadata
+//                                              (doc_title / section_title / topic)
+//   - action=topic-summary                  → book × category 2D cross-tab
+//   - action=reload                         → re-runs ensureVectorStoreLoaded()
 //
 // All read paths delegate to `src/lib/admin-knowledge`. The reload action
 // delegates to `src/lib/rag-init.ensureVectorStoreLoaded` (provided by
@@ -18,6 +21,7 @@ import {
   getKnowledgeStats,
   searchKnowledge,
   listByGroup,
+  getTopicSummary,
 } from '@/lib/admin-knowledge';
 import { ensureVectorStoreLoaded } from '@/lib/rag-init';
 
@@ -70,14 +74,32 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     case 'by-book':
     case 'by-category':
-    case 'by-skill': {
+    case 'by-skill':
+    case 'by-chapter':
+    case 'by-section':
+    case 'by-topic': {
       const limit = parseLimit(url.searchParams.get('limit'));
       if (limit === 'bad') return jsonError('bad_request', 400);
-      const key = action === 'by-book' ? 'book' : action === 'by-category' ? 'category' : 'skillName';
+      const key =
+        action === 'by-book' ? 'book'
+        : action === 'by-category' ? 'category'
+        : action === 'by-skill' ? 'skillName'
+        : action === 'by-chapter' ? 'docTitle'
+        : action === 'by-section' ? 'sectionTitle'
+        : 'topic';
       const opts: { limit?: number } = {};
       if (limit !== null) opts.limit = limit;
       const groups = await listByGroup(store, key, opts);
       return NextResponse.json({ groups });
+    }
+
+    /**
+     * book × category 2D 交叉表 + 各维度独立计数（不依赖 store）。
+     * 由 admin metadata tab 用于一眼看出"晋升书里讲答辩有多少 chunk"。
+     */
+    case 'topic-summary': {
+      const summary = await getTopicSummary();
+      return NextResponse.json(summary);
     }
 
     case 'reload': {
