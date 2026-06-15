@@ -34,6 +34,12 @@ export interface ExtractJdKeywordsOptions {
   llmClient?: LLMClient;
   /** Max keywords to return. Default 20. */
   topK?: number;
+  /**
+   * Override the system prompt used for the LLM call. When omitted (or empty
+   * after trim) the default prompt from `buildAtsKeywordPrompt()` is used.
+   * Allows the admin UI to inject a custom prompt at runtime.
+   */
+  customSystemPrompt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,18 +186,26 @@ function parseLlmKeywords(content: string): JdKeyword[] | null {
   return out;
 }
 
-const KEYWORD_PROMPT_SYSTEM =
+export const DEFAULT_ATS_KEYWORD_SYSTEM =
   '你是 JD 关键词抽取助手。从给定的职位描述中抽取最关键的技术技能、工具、职责关键词，' +
   '按重要性降序排列。严格输出 JSON 数组，不输出其他内容。';
 
-/** Build the user prompt. Pure (no LLM call). */
-function buildKeywordPrompt(jd: string, topK: number): { system: string; user: string } {
+const DEFAULT_ATS_KEYWORD_USER_PREFIX =
+  '请从以下职位描述中抽取最重要的 {TOPK} 个关键词或短语（技术技能、工具、职责），' +
+  '按重要性从高到低排序，weight 取值范围 0-1（最重要为 1）。\n' +
+  '严格输出 JSON 数组，每项格式 {"term": "...", "weight": ...}。\n\n' +
+  '## 职位描述\n';
+
+/**
+ * Build the user prompt for the LLM keyword extractor.
+ *
+ * Exported so the admin UI can read it back, and so the matcher tests can
+ * assert the exact wording. Pure (no LLM call).
+ */
+export function buildAtsKeywordPrompt(jd: string, topK: number): { system: string; user: string } {
   return {
-    system: KEYWORD_PROMPT_SYSTEM,
-    user: `请从以下职位描述中抽取最重要的 ${topK} 个关键词或短语（技术技能、工具、职责），` +
-      `按重要性从高到低排序，weight 取值范围 0-1（最重要为 1）。\n` +
-      `严格输出 JSON 数组，每项格式 {"term": "...", "weight": ...}。\n\n` +
-      `## 职位描述\n${jd}`,
+    system: DEFAULT_ATS_KEYWORD_SYSTEM,
+    user: DEFAULT_ATS_KEYWORD_USER_PREFIX.replace('{TOPK}', String(topK)) + jd,
   };
 }
 
@@ -220,7 +234,11 @@ export async function extractJdKeywords(
   // Try LLM path first if a client was provided.
   if (opts.llmClient) {
     try {
-      const { system, user } = buildKeywordPrompt(jd, topK);
+      const defaultP = buildAtsKeywordPrompt(jd, topK);
+      const system = opts.customSystemPrompt && opts.customSystemPrompt.trim().length > 0
+        ? opts.customSystemPrompt
+        : defaultP.system;
+      const user = defaultP.user;
       const messages: Message[] = [
         { role: 'system', content: system },
         { role: 'user', content: user },

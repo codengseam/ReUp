@@ -51,6 +51,8 @@ const eslintConfig = defineConfig([
     '.trae/**',
     // Coze project (legacy, not in this branch):
     '.cozeproj/**',
+    // gstack browser/brainstorming skills (third-party, excluded from tsconfig):
+    'agent-skills/**',
   ]),
 ]);
 
