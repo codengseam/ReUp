@@ -36,9 +36,9 @@ export const metadata: Metadata = {
   },
   // twitter: {
   //   card: 'summary_large_image',
-  //   title: 'Coze Code | Your AI Engineer is Here',
+  //   title: 'ReUp | 职场晋升与面试顾问',
   //   description:
-  //     'Build and deploy full-stack applications through AI conversation. No env setup, just flow.',
+  //     '以资深 HR + 总裁视角，帮你解决晋升困惑与面试难题。基于《大厂晋升指南》与《面试现场》。',
   //   // images: [''],
   // },
   robots: {
@@ -52,7 +52,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const isDev = process.env.COZE_PROJECT_ENV === 'DEV';
+  const isDev = process.env.NODE_ENV !== 'production';
 
   return (
     <html lang="zh-CN">
