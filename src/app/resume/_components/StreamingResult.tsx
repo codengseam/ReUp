@@ -53,6 +53,7 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
     '建议': null,
   });
   const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const sectionsRef = useRef<Record<StarSection, string>>({
     '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '',
   });
@@ -60,6 +61,7 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
+    mountedRef.current = true;
     sectionsRef.current = { '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' };
     setSections({ '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' });
     setOriginals({ '我的分析': '', 'STAR改写': '', '底层心法': '', '建议': '' });
@@ -111,11 +113,13 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
 
               if (msg.type === 'chunk' && msg.section && msg.delta !== undefined) {
                 sectionsRef.current[msg.section] += msg.delta;
+                if (!mountedRef.current) break;
                 setSections((prev) => ({
                   ...prev,
                   [msg.section!]: prev[msg.section!] + msg.delta!,
                 }));
                 if (msg.done) {
+                  if (!mountedRef.current) break;
                   setCompleted((prev) => {
                     const next = new Set(prev);
                     next.add(msg.section!);
@@ -127,6 +131,7 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
                   });
                 }
               } else if (msg.type === 'done') {
+                if (!mountedRef.current) break;
                 // Calculate confidence: min(1, total chars / 2000)
                 const totalChars = Object.values(sectionsRef.current).reduce(
                   (sum, t) => sum + t.length, 0,
@@ -147,15 +152,17 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!mountedRef.current) return;
         setError(err instanceof Error ? err.message : String(err));
       } finally {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && mountedRef.current) {
           setIsStreaming(false);
         }
       }
     })();
 
     return () => {
+      mountedRef.current = false;
       controller.abort();
       abortRef.current = null;
     };

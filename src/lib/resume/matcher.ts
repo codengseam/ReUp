@@ -138,8 +138,13 @@ export function classifyDimensions(resume: ResumeDocument): DimensionMap {
   const total = bullets.length;
   const out: DimensionMap = {};
 
-  for (const skill of skills) {
-    const keywords = deriveSkillKeywords(skill);
+  // Pre-compute keyword sets per skill to avoid recalculation inside the loop
+  const skillKeywords = skills.map((skill) => ({
+    id: skill.id,
+    keywords: deriveSkillKeywords(skill),
+  }));
+
+  for (const { id, keywords } of skillKeywords) {
     let firstEvidence = '';
     let matchCount = 0;
     for (const b of bullets) {
@@ -148,7 +153,7 @@ export function classifyDimensions(resume: ResumeDocument): DimensionMap {
         if (firstEvidence.length === 0) firstEvidence = b;
       }
     }
-    out[skill.id] = {
+    out[id] = {
       evidence: firstEvidence,
       score: total === 0 ? 0 : clamp01(matchCount / total),
     };

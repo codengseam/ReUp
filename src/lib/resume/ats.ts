@@ -300,7 +300,17 @@ export function computeAtsCoverage(
   return { hits, total, percentage };
 }
 
+// Cache for buildResumeHaystack to avoid rebuilding on repeated calls
+const haystackCache = new WeakMap<ResumeDocument, string>();
+
+/**
+ * Build a normalized, lowercased, concatenated string from all resume fields.
+ * Result is cached on the ResumeDocument instance via WeakMap.
+ */
 function buildResumeHaystack(resume: ResumeDocument): string {
+  const cached = haystackCache.get(resume);
+  if (cached) return cached;
+
   const parts: string[] = [resume.raw];
   if (resume.basic.name) parts.push(resume.basic.name);
   if (resume.basic.title) parts.push(resume.basic.title);
@@ -322,7 +332,9 @@ function buildResumeHaystack(resume: ResumeDocument): string {
     parts.push(ed.school);
     parts.push(ed.degree);
   }
-  return parts.join(' \n ').toLowerCase();
+  const result = parts.join(' \n ').toLowerCase();
+  haystackCache.set(resume, result);
+  return result;
 }
 
 function termMatches(haystackLower: string, term: string): boolean {

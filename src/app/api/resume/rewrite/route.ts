@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
 
     // Mode 1: Full streaming STAR rewrite (SSE)
     const ctrl = new AbortController();
-    request.signal.addEventListener('abort', () => ctrl.abort());
+    const onAbort = () => ctrl.abort();
+    request.signal.addEventListener('abort', onAbort, { once: true });
 
     const stream = new ReadableStream({
       async start(controller) {

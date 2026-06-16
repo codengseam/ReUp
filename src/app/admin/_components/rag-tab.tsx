@@ -44,12 +44,19 @@ export default function RAGTab() {
   // 持久化到服务端
   const persistToServer = async (value: RAGParams) => {
     try {
-      await fetch(CONFIG_API, {
+      const res = await fetch(CONFIG_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'rag', value: { ragParams: value } }),
       });
-    } catch { /* ignore */ }
+      if (!res.ok) {
+        console.error('[RAGTab] persistToServer failed:', res.status);
+        toast.error('保存失败，请稍后重试');
+      }
+    } catch (err) {
+      console.error('[RAGTab] persistToServer failed:', err);
+      toast.error('网络错误，保存失败');
+    }
   };
 
   const debouncedPersist = useDebouncedCallback(

@@ -475,6 +475,8 @@ export class LLMClient {
 
     try {
       while (true) {
+        // Break early if the caller aborted (e.g. client disconnected)
+        if (aborter.signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
