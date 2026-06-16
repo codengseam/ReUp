@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model InterviewReview {
+  id              String   @id @default(cuid())
+  sessionId       String   @unique
+  userId          String
+
+  // 总评
+  overallScore    Float
+  overallVerdict  String   // 'strong_hire' | 'hire' | 'lean_hire' | 'lean_no_hire' | 'no_hire' | 'strong_no_hire'
+  summary         String
+
+  // 维度 (stored as JSON string)
+  dimensions      String   // JSON string of {technicalDepth, communication, ...}
+  dimensionWeights String  // JSON string
+  greatMoments    String   // JSON string
+  topIssues       String   // JSON string
+  perQuestionFeedback String // JSON string
+  actionableItems String   // JSON string
+
+  // 元数据
+  llmTrace        String   // JSON string
+  modelVersion    String   @default("v1")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model OfferPrediction {
+  id                  String   @id @default(cuid())
+  userId              String
+  jdId                String?
+  resumeId            String?
+  interviewSessionId  String?
+
+  probability         Float
+  confidence          Float
+  predictionInterval  String   // JSON {low, high}
+
+  breakdown           String   // JSON array
+  topRisks            String   // JSON array
+  topStrengths        String   // JSON array
+  improvementActions  String   // JSON array
+
+  modelVersion        String   @default("rule-v1")
+  llmTrace            String   // JSON
+
+  // 校准
+  actualResult        String?  // 'offer' | 'rejected' | 'pending' | 'withdrawn'
+  actualResultAt      DateTime?
+  calibrationDelta    Float?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([actualResult])
+}
