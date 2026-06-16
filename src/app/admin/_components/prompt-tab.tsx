@@ -1,12 +1,18 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RotateCcw, Check, InfoIcon } from 'lucide-react';
+import { Save, RotateCcw, Check, InfoIcon, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DEFAULT_SYSTEM_PROMPT } from '../_lib/constants';
 import { DEFAULT_MATCH_REPORT_PROMPT } from '@/lib/resume/prompts/match';
 import { DEFAULT_ATS_KEYWORD_SYSTEM } from '@/lib/resume/ats';
 import { useDebouncedCallback } from '@/hooks/use-debounce';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const CONFIG_API = '/api/admin/config';
 
@@ -102,6 +108,11 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
   const [loaded, setLoaded] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Preview default prompt (only for runtime-generated prompts)
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -179,6 +190,29 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
     toast.success(spec.defaultIsRuntime
       ? '已清空自定义提示词（将回落到内置默认）'
       : '已恢复默认提示词');
+  };
+
+  // 预览运行时生成的默认提示词（仅 STAR 改写 tab）
+  const handlePreviewDefault = async () => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewText(null);
+    try {
+      const res = await fetch(
+        `${CONFIG_API}?key=${encodeURIComponent(spec.configKey)}&action=preview-default`
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '预览失败');
+      }
+      const data = await res.json();
+      setPreviewText(data.defaultPrompt ?? '');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '预览默认提示词失败');
+      setPreviewOpen(false);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const outline = (localPrompt ?? '')
@@ -274,9 +308,43 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
                   : '保存后的提示词存储在服务端，所有用户共享。支持完整的 Markdown 格式、指令结构和代码块。保存后立即生效。'}
               </p>
             </div>
+            {spec.defaultIsRuntime && (
+              <button
+                type="button"
+                onClick={() => void handlePreviewDefault()}
+                className="mt-3 inline-flex items-center gap-1.5 w-full justify-center px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-medium transition-colors"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                预览运行时默认提示词
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 预览运行时默认提示词弹窗 */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              运行时默认提示词预览
+              <span className="text-xs text-muted-foreground font-normal ml-2">
+                （{spec.configKey}）
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          {previewLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : previewText ? (
+            <pre className="text-xs leading-relaxed whitespace-pre-wrap text-foreground bg-muted/30 p-4 rounded-lg">
+              {previewText}
+            </pre>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

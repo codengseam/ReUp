@@ -12,17 +12,117 @@
 // metadata used for grouping and search comes from the JSON file.
 
 import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { tokenize, type VectorStore } from './vector-store';
 import { getAllSkills, loadSkillsSync } from './skills-loader';
 
 const PREVIEW_MAX = 200;
 const DATA_DIR = 'data';
 const VECTORS_FILE = 'skill-vectors.json';
+
+/** Resolve the project root directory. Uses REUP_PROJECT_ROOT env var if set,
+ *  otherwise derives from __dirname (ESM) or falls back to process.cwd(). */
+function getProjectRoot(): string {
+  if (process.env.REUP_PROJECT_ROOT) return process.env.REUP_PROJECT_ROOT;
+  // __dirname is available in CJS/tsup bundles; in ESM, derive from import.meta.url
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return process.cwd();
+  }
+}
+
 /** Resolve the default vector file path at call time (not module load time)
  * so tests that `process.chdir()` to a tmp dir pick up the test fixture. */
 function defaultFilePath(): string {
   return path.join(process.cwd(), DATA_DIR, VECTORS_FILE);
+}
+
+// ---------------- Naming Helpers (Issue 1) ----------------
+
+/**
+ * Transform raw doc_title / section_title into a human-readable name ≤20 chars.
+ *
+ * Strategy:
+ * 1. Strip leading number prefixes like "01_", "02_", "03|" etc.
+ * 2. Strip "(优化版)" and "(xx优化版)" suffixes
+ * 3. For known ambiguous names (e.g. chapter numbers), apply manual overrides
+ * 4. Truncate to 20 chars with "…" if needed
+ */
+const MAX_TITLE_LEN = 20;
+
+/** Manual overrides for doc_titles that can't be auto-simplified well. */
+const DOC_TITLE_OVERRIDES: Record<string, string> = {
+  '大厂晋升指南（1~3章优化版）': '晋升体系（1-3章）',
+  '大厂晋升指南（开篇词优化版）': '开篇词（重新理解晋升）',
+  '大厂晋升指南（第4章优化版）': '晋升逻辑（第4章）',
+  '大厂晋升指南（第5章优化版）': '职级详解P5（新人）',
+  '大厂晋升指南（第6章优化版）': '职级详解P6（独立）',
+  '大厂晋升指南（第7章优化版）': '职级详解P7（带队）',
+  '大厂晋升指南（第8章优化版）': '职级详解P8（专家）',
+  '大厂晋升指南（第9章优化版）': '职级详解P9（总监）',
+  '大厂晋升指南（第10章优化版）': '晋升技巧（材料写作）',
+  '大厂晋升指南（第11章优化版）': '晋升技巧（答辩）',
+  '大厂晋升指南（第12章优化版）': '晋升技巧（陈述）',
+  '大厂晋升指南（第14章优化版）': '做事方法（目标执行）',
+  '大厂晋升指南（第15章优化版）': '做事方法（总结汇报）',
+  '大厂晋升指南（第17章优化版）': '技术提升方法',
+  '大厂晋升指南（第18章优化版）': '业务理解',
+  '大厂晋升指南（第19章优化版）': '团队管理',
+  '大厂晋升指南（第20章优化版）': '管理误区',
+  '大厂晋升指南（加餐一优化版）': '职级对标（硬通货）',
+  '大厂晋升指南（加餐二优化版）': '提名词写作',
+  '大厂晋升指南（加餐三优化版）': '10000小时定律',
+  '大厂晋升指南（加餐四优化版）': '基础学习',
+  '01_面试现场未完待续2019_04_02': '后续（未完待续）',
+  '02_简介': '内容简介',
+  '31_TABLE_OF_CONTENTS': '目录总览',
+  '《面试现场》-源素材': '源素材',
+};
+
+/** Strip leading number prefix like "01_", "02_", "03|", "04_" etc. */
+function stripNumberPrefix(s: string): string {
+  return s.replace(/^\d{2}[_|]/, '');
+}
+
+/** Strip parenthetical suffixes like "(优化版)", "(xx优化版)". */
+function stripOptimizedSuffix(s: string): string {
+  return s.replace(/（.*?优化版）$/, '').replace(/\(.*?优化版\)$/, '');
+}
+
+/** Simplify a title string to ≤20 chars. */
+export function simplifyTitle(raw: string): string {
+  if (!raw) return raw;
+
+  // Check manual overrides first
+  if (DOC_TITLE_OVERRIDES[raw]) return DOC_TITLE_OVERRIDES[raw];
+
+  let result = raw;
+  result = stripNumberPrefix(result);
+  result = stripOptimizedSuffix(result);
+
+  // Truncate if still too long
+  if (result.length > MAX_TITLE_LEN) {
+    result = result.slice(0, MAX_TITLE_LEN - 1) + '…';
+  }
+  return result;
+}
+
+// ---------------- Compliance Notice Stripping (Issue 4) ----------------
+
+/** Pattern matching the compliance notice block. */
+const COMPLIANCE_PATTERN = /^>\s*⚠️\s*\*?\*?合规声明\*?\*?[：:][^\n]*\n?/m;
+
+/**
+ * Strip the compliance notice from the beginning of text.
+ * The notice looks like: "> ⚠️ **合规声明**：本项目及本文档仅用于个人学习..."
+ * We strip it from the display preview but leave the underlying vector data intact.
+ */
+function stripComplianceNotice(text: string): string {
+  if (!text) return text;
+  return text.replace(COMPLIANCE_PATTERN, '').replace(/^\n+/, '');
 }
 
 // ---------------- Public types ----------------
@@ -174,6 +274,8 @@ async function loadAllRecords(filePath?: string): Promise<LoadedRecord[]> {
     } else if (v.metadata && typeof v.metadata === 'object') {
       meta = v.metadata as Record<string, unknown>;
     }
+    const rawDocTitle = v.doc_title ?? '';
+    const rawSectionTitle = v.section_title ?? '';
     return {
       id: v.id,
       text: v.text ?? '',
@@ -182,15 +284,16 @@ async function loadAllRecords(filePath?: string): Promise<LoadedRecord[]> {
       skillName: typeof meta.skillName === 'string' ? meta.skillName : '',
       topic: typeof meta.topic === 'string' ? meta.topic : '',
       sourcePath: v.source_path ?? '',
-      docTitle: v.doc_title ?? '',
-      sectionTitle: v.section_title ?? '',
+      docTitle: simplifyTitle(rawDocTitle),
+      sectionTitle: simplifyTitle(rawSectionTitle),
       chunkIndex: typeof v.chunk_index === 'number' ? v.chunk_index : 0,
     };
   });
 }
 
 function toSummary(rec: LoadedRecord): KnowledgeChunkSummary {
-  const preview = rec.text.length > PREVIEW_MAX ? rec.text.slice(0, PREVIEW_MAX) : rec.text;
+  const raw = rec.text.length > PREVIEW_MAX ? rec.text.slice(0, PREVIEW_MAX) : rec.text;
+  const preview = stripComplianceNotice(raw);
   return {
     id: rec.id,
     preview,
@@ -359,13 +462,41 @@ export async function listByGroup(
 
 const SKILLS_DIR = 'skills';
 
+/**
+ * Resolve the skills directory to an absolute path.
+ * Uses REUP_PROJECT_ROOT env var, then derives from this module's location,
+ * then falls back to process.cwd().
+ */
+function resolveSkillsDir(): string {
+  const root = getProjectRoot();
+  // getProjectRoot returns dirname of this module's file (e.g. src/lib/).
+  // Try cwd first for fixture-override in tests, then derived paths.
+  const candidates = [
+    path.join(process.cwd(), SKILLS_DIR),            // cwd first (test fixtures)
+    path.join(root, '..', '..', SKILLS_DIR),         // from src/lib → project root
+    path.join(root, '..', SKILLS_DIR),               // from src → project root
+  ];
+  for (const p of candidates) {
+    if (existsSync(path.join(p, 'jinsheng-dicing-luoji', 'SKILL.md'))) return p;
+  }
+  return path.join(process.cwd(), SKILLS_DIR);
+}
+
+/** Pre-computed skills dir path (lazy). */
+let _skillsDir: string | null = null;
+function getSkillsDir(): string {
+  if (!_skillsDir) _skillsDir = resolveSkillsDir();
+  return _skillsDir;
+}
+
 /** 尝试读取某个 skill 的 SKILL.md 全文；找不到时返回 null。 */
 async function tryReadSkillMarkdown(
   skillId: string
 ): Promise<{ markdown: string | null; path: string | null }> {
+  const skillsDir = getSkillsDir();
   const candidates = [
-    path.join(process.cwd(), SKILLS_DIR, skillId, 'SKILL.md'),
-    path.join(process.cwd(), SKILLS_DIR, `${skillId}.md`),
+    path.join(skillsDir, skillId, 'SKILL.md'),
+    path.join(skillsDir, `${skillId}.md`),
   ];
   for (const p of candidates) {
     try {
@@ -374,6 +505,10 @@ async function tryReadSkillMarkdown(
     } catch {
       // try next candidate
     }
+  }
+  // Log warning for debugging (only in server context)
+  if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    console.warn(`[admin-knowledge] SKILL.md not found for skill "${skillId}" (tried: ${candidates.join(', ')})`);
   }
   return { markdown: null, path: null };
 }
@@ -460,5 +595,44 @@ export async function getTopicSummary(): Promise<TopicSummary> {
     byBook: toSorted(bookTotals),
     byCategory: toSorted(catTotals),
     genericCount,
+  };
+}
+
+// ---------------- Chunk Full Text (Issue 5) ----------------
+
+/** Result type for getChunkFullText. */
+export interface ChunkFullText {
+  id: string;
+  /** Full text of the chunk (not trimmed). */
+  text: string;
+  book: string;
+  category: string;
+  skillName: string;
+  topic: string;
+  sourcePath: string;
+  docTitle: string;
+  sectionTitle: string;
+  chunkIndex: number;
+}
+
+/**
+ * Retrieve the full text of a specific chunk by its id.
+ * Used by the admin knowledge tab for "查看详情" drill-down.
+ */
+export async function getChunkFullText(chunkId: string): Promise<ChunkFullText | null> {
+  const records = await loadAllRecords();
+  const rec = records.find((r) => r.id === chunkId);
+  if (!rec) return null;
+  return {
+    id: rec.id,
+    text: stripComplianceNotice(rec.text),
+    book: rec.book,
+    category: rec.category,
+    skillName: rec.skillName,
+    topic: rec.topic,
+    sourcePath: rec.sourcePath,
+    docTitle: rec.docTitle,
+    sectionTitle: rec.sectionTitle,
+    chunkIndex: rec.chunkIndex,
   };
 }
