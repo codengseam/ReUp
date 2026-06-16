@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Database, RefreshCw, Search, BookOpen, FolderTree, Sparkles,
   Loader2, FileText, ChevronDown, ChevronRight, BookText, Heading2,
@@ -96,11 +96,15 @@ export default function KnowledgeTab() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [groupChunks, setGroupChunks] = useState<ChunkHit[]>([]);
   const [loadingGroup, setLoadingGroup] = useState(false);
+  const groupToggleAbortRef = useRef<AbortController | null>(null);
+  const groupToggleReqIdRef = useRef(0);
 
   // Full-text detail view
   const [fullTextChunk, setFullTextChunk] = useState<ChunkFullText | null>(null);
   const [loadingFullText, setLoadingFullText] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const fullTextAbortRef = useRef<AbortController | null>(null);
+  const fullTextReqIdRef = useRef(0);
 
   // 加载 stats
   const fetchStats = useCallback(async (withToast = false) => {
@@ -164,7 +168,7 @@ export default function KnowledgeTab() {
     }
   };
 
-  // 展开某分组：搜索该 group name 作为 query（与旧实现保持一致）
+  // 展开某分组：使用 by-* 专有端点按分组 key 过滤，避免全文搜索。
   const handleToggleGroup = useCallback(
     async (key: string) => {
       if (expandedKey === key) {
@@ -172,44 +176,84 @@ export default function KnowledgeTab() {
         setGroupChunks([]);
         return;
       }
+      // Abort previous in-flight request
+      groupToggleAbortRef.current?.abort();
+      const controller = new AbortController();
+      groupToggleAbortRef.current = controller;
+      const reqId = ++groupToggleReqIdRef.current;
+
       setExpandedKey(key);
       setLoadingGroup(true);
       setGroupChunks([]);
       try {
+        // Map the active GroupTab to the corresponding API action
+        const actionMap: Record<GroupTab, string> = {
+          book: 'by-book',
+          category: 'by-category',
+          skillName: 'by-skill',
+          docTitle: 'by-chapter',
+          sectionTitle: 'by-section',
+          topic: 'by-topic',
+        };
+        const action = actionMap[activeGroup] ?? 'by-chapter';
         const res = await fetch(
-          `${KNOWLEDGE_API}?action=search&q=${encodeURIComponent(key)}&limit=10`
+          `${KNOWLEDGE_API}?action=${action}&limit=10`,
+          { signal: controller.signal }
         );
+        if (reqId !== groupToggleReqIdRef.current) return;
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '加载分组 chunk 失败');
-        setGroupChunks(data.results ?? []);
+        // Filter to the specific group by name client-side
+        const allGroups = (data.groups ?? []) as Array<{ name: string; chunks: ChunkHit[] }>;
+        const matched = allGroups.find((g) => g.name === key);
+        if (reqId !== groupToggleReqIdRef.current) return;
+        setGroupChunks(matched?.chunks ?? []);
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (reqId !== groupToggleReqIdRef.current) return;
         toast.error(err instanceof Error ? err.message : '加载分组 chunk 失败');
       } finally {
-        setLoadingGroup(false);
+        if (reqId === groupToggleReqIdRef.current) {
+          setLoadingGroup(false);
+        }
       }
     },
-    [expandedKey]
+    [expandedKey, activeGroup]
   );
 
   // 查看分段全文详情
   const handleViewFullText = useCallback(async (chunkId: string) => {
+    // Abort any in-flight request
+    fullTextAbortRef.current?.abort();
+    const controller = new AbortController();
+    fullTextAbortRef.current = controller;
+    const reqId = ++fullTextReqIdRef.current;
+
     setLoadingFullText(true);
     setDetailOpen(true);
+    setFullTextChunk(null);
     try {
       const res = await fetch(
-        `${KNOWLEDGE_API}?action=chunk-full-text&id=${encodeURIComponent(chunkId)}`
+        `${KNOWLEDGE_API}?action=chunk-full-text&id=${encodeURIComponent(chunkId)}`,
+        { signal: controller.signal }
       );
+      if (reqId !== fullTextReqIdRef.current) return; // stale request
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || '加载全文失败');
       }
       const data = (await res.json()) as ChunkFullText;
+      if (reqId !== fullTextReqIdRef.current) return;
       setFullTextChunk(data);
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (reqId !== fullTextReqIdRef.current) return;
       toast.error(err instanceof Error ? err.message : '加载全文失败');
       setDetailOpen(false);
     } finally {
-      setLoadingFullText(false);
+      if (reqId === fullTextReqIdRef.current) {
+        setLoadingFullText(false);
+      }
     }
   }, []);
 

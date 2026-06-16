@@ -48,7 +48,8 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   // Lazy-load the pre-bundled index on first use; subsequent calls reuse
   // the same loaded store via the memoized promise in rag-init.
-  const store = await ensureVectorStoreLoaded();
+  try {
+    const store = await ensureVectorStoreLoaded();
 
   switch (action) {
     case 'stats': {
@@ -129,5 +130,9 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     default:
       return jsonError('unknown_action', 400);
+  }
+  } catch (err) {
+    console.error('[admin/knowledge] unhandled error:', err);
+    return jsonError('internal_error', 500);
   }
 }
