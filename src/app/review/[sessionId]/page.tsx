@@ -85,7 +85,7 @@ export default function ReviewDetailPage() {
           throw new Error(`请求失败 (${res.status})`);
         }
         const data = await res.json();
-        setReview(data);
+        setReview(data.review);
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
       } finally {

@@ -132,7 +132,7 @@ export default function OfferPage() {
       }
 
       const data = await res.json();
-      setResult(data);
+      setResult(data.prediction);
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失败，请重试');
     } finally {

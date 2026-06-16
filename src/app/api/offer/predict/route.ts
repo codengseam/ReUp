@@ -7,9 +7,14 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  let body: OfferPredictionInput;
   try {
-    const body = await request.json() as OfferPredictionInput;
+    body = await request.json() as OfferPredictionInput;
+  } catch {
+    return NextResponse.json({ ok: false, error: '请求体格式错误，需要 JSON' }, { status: 400 });
+  }
 
+  try {
     if (!body.userId || !body.level) {
       return NextResponse.json({ ok: false, error: '缺少必填字段 userId/level' }, { status: 400 });
     }

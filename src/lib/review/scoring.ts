@@ -51,6 +51,15 @@ export function getDimensionWeights(type: InterviewType): Record<string, number>
         behavioralFit: 0.15,
         systemDesign: 0.05,
       };
+    default:
+      return {
+        technicalDepth: 0.25,
+        communication: 0.20,
+        problemSolving: 0.20,
+        projectMastery: 0.15,
+        behavioralFit: 0.15,
+        systemDesign: 0.05,
+      };
   }
 }
 

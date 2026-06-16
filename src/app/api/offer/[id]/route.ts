@@ -40,7 +40,9 @@ export async function PUT(
       return NextResponse.json({ ok: false, error: '预测不存在' }, { status: 404 });
     }
 
-    const calibrationDelta = actualResult === 'offer' ? prediction.probability - 1 : prediction.probability - 0;
+    const calibrationDelta = actualResult === 'offer' ? prediction.probability - 1
+      : actualResult === 'rejected' ? prediction.probability - 0
+      : null; // pending/withdrawn 不参与校准
 
     await prisma.offerPrediction.update({
       where: { id },

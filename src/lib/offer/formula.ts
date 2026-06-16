@@ -63,7 +63,7 @@ export function computeProbability(input: OfferPredictionInput): {
   if (input.jdId) confidence += 0.1;
   if (!input.companyInfo) confidence -= 0.1;
   if (!input.jdLevel) confidence -= 0.05;
-  confidence = Math.max(0.3, Math.min(0.95, confidence));
+  confidence = Math.max(0.25, Math.min(0.95, confidence));
 
   // Breakdown
   const rawFactors: Array<{
