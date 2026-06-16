@@ -53,6 +53,11 @@ function defaultFilePath(): string {
  */
 const MAX_TITLE_LEN = 20;
 
+/** Module-level regexps — hoisted to avoid re-compilation on every call. */
+const NUMBER_PREFIX_RE = /^\d{2}[_|]/;
+const OPTIMIZED_SUFFIX_RE = /（.*?优化版）$/;
+const OPTIMIZED_SUFFIX_EN_RE = /\(.*?优化版\)$/;
+
 /** Manual overrides for doc_titles that can't be auto-simplified well. */
 const DOC_TITLE_OVERRIDES: Record<string, string> = {
   '大厂晋升指南（1~3章优化版）': '晋升体系（1-3章）',
@@ -82,46 +87,55 @@ const DOC_TITLE_OVERRIDES: Record<string, string> = {
   '《面试现场》-源素材': '源素材',
 };
 
-/** Strip leading number prefix like "01_", "02_", "03|", "04_" etc. */
-function stripNumberPrefix(s: string): string {
-  return s.replace(/^\d{2}[_|]/, '');
-}
-
-/** Strip parenthetical suffixes like "(优化版)", "(xx优化版)". */
-function stripOptimizedSuffix(s: string): string {
-  return s.replace(/（.*?优化版）$/, '').replace(/\(.*?优化版\)$/, '');
-}
-
-/** Simplify a title string to ≤20 chars. */
-export function simplifyTitle(raw: string): string {
-  if (!raw) return raw;
-
-  // Check manual overrides first
-  if (DOC_TITLE_OVERRIDES[raw]) return DOC_TITLE_OVERRIDES[raw];
-
+/** Auto-transform a raw title to a simplified name ≤20 chars. */
+function autoSimplify(raw: string): string {
   let result = raw;
-  result = stripNumberPrefix(result);
-  result = stripOptimizedSuffix(result);
-
-  // Truncate if still too long
+  result = result.replace(NUMBER_PREFIX_RE, '');
+  result = result.replace(OPTIMIZED_SUFFIX_RE, '').replace(OPTIMIZED_SUFFIX_EN_RE, '');
   if (result.length > MAX_TITLE_LEN) {
     result = result.slice(0, MAX_TITLE_LEN - 1) + '…';
   }
   return result;
 }
 
+/** Simplify a doc_title to ≤20 chars. Uses manual overrides, then auto-transform. */
+export function simplifyDocTitle(raw: string): string {
+  if (!raw) return '';
+  if (DOC_TITLE_OVERRIDES[raw]) return DOC_TITLE_OVERRIDES[raw];
+  return autoSimplify(raw);
+}
+
+/** Simplify a section_title to ≤20 chars. Auto-transform only (no manual overrides). */
+export function simplifySectionTitle(raw: string): string {
+  if (!raw) return '';
+  return autoSimplify(raw);
+}
+
+/** Simplify a title string to ≤20 chars (legacy: applies doc_title overrides).
+ *  @deprecated Use simplifyDocTitle or simplifySectionTitle for type-safe scoping. */
+export function simplifyTitle(raw: string): string {
+  if (!raw) return '';
+  if (DOC_TITLE_OVERRIDES[raw]) return DOC_TITLE_OVERRIDES[raw];
+  return autoSimplify(raw);
+}
+
 // ---------------- Compliance Notice Stripping (Issue 4) ----------------
 
-/** Pattern matching the compliance notice block. */
-const COMPLIANCE_PATTERN = /^>\s*⚠️\s*\*?\*?合规声明\*?\*?[：:][^\n]*\n?/m;
+/**
+ * Pattern matching the compliance notice block at the START of text.
+ * No `m` flag — `^` anchors to the beginning of the string, not any line.
+ * Matches multi-line blockquotes: successive "> ..." lines.
+ */
+const COMPLIANCE_PATTERN = /^>\s*⚠️\s*\*?\*?合规声明\*?\*?[：:][^\n]*(\n>.*)*\n?/;
 
 /**
  * Strip the compliance notice from the beginning of text.
  * The notice looks like: "> ⚠️ **合规声明**：本项目及本文档仅用于个人学习..."
- * We strip it from the display preview but leave the underlying vector data intact.
+ * Only strips if the text starts with the compliance notice blockquote.
  */
 function stripComplianceNotice(text: string): string {
-  if (!text) return text;
+  if (!text) return '';
+  if (!text.startsWith('>')) return text;
   return text.replace(COMPLIANCE_PATTERN, '').replace(/^\n+/, '');
 }
 
@@ -146,10 +160,9 @@ export interface KnowledgeStats {
   bySection: Array<{ name: string; count: number }>;
 }
 
-export interface KnowledgeChunkSummary {
+/** Shared fields between KnowledgeChunkSummary and ChunkFullText. */
+interface ChunkBase {
   id: string;
-  /** First 200 chars of text for preview. */
-  preview: string;
   book: string;
   category: string;
   skillName: string;
@@ -159,6 +172,11 @@ export interface KnowledgeChunkSummary {
   docTitle: string;
   sectionTitle: string;
   chunkIndex: number;
+}
+
+export interface KnowledgeChunkSummary extends ChunkBase {
+  /** First 200 chars of text for preview. */
+  preview: string;
 }
 
 /** 框架 Skill 完整定义（包装自 skills-loader，并附 SKILL.md 全文）。 */
@@ -241,8 +259,14 @@ export type ListByGroupKey = GroupKey;
 
 // ---------------- Loaders ----------------
 
+/** Memoized promise for loadAllRecords — reuses cached result across requests. */
+let _recordsPromise: Promise<LoadedRecord[]> | null = null;
+
 /** Read & normalize the skill-vectors.json file into a flat record list. */
 async function loadAllRecords(filePath?: string): Promise<LoadedRecord[]> {
+  // Return cached result if we have one (respects explicit filePath override)
+  if (_recordsPromise && !filePath) return _recordsPromise;
+
   const target = filePath ?? defaultFilePath();
   let raw: string;
   try {
@@ -262,38 +286,54 @@ async function loadAllRecords(filePath?: string): Promise<LoadedRecord[]> {
     throw new Error(`admin-knowledge: missing 'vectors' array in ${target}`);
   }
 
-  return parsed.vectors.map((v) => {
-    let meta: Record<string, unknown> = {};
-    if (typeof v.metadata === 'string') {
-      try {
-        const obj = JSON.parse(v.metadata) as unknown;
-        if (obj && typeof obj === 'object') meta = obj as Record<string, unknown>;
-      } catch {
-        meta = {};
+  const promise = (async () => {
+    return parsed.vectors.map((v) => {
+      let meta: Record<string, unknown> = {};
+      if (typeof v.metadata === 'string') {
+        try {
+          const obj = JSON.parse(v.metadata) as unknown;
+          if (obj && typeof obj === 'object') meta = obj as Record<string, unknown>;
+        } catch {
+          meta = {};
+        }
+      } else if (v.metadata && typeof v.metadata === 'object') {
+        meta = v.metadata as Record<string, unknown>;
       }
-    } else if (v.metadata && typeof v.metadata === 'object') {
-      meta = v.metadata as Record<string, unknown>;
-    }
-    const rawDocTitle = v.doc_title ?? '';
-    const rawSectionTitle = v.section_title ?? '';
-    return {
-      id: v.id,
-      text: v.text ?? '',
-      book: v.book ?? '',
-      category: typeof meta.category === 'string' ? meta.category : '',
-      skillName: typeof meta.skillName === 'string' ? meta.skillName : '',
-      topic: typeof meta.topic === 'string' ? meta.topic : '',
-      sourcePath: v.source_path ?? '',
-      docTitle: simplifyTitle(rawDocTitle),
-      sectionTitle: simplifyTitle(rawSectionTitle),
-      chunkIndex: typeof v.chunk_index === 'number' ? v.chunk_index : 0,
-    };
-  });
+      const rawDocTitle = v.doc_title ?? '';
+      const rawSectionTitle = v.section_title ?? '';
+      return {
+        id: v.id,
+        text: stripComplianceNotice(v.text ?? ''),
+        book: v.book ?? '',
+        category: typeof meta.category === 'string' ? meta.category : '',
+        skillName: typeof meta.skillName === 'string' ? meta.skillName : '',
+        topic: typeof meta.topic === 'string' ? meta.topic : '',
+        sourcePath: v.source_path ?? '',
+        docTitle: simplifyDocTitle(rawDocTitle),
+        sectionTitle: simplifySectionTitle(rawSectionTitle),
+        chunkIndex: typeof v.chunk_index === 'number' ? v.chunk_index : 0,
+      };
+    });
+  })();
+
+  // Cache the promise (not the result) so concurrent calls share the work.
+  // Only cache default-path loads; explicit filePath calls bypass cache.
+  if (!filePath) {
+    _recordsPromise = promise;
+    promise.catch(() => {
+      if (_recordsPromise === promise) _recordsPromise = null;
+    });
+  }
+  return promise;
+}
+
+/** Reset the records cache (for test teardown). */
+export function _resetRecordsCache(): void {
+  _recordsPromise = null;
 }
 
 function toSummary(rec: LoadedRecord): KnowledgeChunkSummary {
-  const raw = rec.text.length > PREVIEW_MAX ? rec.text.slice(0, PREVIEW_MAX) : rec.text;
-  const preview = stripComplianceNotice(raw);
+  const preview = rec.text.length > PREVIEW_MAX ? rec.text.slice(0, PREVIEW_MAX) : rec.text;
   return {
     id: rec.id,
     preview,
@@ -601,18 +641,9 @@ export async function getTopicSummary(): Promise<TopicSummary> {
 // ---------------- Chunk Full Text (Issue 5) ----------------
 
 /** Result type for getChunkFullText. */
-export interface ChunkFullText {
-  id: string;
+export interface ChunkFullText extends ChunkBase {
   /** Full text of the chunk (not trimmed). */
   text: string;
-  book: string;
-  category: string;
-  skillName: string;
-  topic: string;
-  sourcePath: string;
-  docTitle: string;
-  sectionTitle: string;
-  chunkIndex: number;
 }
 
 /**
@@ -625,7 +656,7 @@ export async function getChunkFullText(chunkId: string): Promise<ChunkFullText |
   if (!rec) return null;
   return {
     id: rec.id,
-    text: stripComplianceNotice(rec.text),
+    text: rec.text,
     book: rec.book,
     category: rec.category,
     skillName: rec.skillName,

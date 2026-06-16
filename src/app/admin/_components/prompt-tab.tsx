@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, RotateCcw, Check, InfoIcon, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -143,21 +143,23 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
   }, []);
 
   const persistToServer = async (value: string) => {
-    try {
-      await fetch(CONFIG_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: spec.configKey, value: { customPrompt: value } }),
-      });
-    } catch {
-      /* ignore */
+    const res = await fetch(CONFIG_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: spec.configKey, value: { customPrompt: value } }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || '保存失败');
     }
   };
 
   const debouncedPersist = useDebouncedCallback(
     (value: string) => {
       setPrompt(value);
-      void persistToServer(value);
+      persistToServer(value).catch(() => {
+        /* auto-save fails silently — user will see error on manual save */
+      });
     },
     300,
   );
@@ -169,14 +171,18 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
     debouncedPersist(value);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     debouncedPersist.cancel();
     setPrompt(localPromptRef.current);
-    void persistToServer(localPromptRef.current);
-    setSaved(true);
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
-    toast.success('提示词已保存到服务端');
+    try {
+      await persistToServer(localPromptRef.current);
+      setSaved(true);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
+      toast.success('提示词已保存到服务端');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
   const handleReset = () => {
@@ -215,9 +221,13 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
     }
   };
 
-  const outline = (localPrompt ?? '')
-    .split('\n')
-    .filter((l) => l.startsWith('## ') || l.startsWith('### '));
+  const outline = useMemo(
+    () =>
+      (localPrompt ?? '')
+        .split('\n')
+        .filter((l) => l.startsWith('## ') || l.startsWith('### ')),
+    [localPrompt]
+  );
   const localPromptSafe = localPrompt ?? '';
 
   return (

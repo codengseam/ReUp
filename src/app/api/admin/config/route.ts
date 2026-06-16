@@ -19,7 +19,8 @@ import {
   saveConfig,
   type ServerConfig,
 } from '@/lib/server-config';
-import { buildStarRewritePrompt } from '@/lib/resume/star-rewriter';
+import { buildStarRewritePrompt } from '@/lib/resume/prompts/star';
+import type { ResumeDocument } from '@/lib/resume/types';
 
 export const runtime = 'nodejs';
 
@@ -47,14 +48,25 @@ export async function GET(req: NextRequest): Promise<Response> {
   // Preview default: return the runtime-generated default STAR prompt
   if (key === 'resume.starPrompt' && action === 'preview-default') {
     try {
-      const defaultPrompt = buildStarRewritePrompt();
+      // Minimal dummy resume — only needed to satisfy the function signature.
+      // The system prompt is the key output; the user prompt is discarded.
+      const dummyResume: ResumeDocument = {
+        meta: { version: 'reup.v2.phase3', source: 'text', createdAt: new Date().toISOString() },
+        basic: {},
+        experience: [{ company: '示例公司', role: '示例职位', period: '2020-2024', bullets: ['示例工作内容'] }],
+        projects: [],
+        skills: [],
+        education: [],
+        raw: '示例简历内容',
+      };
+      const { system } = buildStarRewritePrompt(dummyResume);
       return NextResponse.json(
-        { defaultPrompt, previewAt: new Date().toISOString() },
+        { defaultPrompt: system, previewAt: new Date().toISOString() },
         { status: 200 }
       );
     } catch (err) {
       return NextResponse.json(
-        { error: 'preview_failed', detail: String(err) },
+        { error: 'preview_failed' },
         { status: 500 }
       );
     }
