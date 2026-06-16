@@ -8,12 +8,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  let body: ReviewInput;
   try {
-    const body = await request.json() as ReviewInput;
+    body = await request.json() as ReviewInput;
+  } catch {
+    return NextResponse.json({ ok: false, error: '请求体格式错误，需要 JSON' }, { status: 400 });
+  }
 
+  try {
     // Basic validation
     if (!body.sessionId || !body.transcript || !body.transcript.length) {
       return NextResponse.json({ ok: false, error: '缺少必填字段 sessionId/transcript' }, { status: 400 });
+    }
+
+    // Transcript size limit
+    if (body.transcript.length > 20) {
+      return NextResponse.json({ ok: false, error: 'transcript 不能超过 20 题' }, { status: 400 });
     }
 
     let result;
