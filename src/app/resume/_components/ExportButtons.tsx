@@ -138,7 +138,9 @@ export function ExportButtons({ resume, starResult }: ExportButtonsProps) {
         document.body.removeChild(ta);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => {
+        setCopied((cur) => (cur ? false : cur));
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }

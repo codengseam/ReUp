@@ -215,6 +215,35 @@ export default function RAGTab() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white border border-border rounded-xl p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground mb-5 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" />置信度阈值
+          </h3>
+          <div className="space-y-6">
+            <div>
+              <div className="flex justify-between mb-2">
+                <label className="text-xs text-muted-foreground">High 下限</label>
+                <span className="text-sm font-mono font-bold text-primary">{localParams.confidenceHighThreshold.toFixed(2)}</span>
+              </div>
+              <input type="range" min={10} max={90} value={localParams.confidenceHighThreshold * 100}
+                onChange={e => updateParam('confidenceHighThreshold', +e.target.value / 100)}
+                className="w-full accent-[#10b981]" />
+              <p className="text-[10px] text-muted-foreground mt-1">≥ 此分数显示为「高置信度」（0.10-0.90）</p>
+            </div>
+
+            <div>
+              <div className="flex justify-between mb-2">
+                <label className="text-xs text-muted-foreground">Medium 下限</label>
+                <span className="text-sm font-mono font-bold text-primary">{localParams.confidenceMediumThreshold.toFixed(2)}</span>
+              </div>
+              <input type="range" min={5} max={50} value={localParams.confidenceMediumThreshold * 100}
+                onChange={e => updateParam('confidenceMediumThreshold', +e.target.value / 100)}
+                className="w-full accent-[#10b981]" />
+              <p className="text-[10px] text-muted-foreground mt-1">≥ 此分数显示为「中置信度」，低于则为「低置信度」（0.05-0.50）</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="mt-6 bg-muted/30 border border-border rounded-xl p-4">
@@ -228,6 +257,8 @@ export default function RAGTab() {
             `HyDE: ${localParams.hydeEnabled ? '开' : '关'}`,
             `Rerank: ${localParams.rerankEnabled ? '开' : '关'}`,
             `TTL: ${localParams.cacheTTL}min`,
+            `High≥: ${localParams.confidenceHighThreshold.toFixed(2)}`,
+            `Medium≥: ${localParams.confidenceMediumThreshold.toFixed(2)}`,
           ].map(item => (
             <span key={item} className="text-[10px] font-mono bg-white px-2 py-1 rounded border border-border text-muted-foreground">
               {item}

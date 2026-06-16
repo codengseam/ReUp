@@ -1,0 +1,31 @@
+diff --git a/src/utils/image.js b/src/utils/image.js
+index 89bb2481ba0afa67fc8967c2b8c1b156e3df590a..1b349b96453c1927140144ae3943ef785278707b 100644
+--- a/src/utils/image.js
++++ b/src/utils/image.js
+@@ -13,7 +13,13 @@ import { env } from '../env.js';
+ import { Tensor } from './tensor.js';
+ 
+ // Will be empty (or not used) if running in browser or web-worker
+-import sharp from 'sharp';
++let sharp = null;
++try {
++  const sharpModule = await import('sharp');
++  sharp = sharpModule.default ?? sharpModule;
++} catch {
++  // sharp not available, image ops will fail at runtime if used
++}
+ 
+ const BROWSER_ENV = typeof self !== 'undefined';
+ const WEBWORKER_ENV = BROWSER_ENV && self.constructor.name === 'DedicatedWorkerGlobalScope';
+@@ -51,7 +57,10 @@ if (BROWSER_ENV) {
+     }
+ 
+ } else {
+-    throw new Error('Unable to load image processing library.');
++    // sharp unavailable — image processing disabled
++    loadImageFunction = async () => {
++        throw new Error('Image processing is not available because sharp is not installed.');
++    };
+ }
+ 
+ 

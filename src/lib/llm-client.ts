@@ -184,8 +184,11 @@ function resolveConfig(config: LLMClientConfig = {}): Required<LLMClientConfig> 
 
 function endpointUrl(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, '');
+  if (trimmed.endsWith('/chat/completions')) return trimmed;
   // baseUrl 通常形如 `https://.../compatible-mode/v1`，已含 /v1；此时仅追加 /chat/completions
   if (trimmed.endsWith('/v1')) return `${trimmed}/chat/completions`;
+  // 兼容智谱等已含其他版本路径（如 /v4）的 endpoint
+  if (/\/v\d+$/.test(trimmed)) return `${trimmed}/chat/completions`;
   return `${trimmed}/v1/chat/completions`;
 }
 
@@ -475,8 +478,6 @@ export class LLMClient {
 
     try {
       while (true) {
-        // Break early if the caller aborted (e.g. client disconnected)
-        if (aborter.signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
