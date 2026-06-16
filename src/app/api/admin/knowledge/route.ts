@@ -22,6 +22,7 @@ import {
   searchKnowledge,
   listByGroup,
   getTopicSummary,
+  getChunkFullText,
 } from '@/lib/admin-knowledge';
 import { ensureVectorStoreLoaded } from '@/lib/rag-init';
 
@@ -100,6 +101,18 @@ export async function GET(req: NextRequest): Promise<Response> {
     case 'topic-summary': {
       const summary = await getTopicSummary();
       return NextResponse.json(summary);
+    }
+
+    /**
+     * 按 chunk id 返回完整原文（不做截断）。
+     * 用于 admin knowledge tab 的"查看详情"功能。
+     */
+    case 'chunk-full-text': {
+      const chunkId = url.searchParams.get('id');
+      if (!chunkId) return jsonError('bad_request', 400);
+      const data = await getChunkFullText(chunkId);
+      if (!data) return jsonError('not_found', 404);
+      return NextResponse.json(data);
     }
 
     case 'reload': {

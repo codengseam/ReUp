@@ -19,6 +19,7 @@ import {
   saveConfig,
   type ServerConfig,
 } from '@/lib/server-config';
+import { buildStarRewritePrompt } from '@/lib/resume/star-rewriter';
 
 export const runtime = 'nodejs';
 
@@ -41,6 +42,23 @@ function isConfigKey(v: unknown): v is ConfigKey {
 export async function GET(req: NextRequest): Promise<Response> {
   const url = new URL(req.url);
   const key = url.searchParams.get('key');
+  const action = url.searchParams.get('action');
+
+  // Preview default: return the runtime-generated default STAR prompt
+  if (key === 'resume.starPrompt' && action === 'preview-default') {
+    try {
+      const defaultPrompt = buildStarRewritePrompt();
+      return NextResponse.json(
+        { defaultPrompt, previewAt: new Date().toISOString() },
+        { status: 200 }
+      );
+    } catch (err) {
+      return NextResponse.json(
+        { error: 'preview_failed', detail: String(err) },
+        { status: 500 }
+      );
+    }
+  }
 
   if (key === null || key === '') {
     return NextResponse.json({ error: 'missing_key' }, { status: 400 });

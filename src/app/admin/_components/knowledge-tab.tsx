@@ -4,12 +4,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Database, RefreshCw, Search, BookOpen, FolderTree, Sparkles,
   Loader2, FileText, ChevronDown, ChevronRight, BookText, Heading2,
+  Eye, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const KNOWLEDGE_API = '/api/admin/knowledge';
 interface KnowledgeStats {
@@ -31,6 +38,17 @@ interface ChunkHit {
   /** L3 节级一句话主题（来自 metadata.topic，Phase 2A 注入）。 */
   topic: string;
   sourcePath: string;
+  docTitle: string;
+  sectionTitle: string;
+  chunkIndex: number;
+}
+
+/** Full text of a chunk (returned by action=chunk-full-text). */
+interface ChunkFullText {
+  id: string;
+  text: string;
+  book: string;
+  category: string;
   docTitle: string;
   sectionTitle: string;
   chunkIndex: number;
@@ -78,6 +96,11 @@ export default function KnowledgeTab() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [groupChunks, setGroupChunks] = useState<ChunkHit[]>([]);
   const [loadingGroup, setLoadingGroup] = useState(false);
+
+  // Full-text detail view
+  const [fullTextChunk, setFullTextChunk] = useState<ChunkFullText | null>(null);
+  const [loadingFullText, setLoadingFullText] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // 加载 stats
   const fetchStats = useCallback(async (withToast = false) => {
@@ -167,6 +190,28 @@ export default function KnowledgeTab() {
     },
     [expandedKey]
   );
+
+  // 查看分段全文详情
+  const handleViewFullText = useCallback(async (chunkId: string) => {
+    setLoadingFullText(true);
+    setDetailOpen(true);
+    try {
+      const res = await fetch(
+        `${KNOWLEDGE_API}?action=chunk-full-text&id=${encodeURIComponent(chunkId)}`
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '加载全文失败');
+      }
+      const data = (await res.json()) as ChunkFullText;
+      setFullTextChunk(data);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '加载全文失败');
+      setDetailOpen(false);
+    } finally {
+      setLoadingFullText(false);
+    }
+  }, []);
 
   const currentGroups = pickGroups(stats, activeGroup);
 
@@ -414,7 +459,7 @@ export default function KnowledgeTab() {
                                   {groupChunks.map((c) => (
                                     <div
                                       key={c.id}
-                                      className="border border-border rounded-lg bg-white p-3"
+                                      className="border border-border rounded-lg bg-white p-3 group"
                                     >
                                       <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-2">
                                         <FileText className="w-3 h-3" />
@@ -426,9 +471,19 @@ export default function KnowledgeTab() {
                                           <span className="font-mono ml-auto">chunk #{c.chunkIndex}</span>
                                         )}
                                       </div>
-                                      <p className="text-xs text-foreground leading-relaxed">
+                                      <p className="text-xs text-foreground leading-relaxed mb-2">
                                         {c.preview}
                                       </p>
+                                      <div className="flex justify-end">
+                                        <button
+                                          type="button"
+                                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-primary hover:bg-primary/5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                          onClick={(e) => { e.stopPropagation(); void handleViewFullText(c.id); }}
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                          查看全文
+                                        </button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -445,6 +500,39 @@ export default function KnowledgeTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 全文详情弹窗 */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <FileText className="w-4 h-4" />
+              {fullTextChunk ? (
+                <span>
+                  {fullTextChunk.docTitle}
+                  {fullTextChunk.sectionTitle && ` · ${fullTextChunk.sectionTitle}`}
+                  {typeof fullTextChunk.chunkIndex === 'number' && (
+                    <span className="font-mono text-muted-foreground ml-1">
+                      chunk #{fullTextChunk.chunkIndex}
+                    </span>
+                  )}
+                </span>
+              ) : (
+                '加载中...'
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingFullText ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : fullTextChunk ? (
+            <pre className="text-xs leading-relaxed whitespace-pre-wrap text-foreground bg-muted/30 p-4 rounded-lg">
+              {fullTextChunk.text}
+            </pre>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
