@@ -244,6 +244,11 @@ export const maxDuration = 300; // 5 min timeout for SSE streaming routes
 
 export async function POST(request: NextRequest) {
   const chatStartTime = Date.now();
+  const timer = (label: string, since?: number) => {
+    const t = Date.now() - (since ?? chatStartTime);
+    console.log(`[ChatTimer] ${label}: ${t}ms`);
+    return Date.now();
+  };
 
   let body: { messages?: unknown; model?: string; customProvider?: { providerType?: string; endpoint?: string; apiKey?: string; modelId?: string }; ragParams?: Record<string, unknown>; customPrompt?: string };
   try {
@@ -672,7 +677,12 @@ export async function POST(request: NextRequest) {
         }
 
         // ===== 置信度评估 & 转人工 =====
-        const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage);
+        // 传入 latestUserMessage 让热门问题（已收录在 HOT_QUERIES 中的问题及其变体）直接拿高置信度
+        const confidenceThresholds = {
+          high: typeof ragParams?.confidenceHighThreshold === 'number' ? ragParams.confidenceHighThreshold : 0.50,
+          medium: typeof ragParams?.confidenceMediumThreshold === 'number' ? ragParams.confidenceMediumThreshold : 0.25,
+        };
+        const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage, confidenceThresholds);
         const shouldTransferToHuman = confidence.level === 'low';
         safeEnqueue(controller, `data: ${JSON.stringify({
             confidence: confidence.level,

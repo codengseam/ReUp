@@ -463,7 +463,7 @@ describe('LLMClient', () => {
         const url1 = (fetchMock.mock.calls[0] as [string, RequestInit])[0];
         const url2 = (fetchMock.mock.calls[1] as [string, RequestInit])[0];
         expect(url1).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
-        expect(url2).toBe('https://open.bigmodel.cn/api/paas/v4/v1/chat/completions');
+        expect(url2).toBe('https://open.bigmodel.cn/api/paas/v4/chat/completions');
         expect((init1.headers as Record<string, string>).Authorization).toBe('Bearer sk-A');
         expect((init2.headers as Record<string, string>).Authorization).toBe('Bearer glm-key');
         // suppress unused-var

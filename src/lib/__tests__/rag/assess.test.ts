@@ -28,12 +28,10 @@ describe('assessConfidence - 阶段 4 线性打分', () => {
     expect(r.reason).toBe('no_results');
   });
 
-  it('1 条结果 + 高分 (0.9) → score=(1/5)*0.5+0.9*0.5=0.55 → medium', () => {
-    // 召回数权重 0.1 + 最高分权重 0.45 = 0.55
+  it('1 条结果 + 高分 (0.9) → score=(1/5)*0.5+0.9*0.5=0.55 → high（默认阈值 high≥0.50）', () => {
     const r = assessConfidence(mk(0.9, 1), '冷门');
-    expect(r.level).toBe('medium');
+    expect(r.level).toBe('high');
     expect(r.score).toBeCloseTo(0.55, 2);
-    expect(r.reason).toBe('partial_match');
   });
 
   it('5 条结果 + 0.6 最高分 → score=(5/5)*0.5+0.6*0.5=0.80 → high', () => {
@@ -42,17 +40,17 @@ describe('assessConfidence - 阶段 4 线性打分', () => {
     expect(r.score).toBeCloseTo(0.8, 2);
   });
 
-  it('3 条结果 + 0.5 最高分 → score=(3/5)*0.5+0.5*0.5=0.55 → medium', () => {
+  it('3 条结果 + 0.5 最高分 → score=(3/5)*0.5+0.5*0.5=0.55 → high（默认阈值 high≥0.50）', () => {
     const r = assessConfidence(mk(0.5, 3), '冷门');
-    expect(r.level).toBe('medium');
+    expect(r.level).toBe('high');
     expect(r.score).toBeCloseTo(0.55, 2);
   });
 
-  it('2 条结果 + 0.3 最高分 → score=(2/5)*0.5+0.3*0.5=0.35 → low + weak_match', () => {
+  it('2 条结果 + 0.3 最高分 → score=(2/5)*0.5+0.3*0.5=0.35 → medium（默认阈值 medium≥0.25）', () => {
     const r = assessConfidence(mk(0.3, 2), '冷门');
-    expect(r.level).toBe('low');
+    expect(r.level).toBe('medium');
     expect(r.score).toBeCloseTo(0.35, 2);
-    expect(r.reason).toBe('weak_match');
+    expect(r.reason).toBe('partial_match');
   });
 
   it('结果数 > 5 不会让 score 越界（被 Math.min 夹紧到 1）', () => {

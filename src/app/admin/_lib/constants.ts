@@ -61,6 +61,8 @@ export const DEFAULT_RAG_PARAMS: RAGParams = {
   hydeEnabled: true,
   rerankEnabled: true,
   cacheTTL: 5,
+  confidenceHighThreshold: 0.50,
+  confidenceMediumThreshold: 0.25,
 };
 
 
