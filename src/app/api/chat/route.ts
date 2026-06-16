@@ -240,6 +240,8 @@ function mapIntentToCategory(intent: IntentCategory): 'promotion' | 'interview' 
   return 'all';
 }
 
+export const maxDuration = 300; // 5 min timeout for SSE streaming routes
+
 export async function POST(request: NextRequest) {
   const chatStartTime = Date.now();
 
@@ -367,19 +369,26 @@ export async function POST(request: NextRequest) {
   // 选择模型（白名单校验 + 用户自定义）
   const selectedModel = validateModel(model);
 
+  // Helper: safe enqueue that catches errors when stream is already closed
+  const safeEnqueue = (controller: ReadableStreamDefaultController, data: string) => {
+    try { controller.enqueue(encoder.encode(data)); } catch { /* client disconnected */ }
+  };
+
+  // Detect client disconnect and abort outstanding work
+  let clientAborted = false;
+  request.signal.addEventListener('abort', () => { clientAborted = true; }, { once: true });
+
   const stream = new ReadableStream({
     async start(controller) {
       const streamStartTime = Date.now();
+      // Per-Vercel-docs: the runtime checks this flag between enqueue calls
+      const isConnected = () => !clientAborted && !request.signal.aborted;
       try {
         // ===== 阶段1: 正在理解问题 =====
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ status: 'understanding' })}\n\n`)
-        );
+        safeEnqueue(controller, `data: ${JSON.stringify({ status: 'understanding' })}\n\n`);
 
         // ===== 阶段2: RAG检索 =====
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ status: 'searching' })}\n\n`)
-        );
+        safeEnqueue(controller, `data: ${JSON.stringify({ status: 'searching' })}\n\n`);
 
         let ragContext = '';
         let citations: Citation[] = [];
@@ -426,7 +435,7 @@ export async function POST(request: NextRequest) {
 
           // ===== Thinking Steps（阶段 2：步骤 1+2 合并为"理解用户意图"）=====
           if (intentResult) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            safeEnqueue(controller, `data: ${JSON.stringify({
               thinkingStep: {
                 step: 1,
                 title: '理解用户意图',
@@ -434,10 +443,10 @@ export async function POST(request: NextRequest) {
                 status: 'completed',
                 details: '单次 LLM 完成意图分类 + 风险审核 + 查询重写 + 策略规划...'
               }
-            })}\n\n`));
+            })}\n\n`);
           } else {
             // legacy 模式：保留旧的两步
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            safeEnqueue(controller, `data: ${JSON.stringify({
               thinkingStep: {
                 step: 1,
                 title: '理解用户核心诉求',
@@ -445,9 +454,9 @@ export async function POST(request: NextRequest) {
                 status: 'completed',
                 details: '分析对话上下文，识别用户真实意图...'
               }
-            })}\n\n`));
+            })}\n\n`);
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            safeEnqueue(controller, `data: ${JSON.stringify({
               thinkingStep: {
                 step: 2,
                 title: '规划检索策略',
@@ -455,10 +464,10 @@ export async function POST(request: NextRequest) {
                 status: 'completed',
                 details: '根据问题类型选择最优检索方案...'
               }
-            })}\n\n`));
+            })}\n\n`);
           }
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+          safeEnqueue(controller, `data: ${JSON.stringify({
             thinkingStep: {
               step: 2,
               title: '检索相关知识',
@@ -466,9 +475,9 @@ export async function POST(request: NextRequest) {
               status: 'completed',
               details: '执行混合检索与重排序...'
             }
-          })}\n\n`));
+          })}\n\n`);
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+          safeEnqueue(controller, `data: ${JSON.stringify({
             thinkingStep: {
               step: 3,
               title: '筛选优质内容',
@@ -476,7 +485,7 @@ export async function POST(request: NextRequest) {
               status: 'completed',
               details: '对检索结果进行相关性筛选...'
             }
-          })}\n\n`));
+          })}\n\n`);
         } catch (ragError) {
           console.error('[Chat] RAG retrieval failed, continuing without context:', ragError instanceof Error ? ragError.message : ragError);
           // 超时或检索失败，降级为空 context，继续 LLM 生成
@@ -488,25 +497,18 @@ export async function POST(request: NextRequest) {
         // ===== 话题越界检测（unified: intent==='off_topic'；legacy: category==='话题越界'）=====
         const isOffTopic = intentResult?.intent === 'off_topic' || inputSafety.category === '话题越界';
         if (isOffTopic) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ status: 'generating' })}\n\n`)
-          );
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ content: OFF_TOPIC_RESPONSE })}\n\n`)
-          );
-          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          safeEnqueue(controller, `data: ${JSON.stringify({ status: 'generating' })}\n\n`);
+          safeEnqueue(controller, `data: ${JSON.stringify({ content: OFF_TOPIC_RESPONSE })}\n\n`);
+          safeEnqueue(controller, 'data: [DONE]\n\n');
           controller.close();
           return;
         }
 
         // ===== 阶段3: 正在生成答案 =====
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ status: 'generating' })}\n\n`)
-        );
+        safeEnqueue(controller, `data: ${JSON.stringify({ status: 'generating' })}\n\n`);
 
         // 发送元数据（查询策略+重写信息+引文+意图）
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({
+        safeEnqueue(controller, `data: ${JSON.stringify({
             meta: {
               strategy,
               rewrittenQuery,
@@ -514,7 +516,7 @@ export async function POST(request: NextRequest) {
               riskLevel: inputSafety.riskLevel,
               intent: intentResult?.intent,
             }
-          })}\n\n`)
+          })}\n\n`
         );
 
         // ===== 构建Grounded System Prompt =====
@@ -539,6 +541,12 @@ export async function POST(request: NextRequest) {
           systemPrompt += `\n\n## 注意：用户问题涉及${inputSafety.category}相关话题，请谨慎回答，避免透露具体数字或隐私信息。`;
         }
 
+        // ===== 检查客户端是否已断开 =====
+        if (!isConnected()) {
+          controller.close();
+          return;
+        }
+
         // ===== LLM流式生成 =====
         const allMessages = [
           { role: 'system' as const, content: systemPrompt },
@@ -552,41 +560,42 @@ export async function POST(request: NextRequest) {
           const urlSafety = isSafeEndpoint(customProvider.endpoint);
           if (!urlSafety.safe) {
             console.warn(`[Chat] Blocked unsafe customProvider endpoint: ${customProvider.endpoint} (${urlSafety.reason})`);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ error: 'endpoint_blocked', reason: urlSafety.reason ?? 'unknown' })}\n\n`)
-            );
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            safeEnqueue(controller, `data: ${JSON.stringify({ error: 'endpoint_blocked', reason: urlSafety.reason ?? 'unknown' })}\n\n`);
+            safeEnqueue(controller, 'data: [DONE]\n\n');
             controller.close();
             return;
           }
 
-          // 自定义模型：使用 fetch 直接调用（自动补全 /chat/completions）
-          const cpResponse = await fetch(normalizeEndpoint(customProvider.endpoint), {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${customProvider.apiKey}`,
-            },
-            body: JSON.stringify({
-              model: customProvider.modelId,
-              messages: allMessages,
-              temperature: 0.7,
-              stream: true,
-            }),
-          });
+          // 自定义模型：使用 fetch 直接调用（自动补全 /chat/completions），30s 超时
+          const cpAborter = new AbortController();
+          const cpTimeout = setTimeout(() => cpAborter.abort(), 30_000);
+          let cpReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+          try {
+            const cpResponse = await fetch(normalizeEndpoint(customProvider.endpoint), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${customProvider.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: customProvider.modelId,
+                messages: allMessages,
+                temperature: 0.7,
+                stream: true,
+              }),
+              signal: cpAborter.signal,
+            });
 
-          if (!cpResponse.ok) {
-            const errorText = await cpResponse.text().catch(() => '');
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ error: `自定义模型调用失败 (${cpResponse.status}): ${errorText.substring(0, 200)}` })}\n\n`)
-            );
-          } else {
-            const reader = cpResponse.body?.getReader();
-            if (reader) {
+            if (!cpResponse.ok) {
+              const errorText = await cpResponse.text().catch(() => '');
+              safeEnqueue(controller, `data: ${JSON.stringify({ error: `自定义模型调用失败 (${cpResponse.status}): ${errorText.substring(0, 200)}` })}\n\n`);
+            } else if (cpResponse.body) {
+              cpReader = cpResponse.body.getReader();
               const decoder = new TextDecoder();
               let buffer = '';
               while (true) {
-                const { done, value } = await reader.read();
+                if (!isConnected()) break;
+                const { done, value } = await cpReader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
@@ -601,13 +610,16 @@ export async function POST(request: NextRequest) {
                     const text = parsed.choices?.[0]?.delta?.content || '';
                     if (text) {
                       fullOutput += text;
-                      controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`)
-                      );
+                      safeEnqueue(controller, `data: ${JSON.stringify({ content: text })}\n\n`);
                     }
                   } catch { /* skip unparseable chunks */ }
                 }
               }
+            }
+          } finally {
+            clearTimeout(cpTimeout);
+            if (cpReader) {
+              try { cpReader.releaseLock(); } catch { /* already released */ }
             }
           }
         } else {
@@ -615,29 +627,26 @@ export async function POST(request: NextRequest) {
           // （qwen3.6-plus-2026-04-02 → qwen3.6-plus；GLM 单独走 zhipu 链）
           const candidates: ModelCandidate[] = await getModelCandidates(selectedModel);
           if (candidates.length === 0) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ error: `未配置 ${selectedModel} 所需的 API Key，请到管理后台「API Keys」配置` })}\n\n`
-              )
-            );
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            safeEnqueue(controller, `data: ${JSON.stringify({ error: `未配置 ${selectedModel} 所需的 API Key，请到管理后台「API Keys」配置` })}\n\n`);
+            safeEnqueue(controller, 'data: [DONE]\n\n');
             controller.close();
             return;
           }
           const client = new LLMClient();
 
+          // 120s 超时 (比 maxDuration 短，确保能在超时前结束)
           const llmStream = client.stream(allMessages, {
             models: candidates,
             temperature: 0.7,
+            timeoutMs: 120_000,
           });
 
           for await (const chunk of llmStream) {
+            if (!isConnected()) break;
             if (chunk.content) {
               const text = chunk.content.toString();
               fullOutput += text;
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`)
-              );
+              safeEnqueue(controller, `data: ${JSON.stringify({ content: text })}\n\n`);
             }
           }
         }
@@ -647,13 +656,10 @@ export async function POST(request: NextRequest) {
         if (!outputSafety.safe) {
           console.warn('[Chat] Output safety check failed:', outputSafety.reason);
           void recordOutputGuardBlocked();
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({
+          safeEnqueue(controller, `data: ${JSON.stringify({
               safetyWarning: '⚠️ 回复内容已触发安全审核，已替换为安全提示',
               replaceContent: `抱歉，生成的内容涉及${outputSafety.category || '敏感'}话题，已自动替换。请重新提问。`
-            })}
-\n\n`)
-          );
+            })}\n\n`);
         }
 
         // ===== 幻觉校验 =====
@@ -661,18 +667,14 @@ export async function POST(request: NextRequest) {
           const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
           if (!hallucinationResult.faithful) {
             console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ hallucinationDetected: true, hallucinationDetails: hallucinationResult.ungroundedParts })}\n\n`)
-            );
+            safeEnqueue(controller, `data: ${JSON.stringify({ hallucinationDetected: true, hallucinationDetails: hallucinationResult.ungroundedParts })}\n\n`);
           }
         }
 
         // ===== 置信度评估 & 转人工 =====
-        // 传入 latestUserMessage 让热门问题（已收录在 HOT_QUERIES 中的问题及其变体）直接拿高置信度
         const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage);
         const shouldTransferToHuman = confidence.level === 'low';
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({
+        safeEnqueue(controller, `data: ${JSON.stringify({
             confidence: confidence.level,
             confidenceScore: confidence.score,
             confidenceReason: confidence.reason,
@@ -681,21 +683,16 @@ export async function POST(request: NextRequest) {
               transferReason: '当前问题置信度较低，建议转接人工顾问获取更精准的指导',
               conversationContext: messages.slice(-6).map(m => m.role + ': ' + m.content).join('\n')
             } : {})
-          })}\n\n`)
-        );
+          })}\n\n`);
 
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        safeEnqueue(controller, 'data: [DONE]\n\n');
         void recordChatAPICall(Date.now() - streamStartTime);
         controller.close();
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ error: errorMessage })}\n\n`
-          )
-        );
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        safeEnqueue(controller, `data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+        safeEnqueue(controller, 'data: [DONE]\n\n');
         void recordChatAPICall(Date.now() - streamStartTime);
         controller.close();
       }

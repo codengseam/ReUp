@@ -13,6 +13,13 @@ import type { RAGResult } from './types';
 const embedder = createEmbedder();
 const knowledgeBase = createKnowledgeBase({ embed: (text) => embedder.embed(text) });
 
+// ========== Lazy LLMClient singleton (reuse across calls to avoid repeated instantiation) ==========
+let _llmClient: LLMClient | null = null;
+function getLLMClient(): LLMClient {
+  if (!_llmClient) _llmClient = new LLMClient();
+  return _llmClient;
+}
+
 // ========== 1. 语义检索（local knowledge-base） ==========
 async function semanticSearch(
   query: string,
@@ -92,7 +99,7 @@ async function extractKeywordsViaLLM(
   text: string
 ): Promise<string[]> {
   try {
-    const llmClient = new LLMClient();
+    const llmClient = getLLMClient();
 
     const prompt = `从以下文本中提取3-5个最重要的关键词，用于知识库检索。关键词应该是专业术语、核心概念或重要实体。只返回关键词，用逗号分隔，不要其他内容。
 
@@ -232,7 +239,7 @@ async function rerankResults(
   if (results.length <= 2) return results.sort((a, b) => b.score - a.score);
 
   try {
-    const llmClient = new LLMClient();
+    const llmClient = getLLMClient();
 
     // 构建文档摘要列表
     const docList = results.map((r, i) =>
@@ -333,7 +340,7 @@ async function generateHydeAnswer(
   query: string
 ): Promise<string | null> {
   try {
-    const llmClient = new LLMClient();
+    const llmClient = getLLMClient();
 
     const hydePrompt = `你是一位职场指导书作者。请根据用户的问题，写一段专业的、像教科书一样的回答。
 这段回答将用于从知识库中检索相关文档。
