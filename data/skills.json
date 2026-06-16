@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": [
     {
       "id": "jinsheng-dicing-luoji",
@@ -64,6 +64,22 @@
       "trigger": "面试最后问什么？",
       "framework": "三元交集模型（应聘者+面试官+职位）",
       "steps": ["收集真实诉求", "定位三元交集", "设计反问话术", "提供避坑指南"]
+    },
+    {
+      "id": "interview-review",
+      "name": "面试复盘教练",
+      "category": "interview",
+      "trigger": "面试结束后怎么复盘？",
+      "framework": "从技术深度、表达清晰度、思维结构、项目掌握、行为匹配五个维度进行全面复盘，提取亮点与问题，给出可执行的改进建议",
+      "steps": ["维度评分", "亮点提取", "问题诊断", "逐题反馈", "行动建议"]
+    },
+    {
+      "id": "offer-prediction",
+      "name": "Offer概率分析",
+      "category": "interview",
+      "trigger": "我拿到Offer的概率有多大？",
+      "framework": "基于简历匹配度、面试表现、级别匹配、公司梯队、市场行情、经验匹配六大因子，加权计算Offer概率，给出提升建议",
+      "steps": ["因子计算", "概率评估", "风险识别", "优势分析", "行动建议"]
     }
   ],
   "hotQueries": [
@@ -80,7 +96,9 @@
     { "id": 11, "text": "我做的业务很稳定但不出彩，如何在晋升中体现价值？", "category": "promotion" },
     { "id": 12, "text": "面试时被问到不懂的技术栈，怎么优雅地转场？", "category": "interview" },
     { "id": 13, "text": "简历上的项目比较平淡，怎么挖掘出亮点？", "category": "interview" },
-    { "id": 14, "text": "面试最后反问环节，问什么问题能给面试官留下好印象？", "category": "interview" }
+    { "id": 14, "text": "面试最后反问环节，问什么问题能给面试官留下好印象？", "category": "interview" },
+    { "id": 15, "text": "面试结束后怎么复盘？", "category": "interview" },
+    { "id": 16, "text": "我拿到Offer的概率有多大？", "category": "interview" }
   ],
   "quickEntries": [
     { "label": "晋升困惑", "icon": "TrendingUp", "query": "我绩效很好，为什么没晋升？" },
@@ -100,6 +118,8 @@
     { "keywords": ["总监", "管理"], "suggestion": "升了总监天天开会怎么办？" },
     { "keywords": ["技术", "学什么"], "suggestion": "我应该学什么技术才能晋升？" },
     { "keywords": ["P7", "P8"], "suggestion": "从P7到P8需要做哪些关键转变？" },
-    { "keywords": ["跳槽", "换工作"], "suggestion": "跳槽面试需要特别注意什么？" }
+    { "keywords": ["跳槽", "换工作"], "suggestion": "跳槽面试需要特别注意什么？" },
+    { "keywords": ["复盘", "面试回顾"], "suggestion": "面试结束后怎么复盘？" },
+    { "keywords": ["Offer", "概率", "拿offer"], "suggestion": "我拿到Offer的概率有多大？" }
   ]
 }
