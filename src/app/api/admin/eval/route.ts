@@ -6,15 +6,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/connection';
-import { isAuthConfigured, verifySessionCookie } from '@/lib/admin-auth';
+import { verifyCookie } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 
+const ADMIN_COOKIE = 'boss_admin_session';
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'dev-only-insecure-secret-change-me-please-32chars';
+
 async function requireAdmin(request: NextRequest): Promise<boolean> {
-  if (!isAuthConfigured()) return true; // 后端未配置时开放 (dev only)
-  const cookie = request.cookies.get('boss_admin_session')?.value;
+  // 后端未配置 session secret 时 (dev), 开放
+  if (!process.env.ADMIN_SESSION_SECRET) return true;
+  const cookie = request.cookies.get(ADMIN_COOKIE)?.value;
   if (!cookie) return false;
-  return verifySessionCookie(cookie) !== null;
+  return verifyCookie(cookie, SESSION_SECRET);
 }
 
 export async function GET(request: NextRequest) {

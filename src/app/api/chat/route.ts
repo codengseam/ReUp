@@ -668,9 +668,11 @@ export async function POST(request: NextRequest) {
         }
 
         // ===== 幻觉校验 =====
+        let hallucinationDetectedFlag = 0;
         if (ragContext) {
           const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
           if (!hallucinationResult.faithful) {
+            hallucinationDetectedFlag = 1;
             console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
             safeEnqueue(controller, `data: ${JSON.stringify({ hallucinationDetected: true, hallucinationDetails: hallucinationResult.ungroundedParts })}\n\n`);
           }
@@ -718,9 +720,9 @@ export async function POST(request: NextRequest) {
               query: latestUserMessage,
               answer: fullOutput,
               context_text: contextText,
-              context_doc_ids: (ragResults as RAGResult[] | undefined)?.map(r => r.id).join(',') ?? null,
+              doc_ids: (ragResults as RAGResult[] | undefined)?.map(r => r.docId).filter(Boolean).join(',') ?? null,
               has_recall: hasRecall,
-              model_id: modelId,
+              model_id: model,
               prompt_version: null,
               experiment_id: null,
               variant: 'control',
@@ -728,24 +730,12 @@ export async function POST(request: NextRequest) {
               prompt_tokens: inputTokens,
               completion_tokens: outputTokens,
               cost,
-              rag_latency_ms: null,
-              llm_latency_ms: latencyMs,
-              confidence_level: confidence.level,
-              hallucination_detected: hallucinationResult ? (hallucinationResult.faithful ? 0 : 1) : 0,
-              input_risk_level: 'safe',
-              output_safe: outputSafety.safe ? 1 : 0,
-              status: 'success',
-              error_message: null,
-              metadata: JSON.stringify({ confidence_score: confidence.score, transfer_to_human: shouldTransferToHuman }),
+              latency_ms: latencyMs,
+              error: null,
             });
             // RLS 抽样: 10% 概率 或 空召回强制入队
             if (Math.random() < 0.10 || hasRecall === 0) {
-              enqueueEvalJob({
-                request_id: requestId,
-                priority: hasRecall === 0 ? 10 : 5, // 空召回高优先级
-                max_retries: 3,
-                metadata: JSON.stringify({ sampled_reason: hasRecall === 0 ? 'empty_recall' : 'random' }),
-              });
+              enqueueEvalJob(requestId, hasRecall === 0 ? 10 : 5); // 空召回高优先级
             }
           } catch (err) {
             // 埋点失败不能影响用户, 静默记录

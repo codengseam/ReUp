@@ -158,15 +158,7 @@ async function processJob(job: { id: number; request_id: string }): Promise<Proc
       hallu.error ?? null,
     );
 
-    completeEvalJob(job.id, {
-      overall_score: overallScore,
-      faithfulness_score: faith.score,
-      answer_relevancy_score: relev.score,
-      context_relevancy_score: ctxRel.score,
-      hallucination_score: hallu.hallucination_score,
-      user_fact_hallucination: hallu.user_fact_hallucination,
-      methodology_hallucination: hallu.methodology_hallucination,
-    });
+    completeEvalJob(job.id);
 
     stats.succeeded++;
     console.log(

@@ -26,7 +26,7 @@ describe('ragas metrics (with mocked LLM)', () => {
   beforeEach(() => {
     mockInvoke.mockReset();
     // 默认: 按 prompt 内容返回不同响应
-    mockInvoke.mockImplementation(({ messages }: { messages: Array<{ content: string }> }) => {
+    mockInvoke.mockImplementation((messages: Array<{ content: string }>) => {
       const content = messages[messages.length - 1]?.content || '';
       if (content.includes('拆分为独立的陈述句')) {
         return Promise.resolve({

@@ -73,13 +73,15 @@ ${answer}`;
   try {
     const client = new LLMClient();
     const models = await getModelCandidates(HALLUCINATION_MODEL);
-    const response = await client.invoke({
-      models: models.length > 0 ? models : undefined,
-      model: models.length === 0 ? HALLUCINATION_MODEL : undefined,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      timeoutMs: HALLUCINATION_TIMEOUT_MS,
-    });
+    const response = await client.invoke(
+      [{ role: 'user', content: prompt }],
+      {
+        models: models.length > 0 ? models : undefined,
+        model: models.length === 0 ? HALLUCINATION_MODEL : undefined,
+        temperature: 0,
+        timeoutMs: HALLUCINATION_TIMEOUT_MS,
+      },
+    );
     const parsed = extractJson<Omit<HallucinationDetection, 'raw_response'>>(response.content);
     if (!parsed) {
       return { ...empty, raw_response: response.content, error: 'parse failed' };

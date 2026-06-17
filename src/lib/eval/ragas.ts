@@ -27,7 +27,7 @@ export interface RelevancyResult {
 }
 
 /** 提取 JSON 块 (容错: LLM 可能直接返回 JSON, 包 ```json 围栏, 或夹在文本中) */
-function extractJson<T>(text: string): T | null {
+export function extractJson<T>(text: string): T | null {
   const trimmed = text.trim();
   // 1. 直接 JSON.parse (LLM 严格遵守 prompt)
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -89,13 +89,15 @@ ${answer}
   try {
     const client = new LLMClient();
     const models: ModelCandidate[] = await getModelCandidates(EVAL_MODEL_ID);
-    const response = await client.invoke({
-      models: models.length > 0 ? models : undefined,
-      model: models.length === 0 ? EVAL_MODEL_ID : undefined,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      timeoutMs: EVAL_TIMEOUT_MS,
-    });
+    const response = await client.invoke(
+      [{ role: 'user', content: prompt }],
+      {
+        models: models.length > 0 ? models : undefined,
+        model: models.length === 0 ? EVAL_MODEL_ID : undefined,
+        temperature: 0,
+        timeoutMs: EVAL_TIMEOUT_MS,
+      },
+    );
     const parsed = extractJson<{ claims?: FaithfulnessClaim[] }>(response.content);
     const claims = parsed?.claims ?? [];
     if (claims.length === 0) {
@@ -133,13 +135,15 @@ export async function evaluateAnswerRelevancy(
   try {
     const client = new LLMClient();
     const models: ModelCandidate[] = await getModelCandidates(EVAL_MODEL_ID);
-    const response = await client.invoke({
-      models: models.length > 0 ? models : undefined,
-      model: models.length === 0 ? EVAL_MODEL_ID : undefined,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      timeoutMs: EVAL_TIMEOUT_MS,
-    });
+    const response = await client.invoke(
+      [{ role: 'user', content: prompt }],
+      {
+        models: models.length > 0 ? models : undefined,
+        model: models.length === 0 ? EVAL_MODEL_ID : undefined,
+        temperature: 0,
+        timeoutMs: EVAL_TIMEOUT_MS,
+      },
+    );
     const parsed = extractJson<{ relevancy?: number; reason?: string }>(response.content);
     if (!parsed || typeof parsed.relevancy !== 'number') {
       return { score: 0, reason: 'parse failed' };
@@ -179,13 +183,15 @@ ${context}
   try {
     const client = new LLMClient();
     const models: ModelCandidate[] = await getModelCandidates(EVAL_MODEL_ID);
-    const response = await client.invoke({
-      models: models.length > 0 ? models : undefined,
-      model: models.length === 0 ? EVAL_MODEL_ID : undefined,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      timeoutMs: EVAL_TIMEOUT_MS,
-    });
+    const response = await client.invoke(
+      [{ role: 'user', content: prompt }],
+      {
+        models: models.length > 0 ? models : undefined,
+        model: models.length === 0 ? EVAL_MODEL_ID : undefined,
+        temperature: 0,
+        timeoutMs: EVAL_TIMEOUT_MS,
+      },
+    );
     const parsed = extractJson<{ relevancy?: number; reason?: string }>(response.content);
     if (!parsed || typeof parsed.relevancy !== 'number') {
       return { score: 0, reason: 'parse failed' };
