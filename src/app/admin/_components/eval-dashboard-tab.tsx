@@ -46,6 +46,16 @@ interface EvalData {
     error_count: number;
   }>;
   queue_stats: Array<{ status: string; c: number }>;
+  summary: {
+    total_requests: number;
+    empty_recall_rate: number;
+    total_cost: number;
+    total_tokens: number;
+    avg_latency_ms: number;
+    error_count: number;
+    error_rate: number;
+    thumbs_down_rate: number;
+  };
   generated_at: number;
 }
 
@@ -55,6 +65,32 @@ const SCORE_COLOR = (s: number | null) => {
   if (s >= 0.6) return 'text-amber-600';
   return 'text-red-600';
 };
+
+const SUMMARY_COLOR = (color: 'default' | 'red') => {
+  return color === 'red' ? 'text-red-600' : 'text-foreground';
+};
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  color = 'default',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color?: 'default' | 'red';
+}) {
+  return (
+    <div className="bg-white border border-border rounded-lg p-4">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <div className={`text-xl font-semibold mt-1 ${SUMMARY_COLOR(color)}`}>{value}</div>
+    </div>
+  );
+}
 
 export default function EvalDashboardTab() {
   const [data, setData] = useState<EvalData | null>(null);

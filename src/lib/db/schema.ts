@@ -42,10 +42,11 @@ CREATE INDEX IF NOT EXISTS idx_request_logs_strategy ON request_logs(strategy);
 CREATE INDEX IF NOT EXISTS idx_request_logs_prompt_version ON request_logs(prompt_version);
 CREATE INDEX IF NOT EXISTS idx_request_logs_experiment ON request_logs(experiment_id, variant);
 
--- M2: 评估结果 (一条 request 可有多个 evaluator 输出)
+-- M2: 评估结果 (一条 request 一行, 重跑覆盖)
+-- C-1 修复: request_id UNIQUE 让 worker 用 ON CONFLICT 幂等写入
 CREATE TABLE IF NOT EXISTS eval_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  request_id TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
   job_id INTEGER,
   overall_score REAL,           -- 可空 (I2/C2: -1 改用 null)
   faithfulness_score REAL,
@@ -69,22 +70,25 @@ CREATE INDEX IF NOT EXISTS idx_eval_results_created ON eval_results(created_at);
 CREATE INDEX IF NOT EXISTS idx_eval_results_score ON eval_results(overall_score);
 
 -- M2: 用户反馈 (补充 feedback-store.ts, 这里是 SQL 版)
+-- reason: good | too_vague | wrong | unhelpful | other | thumbs_up | thumbs_down
 CREATE TABLE IF NOT EXISTS feedback (
   id TEXT PRIMARY KEY,
   request_id TEXT,
   message_id TEXT,
-  reason TEXT NOT NULL,           -- good | too_vague | wrong | unhelpful | other
+  reason TEXT NOT NULL,
   comment TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
 CREATE INDEX IF NOT EXISTS idx_feedback_request ON feedback(request_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_reason ON feedback(reason);
 
 -- M2: 异步评估任务队列 (RLS 抽样驱动)
+-- request_id UNIQUE 防重复入队 (C2)
 CREATE TABLE IF NOT EXISTS eval_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  request_id TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
   status TEXT NOT NULL DEFAULT 'pending',  -- pending | running | done | failed
   priority INTEGER NOT NULL DEFAULT 0,
   attempts INTEGER NOT NULL DEFAULT 0,
@@ -102,6 +106,11 @@ CREATE INDEX IF NOT EXISTS idx_eval_jobs_status ON eval_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_eval_jobs_priority ON eval_jobs(priority DESC);
 -- I10: 复合索引覆盖 worker 的 dequeue 模式
 CREATE INDEX IF NOT EXISTS idx_eval_jobs_queue ON eval_jobs(status, priority DESC, created_at);
+-- I9/Perf-7: 让 auto-optimizer 走索引而非全表扫
+CREATE INDEX IF NOT EXISTS idx_request_logs_query ON request_logs(query);
+-- C-2 性能: request_logs.prompt_version 已在 idx_request_logs_prompt_version
+-- C-2 性能: eval_results JOIN 用 (request_id, overall_score) 复合索引
+CREATE INDEX IF NOT EXISTS idx_eval_results_request_score ON eval_results(request_id, overall_score);
 
 -- M2: Golden 测试集 (人工标注期望答案, 用于 judge 校准)
 CREATE TABLE IF NOT EXISTS golden_tests (

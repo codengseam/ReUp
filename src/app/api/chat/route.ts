@@ -698,47 +698,99 @@ export async function POST(request: NextRequest) {
           })}\n\n`);
 
         // ===== Loop Engineering M2: 埋点地基 (1.x - request_logs + eval_jobs 入队) =====
-        // 只在服务端写日志, 不阻塞流
+        // 关键修复 (Loop Engineering Round 2):
+        // - C-5: 调用 pickPromptForUser 决定 variant, 不再写死 'control'
+        // - C4: insertRequestLog + enqueueEvalJob 包到事务, 中途崩溃一致
+        // - I5: startTrace/recordGeneration 真正接入 Langfuse
+        // - M3: client abort 时不写埋点 (signal.aborted 早返)
         void (async () => {
           try {
             const { randomUUID } = await import('node:crypto');
             const { insertRequestLog } = await import('@/lib/db/request-logger');
             const { enqueueEvalJob } = await import('@/lib/db/eval-jobs');
+            const { pickPromptForUser } = await import('@/lib/experiments/ab-test');
+            const { startTrace, recordGeneration, getLangfuse } = await import('@/lib/observability/langfuse');
+            const { getDb } = await import('@/lib/db/connection');
+
+            // M3: client 早断不再写埋点
+            if (request.signal.aborted) return;
+
             const requestId = randomUUID();
+            const userId = request.headers.get('x-user-id') || `anon-${requestId.slice(0, 8)}`;
+            const sessionId = request.headers.get('x-session-id') || null;
             const latencyMs = Date.now() - streamStartTime;
-            // I4 修复: 存真实进 LLM 的 RAG 拼接文本, 不是 doc_ids
             const contextText = ragContext || '';
-            // 计算 has_recall (空召回检测)
             const hasRecall = ragResults && ragResults.length > 0 && contextText.length > 0 ? 1 : 0;
-            // 计算 cost (粗略: input 0.0008/1k, output 0.002/1k token)
             const inputTokens = Math.ceil((contextText.length + latestUserMessage.length) / 4);
             const outputTokens = Math.ceil(fullOutput.length / 4);
             const cost = (inputTokens * 0.0008 + outputTokens * 0.002) / 1000;
-            insertRequestLog({
-              request_id: requestId,
-              session_id: null,
-              query: latestUserMessage,
-              answer: fullOutput,
-              context_text: contextText,
-              doc_ids: (ragResults as RAGResult[] | undefined)?.map(r => r.docId).filter(Boolean).join(',') ?? null,
-              has_recall: hasRecall,
-              model_id: model,
-              prompt_version: null,
-              experiment_id: null,
-              variant: 'control',
-              total_tokens: inputTokens + outputTokens,
-              prompt_tokens: inputTokens,
-              completion_tokens: outputTokens,
-              cost,
-              latency_ms: latencyMs,
-              error: null,
-            });
-            // RLS 抽样: 10% 概率 或 空召回强制入队
-            if (Math.random() < 0.10 || hasRecall === 0) {
-              enqueueEvalJob(requestId, hasRecall === 0 ? 10 : 5); // 空召回高优先级
+
+            // C-5 修复: 真正的 A/B 分桶
+            const promptPick = pickPromptForUser(userId);
+
+            // C-4 修复: Langfuse trace 真接入
+            const traceCtx = startTrace('chat-completion', userId, sessionId ?? undefined);
+            recordGeneration(
+              traceCtx.trace,
+              'rag-answer',
+              model ?? 'unknown',
+              latestUserMessage,
+              fullOutput,
+              { promptTokens: inputTokens, completionTokens: outputTokens, totalTokens: inputTokens + outputTokens },
+              {
+                strategy: strategy ?? 'unknown',
+                intent: intentResult?.intent ?? 'unknown',
+                variant: promptPick.variant,
+                experiment_id: promptPick.experiment_id,
+                in_experiment: promptPick.in_experiment,
+              },
+            );
+
+            // C4 修复: insertRequestLog + enqueueEvalJob 包到事务, 中途崩溃一致
+            const db = getDb();
+            db.transaction(() => {
+              insertRequestLog({
+                request_id: requestId,
+                user_id: userId,
+                session_id: sessionId,
+                query: latestUserMessage,
+                answer: fullOutput,
+                context_text: contextText,
+                doc_ids: (ragResults as RAGResult[] | undefined)?.map(r => r.docId).filter(Boolean).join(',') ?? null,
+                has_recall: hasRecall,
+                model_id: model,
+                prompt_version: promptPick.prompt_version,
+                experiment_id: promptPick.experiment_id,
+                variant: promptPick.variant,
+                total_tokens: inputTokens + outputTokens,
+                prompt_tokens: inputTokens,
+                completion_tokens: outputTokens,
+                cost,
+                latency_ms: latencyMs,
+                error: null,
+              });
+              // RLS 抽样: 10% 概率 或 空召回强制入队
+              if (Math.random() < 0.10 || hasRecall === 0) {
+                enqueueEvalJob(requestId, hasRecall === 0 ? 10 : 5); // 空召回高优先级
+              }
+            })();
+
+            // 记录 trace_id 关联 (给后续回查)
+            if (traceCtx.traceId) {
+              try {
+                db.prepare(
+                  `INSERT OR REPLACE INTO trace_links (request_id, langfuse_trace_id) VALUES (?, ?)`,
+                ).run(requestId, traceCtx.traceId);
+              } catch { /* trace_links 是非关键, 静默 */ }
+            }
+
+            // 关闭期 flush
+            const lf = getLangfuse();
+            if (lf) {
+              lf.flushAsync().catch(() => {});
             }
           } catch (err) {
-            // 埋点失败不能影响用户, 静默记录
+            // 埋点失败不能影响用户, 记录供排查
             console.warn('[Chat] 埋点失败:', err);
           }
         })();
@@ -753,31 +805,38 @@ export async function POST(request: NextRequest) {
         safeEnqueue(controller, 'data: [DONE]\n\n');
         void recordChatAPICall(Date.now() - streamStartTime);
         // 错误埋点 (Loop Engineering 修复: 失败请求也要记, 否则 dashboard 会低估错误率)
-        void (async () => {
-          try {
-            const { randomUUID } = await import('node:crypto');
-            const { insertRequestLog } = await import('@/lib/db/request-logger');
-            insertRequestLog({
-              request_id: randomUUID(),
-              session_id: null,
-              query: latestUserMessage,
-              answer: null,
-              context_text: '',
-              doc_ids: null,
-              has_recall: 0,
-              model_id: model,
-              prompt_version: null,
-              experiment_id: null,
-              variant: 'control',
-              total_tokens: 0,
-              prompt_tokens: 0,
-              completion_tokens: 0,
-              cost: 0,
-              latency_ms: Date.now() - streamStartTime,
-              error: errorMessage.slice(0, 500),
-            });
-          } catch { /* 静默 */ }
-        })();
+        // M3: client 早断不写
+        if (!request.signal.aborted) {
+          void (async () => {
+            try {
+              const { randomUUID } = await import('node:crypto');
+              const { insertRequestLog } = await import('@/lib/db/request-logger');
+              const { pickPromptForUser } = await import('@/lib/experiments/ab-test');
+              const userId = request.headers.get('x-user-id') || `anon-${randomUUID().slice(0, 8)}`;
+              const pick = pickPromptForUser(userId);
+              insertRequestLog({
+                request_id: randomUUID(),
+                user_id: userId,
+                session_id: null,
+                query: latestUserMessage,
+                answer: null,
+                context_text: '',
+                doc_ids: null,
+                has_recall: 0,
+                model_id: model ?? null,
+                prompt_version: pick.prompt_version,
+                experiment_id: pick.experiment_id,
+                variant: pick.variant,
+                total_tokens: 0,
+                prompt_tokens: 0,
+                completion_tokens: 0,
+                cost: 0,
+                latency_ms: Date.now() - streamStartTime,
+                error: errorMessage.slice(0, 500),
+              });
+            } catch (err) { console.warn('[Chat] 错误埋点失败:', err); }
+          })();
+        }
         controller.close();
       }
     },
