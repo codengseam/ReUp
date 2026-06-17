@@ -103,3 +103,4 @@ tsconfig.tsbuildinfo
 
 # 运行时 API key 存储（管理后台可改、含明文 key）
 data/.runtime-config.json
+data/loop-engineering.sqlite*
