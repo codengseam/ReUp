@@ -102,4 +102,44 @@ CREATE INDEX IF NOT EXISTS idx_eval_jobs_status ON eval_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_eval_jobs_priority ON eval_jobs(priority DESC);
 -- I10: 复合索引覆盖 worker 的 dequeue 模式
 CREATE INDEX IF NOT EXISTS idx_eval_jobs_queue ON eval_jobs(status, priority DESC, created_at);
+
+-- M2: Golden 测试集 (人工标注期望答案, 用于 judge 校准)
+CREATE TABLE IF NOT EXISTS golden_tests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  query TEXT NOT NULL,
+  expected_answer TEXT NOT NULL,
+  expected_faithfulness REAL,
+  expected_relevancy REAL,
+  context_docs TEXT,
+  category TEXT,
+  difficulty TEXT DEFAULT 'medium',
+  tags TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_golden_category ON golden_tests(category);
+
+-- M3: Prompt 版本注册表
+CREATE TABLE IF NOT EXISTS prompt_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  version TEXT NOT NULL UNIQUE,
+  prompt_content TEXT NOT NULL,
+  prompt_hash TEXT NOT NULL,
+  change_description TEXT,
+  author TEXT,
+  is_active INTEGER NOT NULL DEFAULT 0,
+  is_experiment INTEGER NOT NULL DEFAULT 0,
+  experiment_id TEXT,
+  experiment_traffic REAL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_prompt_versions_active ON prompt_versions(is_active);
+CREATE INDEX IF NOT EXISTS idx_prompt_versions_experiment ON prompt_versions(experiment_id);
+
+-- M3: Langfuse trace 关联 (内部 request_id ↔ Langfuse trace_id)
+CREATE TABLE IF NOT EXISTS trace_links (
+  request_id TEXT PRIMARY KEY,
+  langfuse_trace_id TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_trace_links_trace ON trace_links(langfuse_trace_id);
 `;
