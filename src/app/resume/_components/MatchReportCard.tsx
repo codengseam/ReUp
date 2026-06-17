@@ -8,7 +8,7 @@ import {
   suggestSectionForKeyword,
   type JdKeyword,
 } from '@/lib/resume/ats';
-import { classifyDimensions, DEFAULT_PRIORITIES } from '@/lib/resume/matcher';
+import { DEFAULT_PRIORITIES } from '@/lib/resume/matcher';
 import type {
   ATSResult,
   MatchReport,
@@ -84,6 +84,7 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
   // when the API is unavailable or returns an empty body.
   const [remoteReport, setRemoteReport] = useState<MatchReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(error ?? null);
+  const [reportLoading, setReportLoading] = useState(false);
   useEffect(() => {
     if (error) {
       setReportError(error);
@@ -96,14 +97,19 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
     }
     if (!jd || jd.trim().length === 0) return;
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 130_000); // 130s
     setReportError(null);
+    setReportLoading(true);
     void (async () => {
       try {
         const res = await fetch('/api/resume/match-report', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ resume, jd }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         const json = (await res.json()) as MatchReport & { error?: string; message?: string };
         if (cancelled) return;
         if (!res.ok) {
@@ -116,12 +122,19 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
           priorities: json.priorities ?? DEFAULT_PRIORITIES.map((p) => ({ ...p })),
         });
       } catch (err) {
+        clearTimeout(timeoutId);
         if (cancelled) return;
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setReportError('LLM \u8bf7\u6c42\u8d85\u65f6\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u6216\u7b80\u5316\u7b80\u5386\u5185\u5bb9');
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Network error';
         setReportError(message);
+      } finally {
+        if (!cancelled) setReportLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); clearTimeout(timeoutId); };
   }, [resume, jd, matchReport, error]);
 
   const report = useMemo<MatchReport>(() => {
@@ -162,6 +175,15 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           <Target className="w-3 h-3" />
           匹配报告
+          {reportLoading && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium normal-case tracking-normal">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </span>
+              AI 分析中...
+            </span>
+          )}
         </div>
         <span className={`text-[10px] px-1.5 py-0.5 rounded border border-border font-mono ${toneTextClass}`}>
           覆盖率 {coverageLabel}
@@ -175,11 +197,20 @@ export function MatchReportCard({ resume, jd, atsResult, matchReport, error }: M
         className={`h-1.5 mb-3 ${toneTrackClass} ${TONE_INDICATOR_CLASS[tone]}`}
       />
 
-      <div className="grid grid-cols-2 gap-2">
-        <StrengthsCard strengths={report.strengths} />
-        <GapsCard gaps={report.gaps} />
-        <PrioritiesCard priorities={report.priorities} />
-        <MissingKeywordsCard missing={ats.missing} resumeEmpty={resumeEmpty} />
+      <div className="relative">
+        {reportLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px] rounded-lg">
+            <span className="text-[11px] text-muted-foreground font-medium">
+              正在分析简历与 JD 匹配度...
+            </span>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <StrengthsCard strengths={report.strengths} />
+          <GapsCard gaps={report.gaps} />
+          <PrioritiesCard priorities={report.priorities} />
+          <MissingKeywordsCard missing={ats.missing} resumeEmpty={resumeEmpty} />
+        </div>
       </div>
     </div>
   );
@@ -299,24 +330,15 @@ function MissingKeywordsCard({ missing, resumeEmpty }: { missing: ATSResult['mis
   );
 }
 
-function buildReportSync(resume: ResumeDocument): MatchReport {
-  const dims = classifyDimensions(resume);
-  const strengths: MatchReport['strengths'] = [];
-  const gaps: MatchReport['gaps'] = [];
-  for (const [dimension, entry] of Object.entries(dims)) {
-    if (entry.evidence.length > 0) {
-      strengths.push({ dimension, evidence: entry.evidence });
-    } else if (entry.score === 0) {
-      gaps.push({ dimension, severity: 'high' });
-    } else if (entry.score < 0.1) {
-      gaps.push({ dimension, severity: 'medium' });
-    } else {
-      gaps.push({ dimension, severity: 'low' });
-    }
-  }
+/**
+ * Fallback when the LLM match-report API is unavailable or returns empty.
+ * Returns an empty strengths/gaps report with default priorities only.
+ * Avoids using `classifyDimensions` (deprecated) which returns skill IDs.
+ */
+function buildReportSync(_resume: ResumeDocument): MatchReport {
   return {
-    strengths,
-    gaps,
+    strengths: [],
+    gaps: [],
     priorities: DEFAULT_PRIORITIES.map((p) => ({ ...p })),
   };
 }

@@ -4,6 +4,8 @@
 //   1. Full streaming: { resume } → SSE stream of STAR chunks
 //   2. Single-section: { resume, section, currentText } → JSON { text, confidence }
 
+export const maxDuration = 300; // 5 minutes for 4 sequential LLM stream calls
+
 import { type NextRequest } from 'next/server';
 import { rewriteResumeStream } from '@/lib/resume/star-rewriter';
 import { rewriteResumeSection } from '@/lib/resume/iteration';

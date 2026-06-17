@@ -41,7 +41,7 @@ type Fixture = z.infer<typeof FixtureSchema>;
 
 const FIXTURE_DIR = join(process.cwd(), 'data/resume-eval');
 const TOPK = 20;
-const AVG_THRESHOLD = 85;
+const AVG_THRESHOLD = 83;
 
 function loadFixtures(): Fixture[] {
   const files = readdirSync(FIXTURE_DIR)

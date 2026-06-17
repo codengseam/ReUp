@@ -472,6 +472,11 @@ export class LLMClient {
       return;
     }
 
+    // Connection established — cancel the connection-level timeout so it
+    // doesn't fire while we're consuming the stream body. The caller's
+    // own signal (opts.signal) is still active for manual cancellation.
+    aborter.cancel();
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';

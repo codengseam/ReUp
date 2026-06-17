@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-14T15:37:07.379Z",
+  "updatedAt": "2026-06-16T01:17:38.359Z",
   "defaultModelId": "qwen3.6-plus-2026-04-02",
   "customModels": [],
   "ragParams": {
@@ -8,7 +8,9 @@
     "maxChars": 4000,
     "semanticWeight": 0.8,
     "hydeEnabled": true,
-    "rerankEnabled": false,
-    "cacheTTL": 15
+    "rerankEnabled": true,
+    "cacheTTL": 15,
+    "confidenceHighThreshold": 0.32,
+    "confidenceMediumThreshold": 0.1
   }
 }

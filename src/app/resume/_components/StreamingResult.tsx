@@ -74,6 +74,8 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
     setFeedback({ '我的分析': null, 'STAR改写': null, '底层心法': null, '建议': null });
 
     (async () => {
+      // Auto-abort after 3 minutes if LLM is stuck
+      const autoTimeout = setTimeout(() => controller.abort(), 180_000);
       try {
         const res = await fetch('/api/resume/rewrite', {
           method: 'POST',
@@ -102,59 +104,71 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
           for (const line of lines) {
             const dataLine = line.replace(/^data: /, '');
             if (!dataLine) continue;
-            try {
-              const msg = JSON.parse(dataLine) as {
-                type: string;
-                section?: StarSection;
-                delta?: string;
-                done?: boolean;
-                error?: string;
-              };
 
-              if (msg.type === 'chunk' && msg.section && msg.delta !== undefined) {
-                sectionsRef.current[msg.section] += msg.delta;
-                if (!mountedRef.current) break;
-                setSections((prev) => ({
-                  ...prev,
-                  [msg.section!]: prev[msg.section!] + msg.delta!,
-                }));
-                if (msg.done) {
-                  if (!mountedRef.current) break;
-                  setCompleted((prev) => {
-                    const next = new Set(prev);
-                    next.add(msg.section!);
-                    return next;
-                  });
-                  setOriginals((prev) => {
-                    if (prev[msg.section!]) return prev;
-                    return { ...prev, [msg.section!]: sectionsRef.current[msg.section!] };
-                  });
-                }
-              } else if (msg.type === 'done') {
-                if (!mountedRef.current) break;
-                // Calculate confidence: min(1, total chars / 2000)
-                const totalChars = Object.values(sectionsRef.current).reduce(
-                  (sum, t) => sum + t.length, 0,
-                );
-                const conf = Math.min(1, totalChars / 2000);
-                setConfidence(conf);
-                onComplete?.({
-                  sections: { ...sectionsRef.current },
-                  confidence: conf,
-                });
-              } else if (msg.type === 'error') {
-                throw new Error(msg.error ?? 'STAR rewrite failed');
-              }
+            // Parse JSON in a separate try/catch so malformed frames are
+            // skipped but legitimate errors (type: 'error') propagate.
+            type SseMsg = {
+              type: string;
+              section?: StarSection;
+              delta?: string;
+              done?: boolean;
+              error?: string;
+            };
+            let msg: SseMsg;
+            try {
+              msg = JSON.parse(dataLine) as SseMsg;
             } catch {
               // skip malformed frames
+              continue;
+            }
+
+            if (msg.type === 'chunk' && msg.section && msg.delta !== undefined) {
+              sectionsRef.current[msg.section] += msg.delta;
+              if (!mountedRef.current) break;
+              setSections((prev) => ({
+                ...prev,
+                [msg.section!]: prev[msg.section!] + msg.delta!,
+              }));
+              if (msg.done) {
+                if (!mountedRef.current) break;
+                setCompleted((prev) => {
+                  const next = new Set(prev);
+                  next.add(msg.section!);
+                  return next;
+                });
+                setOriginals((prev) => {
+                  if (prev[msg.section!]) return prev;
+                  return { ...prev, [msg.section!]: sectionsRef.current[msg.section!] };
+                });
+              }
+            } else if (msg.type === 'done') {
+              if (!mountedRef.current) break;
+              const totalChars = Object.values(sectionsRef.current).reduce(
+                (sum, t) => sum + t.length, 0,
+              );
+              const conf = Math.min(1, totalChars / 2000);
+              setConfidence(conf);
+              onComplete?.({
+                sections: { ...sectionsRef.current },
+                confidence: conf,
+              });
+            } else if (msg.type === 'error') {
+              throw new Error(msg.error ?? 'STAR rewrite failed');
             }
           }
         }
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        clearTimeout(autoTimeout);
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          if (mountedRef.current) {
+            setError('STAR \u91cd\u5199\u8d85\u65f6\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5');
+          }
+          return;
+        }
         if (!mountedRef.current) return;
         setError(err instanceof Error ? err.message : String(err));
       } finally {
+        clearTimeout(autoTimeout);
         if (!controller.signal.aborted && mountedRef.current) {
           setIsStreaming(false);
         }
@@ -287,6 +301,15 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
           STAR 重写结果
         </div>
         <div className="flex items-center gap-1.5">
+          {isStreaming && !error && (
+            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+              </span>
+              AI 生成中...
+            </span>
+          )}
           {confidence !== null && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-container text-accent-foreground font-mono">
               置信度 {confidence.toFixed(2)}
@@ -303,7 +326,7 @@ export function StreamingResult({ resume, onComplete }: StreamingResultProps) {
         </div>
       </div>
 
-      {error && (
+      {error && !isStreaming && (
         <div role="alert" className="text-[11px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg mb-3">
           {error}
         </div>

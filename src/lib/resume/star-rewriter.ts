@@ -140,7 +140,7 @@ export async function* rewriteResumeStream(
       { role: 'user', content: `${user}\n\n请先输出【${section}】部分。` },
     ];
 
-    const stream = client.stream(messages, { signal: opts.signal });
+    const stream = client.stream(messages, { signal: opts.signal, timeoutMs: 90_000 });
 
     let stopped = false;
 

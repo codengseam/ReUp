@@ -506,13 +506,32 @@ function splitSubBlocks(
         // Non-bullet line after bullets → start new sub-block with this line as header
         flush();
         current = { header: cleaned, lines: [], hasBullet: false, headerSource: 'title-line' };
+      } else if (
+        !isBullet &&
+        current.headerSource === 'title-line' &&
+        current.lines.length > 0 &&
+        PERIOD_RE.test(cleaned)
+      ) {
+        // Non-bullet line with an inline period (e.g. "科大讯飞 - AI教育2019年07月 - 2021年04月")
+        // when the current block header does NOT already contain a period.
+        // This handles PDF-extracted text where company+period are on the same line
+        // and there are no bullet markers.
+        flush();
+        current = { header: cleaned, lines: [], hasBullet: false, headerSource: 'title-line' };
       } else {
         current.lines.push(rawLine);
         if (isBullet) current.hasBullet = true;
       }
     } else {
-      // No current block — start implicit
-      current = { header: '', lines: [rawLine], hasBullet: isBulletLine(cleaned), headerSource: 'none' };
+      // No current block — start implicit.
+      // Bug fix: if the first line is NOT a bullet, use it as the header
+      // (e.g. "字节跳动 - 懂车帝2022年10月 - 至今"). Only use empty header
+      // when the first line is a bullet.
+      if (isBulletLine(cleaned)) {
+        current = { header: '', lines: [rawLine], hasBullet: true, headerSource: 'none' };
+      } else {
+        current = { header: cleaned, lines: [], hasBullet: false, headerSource: 'title-line' };
+      }
     }
   }
   flush();
@@ -591,11 +610,6 @@ function parseSkillsSection(body: string): string[] {
     .map(cleanLine)
     .filter(Boolean);
   const skills: string[] = [];
-  // We treat each bullet line as a "skill group". Within a group we split on
-  // common Chinese / English separators — but NOT on `:` / `：` because
-  // categories like "数据库：MySQL" are intentionally one logical skill entry.
-  const SEP_RE = /[、,;；\/]| and | & /i;
-  const SENTENCE_RE = /[;；。]/;
   const push = (raw: string) => {
     const cleaned = raw.replace(/^\*+\s*/, '').replace(/\*+\s*$/, '').trim();
     if (!cleaned) return;
@@ -606,18 +620,54 @@ function parseSkillsSection(body: string): string[] {
     const m = BULLET_RE.exec(line);
     const text = m?.[1]?.trim() ?? line;
     if (!text) continue;
-    // Bug D: if the text is a long sentence without common list separators,
-    // AND does not contain a colon (which indicates a category prefix like
-    // "数据库：MySQL"), try splitting by sentence terminators.
-    if (text.length > 20 && ![...text].some((c) => /[、,;；\/]/.test(c)) && !/[：:]/.test(text)) {
-      const sentences = text.split(SENTENCE_RE).map((s) => s.trim()).filter(Boolean);
+
+    // Case 1: line contains sentence terminators (。) → split by sentence
+    if (text.includes('\u3002')) {
+      const sentences = text.split(/\u3002/).map((s) => s.trim()).filter(Boolean);
       if (sentences.length > 1) {
         for (const s of sentences) push(s);
         continue;
       }
     }
-    const parts = text.split(SEP_RE).map((p) => p.trim()).filter(Boolean);
-    for (const p of parts) push(p);
+
+    // Strip trailing semicolons / periods for cleaner matching
+    const textTrimmed = text.replace(/[；;。.\s]+$/, '');
+
+    // Case 2: long descriptive line with skill verbs → single skill.
+    // Skill verbs signal descriptive text where 、 and ， are part of the
+    // description, NOT list separators. Excludes category lines (：) and
+    // sentence-terminated lines (。) which are handled by Cases 1 & 3.
+    const SKILL_VERB_RE = /^\s*(?:精通|熟悉|了解|具备|掌握|从事|擅长|具有|拥有)/;
+    if (
+      textTrimmed.length > 15 &&
+      SKILL_VERB_RE.test(textTrimmed) &&
+      !/[：:]/.test(textTrimmed) &&
+      !textTrimmed.includes('\u3002') &&
+      !/[；;]/.test(textTrimmed.replace(/[；;。\s]+$/, ''))  // no mid-text semicolons
+    ) {
+      push(textTrimmed);
+      continue;
+    }
+
+    // Case 3: short keyword / category-style entries
+    // Split on 、, ,, ;, ；, / but preserve "category：items" as a group
+    if (/[：:]/.test(text)) {
+      // Category line: split only the part AFTER the colon
+      const colonIdx = text.search(/[：:]/);
+      const prefix = text.slice(0, colonIdx + 1).trim(); // "数据库："
+      const suffix = text.slice(colonIdx + 1).trim(); // "MySQL、SQL优化、一致性对账"
+      const parts = suffix.split(/[、,;；\/]/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 0) {
+        push(prefix + parts[0]); // "数据库：MySQL"
+        for (let i = 1; i < parts.length; i++) push(parts[i]!); // remaining
+      } else {
+        push(text);
+      }
+    } else {
+      // Simple keyword list
+      const parts = text.split(/[、,;；\/]| and | & /i).map((p) => p.trim()).filter(Boolean);
+      for (const p of parts) push(p);
+    }
   }
   return skills;
 }

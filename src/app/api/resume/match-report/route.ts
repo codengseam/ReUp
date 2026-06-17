@@ -10,6 +10,8 @@
 // in resume facts. Parse failures are surfaced as HTTP 502 instead of a
 // silent fallback so the UI can show a red banner.
 
+export const maxDuration = 150; // 150 seconds for LLM invoke with large prompt
+
 import { type NextRequest } from 'next/server';
 import { LLMClient } from '@/lib/llm-client';
 import type { MatchReport, ResumeDocument } from '@/lib/resume/types';
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     let response;
     try {
-      response = await llmClient.invoke(messages, { temperature: 0.3 });
+      response = await llmClient.invoke(messages, { temperature: 0.3, timeoutMs: 120_000 });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'LLM invoke failed';
       // eslint-disable-next-line no-console
