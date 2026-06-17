@@ -1,0 +1,8 @@
+{
+  "id": "fake-08-ml",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：周翔\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级算法工程师\n**工作经验**：4年算法工程经验\n\n## 核心能力\n\n- 机器学习：分类、回归、聚类、推荐\n- 深度学习：CNN、RNN、Transformer、LLM\n- 框架：PyTorch、TensorFlow、Hugging Face\n- 部署：TorchServe、Triton、ONNX\n\n## 工作经历\n\n### 示例公司 P\n\n高级算法工程师（2022年02月 - 至今）\n\n- 主导推荐系统 CTR 模型升级\n- AUC 从 0.72 提升到 0.79\n- 推动 LLM 在业务中的落地\n\n### 示例公司 Q\n\n算法工程师（2020年07月 - 2022年01月）\n\n- 负责 NLP 模型训练和部署\n- 文本分类 F1 从 0.85 提升到 0.92\n- 沉淀模型推理框架\n\n## 专业技能\n\n- 机器学习：XGBoost、LightGBM、CatBoost\n- 深度学习：PyTorch、TensorFlow、Hugging Face\n- 部署：TorchServe、Triton、ONNX、TensorRT\n- 工具：Python、NumPy、Pandas、Scikit-learn",
+  "jd": "高级算法工程师招聘。负责推荐系统、NLP、CV、LLM 应用的算法设计与落地、模型训练与部署、性能优化。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPyTorch PyTorch PyTorch PyTorch PyTorch — deep learning.\nTensorFlow TensorFlow TensorFlow TensorFlow TensorFlow — deep learning.\nPython Python Python Python Python — primary language.\nHugging Face Hugging Face Hugging Face Hugging Face Hugging Face — model hub.\nLLM LLM LLM LLM LLM — large language models.\nTransformer Transformer Transformer Transformer Transformer — architecture.\nCUDA CUDA CUDA CUDA CUDA — GPU compute.\nONNX ONNX ONNX ONNX ONNX — model format.\n\n需要熟悉机器学习、深度学习、推荐系统、NLP、CV、LLM、Transformer、模型蒸馏、量化、ONNX、TensorRT、CUDA、性能优化、A/B 测试。3+ years ML experience required.",
+  "expectedTopKeywords": ["pytorch", "tensorflow", "python", "hugging", "llm", "transformer", "cuda", "onnx"],
+  "expectedMinCoverage": 75
+}

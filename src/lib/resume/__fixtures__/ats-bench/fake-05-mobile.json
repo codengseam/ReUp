@@ -1,0 +1,8 @@
+{
+  "id": "fake-05-mobile",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：陈昊\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级移动端开发工程师\n**工作经验**：4年移动端开发经验\n\n## 核心能力\n\n- iOS / Android 双端开发\n- 跨平台：React Native、Flutter\n- 性能优化：启动、卡顿、内存\n\n## 工作经历\n\n### 示例公司 J\n\n高级移动端开发工程师（2022年03月 - 至今）\n\n- 负责示例 App 双端架构升级\n- 启动时间从 2.8s 优化至 1.2s\n- 推进组件化改造\n\n### 示例公司 K\n\n移动端开发工程师（2020年07月 - 2022年02月）\n\n- 负责电商 App 开发\n- 使用 React Native 跨平台方案\n- 集成埋点、监控、推送\n\n## 专业技能\n\n- iOS：Swift、Objective-C、UIKit、SwiftUI\n- Android：Kotlin、Java、Jetpack Compose\n- 跨平台：React Native、Flutter\n- 工具：Xcode、Android Studio、Fastlane\n- 性能：Instruments、LeakCanary、Firebase",
+  "jd": "高级移动端开发工程师招聘。负责 iOS / Android 双端开发、跨平台方案、性能优化、组件化、监控告警。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nSwift Swift Swift Swift Swift — iOS language.\nKotlin Kotlin Kotlin Kotlin Kotlin — Android language.\nReact Native React Native React Native React Native React Native — cross-platform.\nFlutter Flutter Flutter Flutter Flutter — cross-platform.\niOS iOS iOS iOS iOS — Apple platform.\nAndroid Android Android Android Android — Google platform.\n\n需要熟悉 Swift、Kotlin、Objective-C、Java、UIKit、SwiftUI、Jetpack、协程、组件化、性能优化、监控告警、CI/CD、Fastlane。3+ years mobile experience required.",
+  "expectedTopKeywords": ["swift", "kotlin", "react native", "flutter", "ios", "android"],
+  "expectedMinCoverage": 65
+}

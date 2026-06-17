@@ -1,0 +1,8 @@
+{
+  "id": "fake-11-junior-sdet",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：示例候选人 K\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：软件测试工程师（初级）\n**工作经验**：1年测试实习经验\n\n## 专业技能\n\n- Python：基础语法，可写自动化脚本\n- Pytest：入门使用\n- MySQL：了解基本 SQL\n- Java：了解基本语法\n- Linux：了解常用命令\n- Git：了解 clone / commit\n- JIRA：了解工单创建\n- Selenium：了解基础用法\n\n## 工作经历\n\n### 示例实习公司 V\n\nQA质量保障-教育（2021年04月 - 至今）\n\n- 负责示例教务系统功能测试\n- 协助 PyTest 自动化建设\n- 使用 JIRA 提交缺陷，使用 Git 管理脚本\n- 了解 MySQL 数据验证，Linux 环境部署\n\n### 示例实习公司 W\n\n软件测试工程师（实习）（2019年07月 - 2020年07月）\n\n- 负责走班考勤 web 端和 H5 测试\n- 协助智能排课、等级赋分等应用测试\n- 了解 Python、Pytest、MySQL、Git 等工具\n\n## 项目\n\n- 自动化测试入门：Python + Selenium + Pytest\n- 接口自动化入门：Python + Requests + Pytest + MySQL\n- 持续集成入门：Jenkins + Git + Linux\n- 缺陷跟踪：JIRA",
+  "jd": "初级测试工程师招聘。负责功能测试、自动化测试脚本编写、缺陷跟踪。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — scripting basics.\nPytest Pytest Pytest Pytest Pytest — test framework basics.\nMySQL MySQL MySQL MySQL MySQL — SQL basics.\nSelenium Selenium Selenium Selenium Selenium — web automation basics.\nJIRA JIRA JIRA JIRA JIRA — bug tracking basics.\nLinux Linux Linux Linux Linux — basic commands.\n\n需要了解 Python、Pytest、MySQL、Selenium、JIRA、Linux、Git。1+ year QA intern experience required.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "selenium", "jira", "linux"],
+  "expectedMinCoverage": 50
+}
