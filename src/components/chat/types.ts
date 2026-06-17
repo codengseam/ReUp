@@ -32,7 +32,7 @@ export interface CitationData {
   fullContent?: string;
   source: string;
   skillName?: string;
-  category?: 'promotion' | 'interview';
+  category?: string;
 }
 
 // 复用共享的 ModelConfig 类型（实际定义在 src/lib/models.ts）
@@ -59,76 +59,67 @@ export const PROVIDER_TEMPLATES: { type: string; name: string; endpoint: string 
 // 复用共享的模型白名单（实际数据来自 src/lib/models.ts）
 export { BUILTIN_MODELS as AVAILABLE_MODELS } from '@/lib/models';
 
-// 快捷入口
+// 快捷入口（通用示例，可按需替换为具体领域的快捷入口）
 export const QUICK_ENTRIES = [
-  { label: '晋升困惑', icon: 'TrendingUp', query: '我绩效很好，为什么没晋升？' },
-  { label: '面试准备', icon: 'Target', query: '怎么自我介绍最加分？' },
-  { label: '反问设计', icon: 'HelpCircle', query: '面试最后问什么问题？' },
+  { label: '功能介绍', icon: 'Sparkles', query: '这个系统能帮我做什么？' },
+  { label: '使用指南', icon: 'BookOpen', query: '如何使用知识库问答功能？' },
+  { label: '常见问题', icon: 'HelpCircle', query: '有哪些常见问题？' },
 ];
 
-// 优秀提问案例库
+// 优秀提问案例库（通用示例）
 export const EXAMPLE_QUERIES = [
   {
-    category: '晋升',
-    badExample: '怎么晋升？',
-    goodExample: '我P6做了2年核心业务，绩效连续2次A，但晋升答辩没过，可能是什么原因？',
-    tip: '补充具体背景信息'
+    category: '基础',
+    badExample: '怎么用？',
+    goodExample: '这个系统的知识库问答功能具体怎么使用？',
+    tip: '补充具体功能名称'
   },
   {
-    category: '晋升',
-    badExample: '我该学什么技术才能晋升？',
-    goodExample: '作为技术负责人，我该学什么方向才能从P7升到P8？',
-    tip: '说明当前职级和目标职级'
+    category: '基础',
+    badExample: '能做什么？',
+    goodExample: '这个系统能帮我回答哪些类型的问题？',
+    tip: '说明你想了解的方面'
   },
   {
-    category: '晋升',
-    badExample: '业务没亮点怎么办？',
-    goodExample: '我做的业务很稳定但不出彩，如何在晋升中体现价值？',
-    tip: '描述具体困境而非笼统提问'
+    category: '基础',
+    badExample: '不好用',
+    goodExample: '回答不够准确时，我该如何优化提问以获得更好的结果？',
+    tip: '描述具体问题而非笼统评价'
   },
   {
-    category: '面试',
-    badExample: '面试不会回答怎么办？',
-    goodExample: '面试时被问到不懂的技术栈，怎么优雅地转场？',
-    tip: '聚焦具体场景'
+    category: '进阶',
+    badExample: '怎么配置？',
+    goodExample: '如何在管理后台配置自定义的 LLM API 密钥？',
+    tip: '聚焦具体配置项'
   },
   {
-    category: '面试',
-    badExample: '简历怎么写？',
-    goodExample: '简历上的项目比较平淡，怎么挖掘出亮点？',
-    tip: '指出具体问题点'
+    category: '进阶',
+    badExample: '知识库怎么用？',
+    goodExample: '如何向知识库添加新的文档？添加后多久能被检索到？',
+    tip: '指出具体操作场景'
   },
   {
-    category: '面试',
-    badExample: '面试最后问什么？',
-    goodExample: '面试最后反问环节，问什么问题能给面试官留下好印象？',
+    category: '进阶',
+    badExample: '能自定义吗？',
+    goodExample: '能否自定义 AI 助手的角色和回答风格？如何配置？',
     tip: '明确场景和目的'
   },
 ];
 
-// 8个Skills
-export const SKILLS = [
-  { name: '晋升底层逻辑', category: '晋升类', icon: '📈', trigger: '我绩效很好，为什么没晋升？' },
-  { name: '晋升三大原则', category: '晋升类', icon: '🎯', trigger: '我该学什么技术才能晋升？' },
-  { name: '能力三重境界', category: '晋升类', icon: '🏔️', trigger: '这个业务做了两年还能怎么提升？' },
-  { name: '领域专家演进', category: '晋升类', icon: '🧭', trigger: '升了总监天天开会怎么办？' },
-  { name: '素质模型对齐', category: '面试类', icon: '🧊', trigger: '怎么自我介绍最加分？' },
-  { name: '亮点挖掘', category: '面试类', icon: '💎', trigger: '简历没亮点怎么办？' },
-  { name: '盲区导航', category: '面试类', icon: '🛡️', trigger: '面试被问住怎么圆？' },
-  { name: '反问框架', category: '面试类', icon: '❓', trigger: '面试最后问什么问题？' },
-];
+// Skills 列表（从 data/skills.json 动态加载，前端默认为空）
+export const SKILLS: { name: string; category: string; icon: string; trigger: string }[] = [];
 
-// 输入联想建议
+// 输入联想建议（通用示例）
 export const INPUT_SUGGESTIONS_DB = [
-  '我绩效很好，为什么没晋升？',
-  '我的经历没有亮点怎么办？',
-  '面试被问住不会回答怎么圆？',
-  '升了总监天天开会怎么办？',
-  '怎么自我介绍最加分？',
-  '面试最后问什么问题？',
-  '如何在现有业务中继续提升？',
-  '该学什么技术才能晋升？',
-  '从P7到P8需要做哪些关键转变？',
-  '跳槽面试需要特别注意什么？',
+  '这个系统能帮我做什么？',
+  '如何使用知识库问答功能？',
+  '有哪些常见问题？',
+  '如何配置自定义 LLM API？',
+  '如何向知识库添加文档？',
+  '回答不准确时怎么优化提问？',
+  '能否自定义 AI 助手的角色？',
+  '如何查看对话历史记录？',
+  '系统支持哪些 LLM 模型？',
+  '如何导出对话内容？',
 ];
 

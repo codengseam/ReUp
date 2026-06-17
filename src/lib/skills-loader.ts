@@ -17,7 +17,7 @@ import skillsJson from '../../data/skills.json';
 const SkillSchema = z.object({
   id: z.string(),
   name: z.string(),
-  category: z.enum(['promotion', 'interview']),
+  category: z.string(),
   trigger: z.string(),
   framework: z.string(),
   steps: z.array(z.string()),
@@ -26,7 +26,7 @@ const SkillSchema = z.object({
 const HotQuerySchema = z.object({
   id: z.number(),
   text: z.string(),
-  category: z.enum(['promotion', 'interview']),
+  category: z.string(),
 });
 
 const QuickEntrySchema = z.object({

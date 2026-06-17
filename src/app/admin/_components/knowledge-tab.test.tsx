@@ -167,7 +167,7 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     await screen.findByText('大厂晋升指南（第10章优化版）');
 
     // 触发搜索
-    const input = screen.getByPlaceholderText(/晋升/);
+    const input = screen.getByPlaceholderText(/关键词/);
     fireEvent.change(input, { target: { value: '晋升' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
 
@@ -201,7 +201,7 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     render(<KnowledgeTab />);
     await screen.findByText('大厂晋升指南（第10章优化版）');
 
-    const input = screen.getByPlaceholderText(/晋升/);
+    const input = screen.getByPlaceholderText(/关键词/);
     fireEvent.change(input, { target: { value: '晋升' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
 

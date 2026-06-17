@@ -177,7 +177,7 @@ export default function KnowledgeTab() {
         <div>
           <h2 className="text-xl font-bold text-foreground">知识库管理</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            本地向量知识库（基于 data/skill-vectors.json，608 个 chunk），支持搜索、统计、重新加载
+            本地向量知识库（基于 data/skill-vectors.json，{loadingStats ? '…' : `${stats?.total ?? 0}`} 个 chunk），支持搜索、统计、重新加载
           </p>
         </div>
         <Button
@@ -259,7 +259,7 @@ export default function KnowledgeTab() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="输入关键词，如「晋升」「STAR」「项目复盘」..."
+                placeholder="输入关键词搜索..."
                 className="pl-9"
               />
             </div>

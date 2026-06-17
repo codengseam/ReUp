@@ -1,11 +1,7 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
-import { Briefcase, ChevronRight, FileText } from 'lucide-react';
-import {
-  TrendingUp, Sparkles, Target, HelpCircle
-} from 'lucide-react';
+import { ChevronRight, Sparkles, Target, HelpCircle, TrendingUp } from 'lucide-react';
 import { QUICK_ENTRIES, EXAMPLE_QUERIES } from './types';
 
 // 图标名称到组件的映射
@@ -26,18 +22,10 @@ export default function WelcomeScreen({ onQuickEntry, expandedExamples, onToggle
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-6">
-        <Briefcase className="w-8 h-8 text-primary-foreground" />
+        <Sparkles className="w-8 h-8 text-primary-foreground" />
       </div>
-      <h2 className="text-xl font-semibold text-foreground mb-2">你好，我是你的职场顾问</h2>
-      <p className="text-sm text-muted-foreground mb-6 text-center">以资深 HR + 总裁视角，帮你解决晋升和面试问题</p>
-      {/* 简历优化：主操作胶囊按钮，跳转上传页 */}
-      <Link
-        href="/resume"
-        className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all mb-8 shadow-sm"
-      >
-        <FileText className="w-4 h-4 shrink-0" />
-        <span>简历优化</span>
-      </Link>
+      <h2 className="text-xl font-semibold text-foreground mb-2">你好，我是你的 AI 助手</h2>
+      <p className="text-sm text-muted-foreground mb-6 text-center">基于知识库为你提供专业解答</p>
       <div className="flex flex-wrap items-center justify-center gap-3 max-w-md">
         {QUICK_ENTRIES.map(entry => {
           const IconComponent = ICON_MAP[entry.icon];

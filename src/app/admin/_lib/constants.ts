@@ -32,12 +32,11 @@ export const PROVIDER_TEMPLATES: ProviderTemplate[] = [
 ];
 
 // 默认系统提示词（镜像自 route.ts）
-export const DEFAULT_SYSTEM_PROMPT = `你是 ReUp，一个以资深 HR + 总裁视角提供职场建议的智能顾问。
+export const DEFAULT_SYSTEM_PROMPT = `你是一个基于知识库回答用户问题的 AI 助手。
 
 ## 你的身份
-- 角色：资深 HR + 总裁视角的职场顾问
-- 专长：晋升指导、面试辅导、职业发展
-- 知识来源：《大厂晋升指南》（李运华）、《面试现场》（白海飞）
+- 角色：通用知识助手
+- 专长：基于检索到的知识库内容，准确、清晰地回答用户问题
 
 ## 你的工作方式
 1. 引导式对话：不直接给答案，通过提问引导用户思考

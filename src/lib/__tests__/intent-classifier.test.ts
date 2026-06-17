@@ -6,9 +6,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 describe('parseIntentResponse', () => {
   it('parses valid JSON', async () => {
     const { parseIntentResponse } = await import('@/lib/intent-classifier');
-    const raw = '{"intent":"promotion","strategy":"direct","rewrittenQuery":"P7 升 P8","riskLevel":"low","reason":"ok"}';
+    const raw = '{"intent":"general","strategy":"direct","rewrittenQuery":"P7 升 P8","riskLevel":"low","reason":"ok"}';
     const r = parseIntentResponse(raw);
-    expect(r.intent).toBe('promotion');
+    expect(r.intent).toBe('general');
     expect(r.strategy).toBe('direct');
     expect(r.riskLevel).toBe('low');
     expect(r.rewrittenQuery).toBe('P7 升 P8');
@@ -16,11 +16,22 @@ describe('parseIntentResponse', () => {
 
   it('extracts JSON from prose', async () => {
     const { parseIntentResponse } = await import('@/lib/intent-classifier');
-    const raw = '好的，结果是：{"intent":"interview","strategy":"multiquery","subQueries":["a","b"],"riskLevel":"low","reason":"ok"} 完';
+    const raw = '好的，结果是：{"intent":"off_topic","strategy":"multiquery","subQueries":["a","b"],"riskLevel":"low","reason":"ok"} 完';
     const r = parseIntentResponse(raw);
-    expect(r.intent).toBe('interview');
+    expect(r.intent).toBe('off_topic');
     expect(r.strategy).toBe('multiquery');
     expect(r.subQueries).toEqual(['a', 'b']);
+  });
+
+  it('downgrades domain-specific intent (e.g. promotion) to general', async () => {
+    // 框架级 IntentCategory 只保留 general/off_topic/jailbreak；
+    // 领域特定值（如 promotion）不在合法集合内，应被降级为 general。
+    const { parseIntentResponse } = await import('@/lib/intent-classifier');
+    const raw = '{"intent":"promotion","strategy":"direct","rewrittenQuery":"P7 升 P8","riskLevel":"low","reason":"ok"}';
+    const r = parseIntentResponse(raw);
+    expect(r.intent).toBe('general');
+    expect(r.strategy).toBe('direct');
+    expect(r.rewrittenQuery).toBe('P7 升 P8');
   });
 
   it('falls back gracefully on garbage', async () => {

@@ -5,26 +5,26 @@ import type { FrameworkSkill } from '@/lib/admin-knowledge';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-// 手摇 mock 数据：2 个 skill（1 晋升 + 1 面试），让测试跑得快
+// 手摇 mock 数据：2 个 skill，让测试跑得快
 const MOCK_SKILLS: FrameworkSkill[] = [
   {
     id: 'jinsheng-dicing-luoji',
-    name: '晋升底层逻辑',
+    name: '示例 Skill 一',
     category: 'promotion',
     trigger: '我绩效很好，为什么没晋升？',
     framework: '先精通当前级别，再做下一级别的事',
     steps: ['确认晋升通道', '评估当前级别', '对标下一级', '寻找越级机会'],
-    markdown: '# 晋升底层逻辑\n\n## 心法\n\n- 长期主义\n- 跨级别思考',
+    markdown: '# 示例 Skill 一\n\n## 心法\n\n- 长期主义\n- 跨级别思考',
     markdownPath: '/abs/path/skills/jinsheng-dicing-luoji/SKILL.md',
   },
   {
     id: 'highlight-extractor',
-    name: '亮点挖掘',
+    name: '示例 Skill 二',
     category: 'interview',
     trigger: '简历没亮点怎么办？',
     framework: '价值/结果/创新/动机四维挖掘',
     steps: ['输入平淡经历', '价值与结果榨取', '创新与动机榨取', '生成亮点句'],
-    markdown: '## 亮点挖掘\n\n### 输入\n\n平淡的项目经历',
+    markdown: '## 示例 Skill 二\n\n### 输入\n\n平淡的项目经历',
     markdownPath: '/abs/path/skills/highlight-extractor/SKILL.md',
   },
 ];
@@ -68,9 +68,9 @@ describe('FrameworkSkillsTab', () => {
     render(<FrameworkSkillsTab />);
     // 等待异步 fetch 完成
     await waitFor(() => {
-      expect(screen.getByText('晋升底层逻辑')).toBeInTheDocument();
+      expect(screen.getByText('示例 Skill 一')).toBeInTheDocument();
     });
-    expect(screen.getByText('亮点挖掘')).toBeInTheDocument();
+    expect(screen.getByText('示例 Skill 二')).toBeInTheDocument();
     // 数据来源是 MOCK_SKILLS，包含 2 个
     expect(screen.getByTestId('skill-card-jinsheng-dicing-luoji')).toBeInTheDocument();
     expect(screen.getByTestId('skill-card-highlight-extractor')).toBeInTheDocument();
@@ -84,11 +84,9 @@ describe('FrameworkSkillsTab', () => {
       expect(screen.getByTestId('stat-total').textContent).toContain('2');
     });
     const totalStat = screen.getByTestId('stat-total');
-    const promotionStat = screen.getByTestId('stat-promotion');
-    const interviewStat = screen.getByTestId('stat-interview');
+    const mdStat = screen.getByTestId('stat-md');
     expect(totalStat.textContent).toMatch(/2\s*个/);
-    expect(promotionStat.textContent).toMatch(/1\s*个/);
-    expect(interviewStat.textContent).toMatch(/1\s*个/);
+    expect(mdStat.textContent).toMatch(/2\/2/);
   });
 
   it('(d) 点击卡片展开 SKILL.md markdown 内容', async () => {
@@ -103,9 +101,9 @@ describe('FrameworkSkillsTab', () => {
     await waitFor(() => {
       expect(screen.getByTestId('skill-markdown-jinsheng-dicing-luoji')).toBeInTheDocument();
     });
-    // markdown 容器里出现「晋升底层逻辑」（# 标题被渲染为 h1）
+    // markdown 容器里出现「示例 Skill 一」（# 标题被渲染为 h1）
     const md = screen.getByTestId('skill-markdown-jinsheng-dicing-luoji');
-    expect(md.textContent).toContain('晋升底层逻辑');
+    expect(md.textContent).toContain('示例 Skill 一');
     expect(md.textContent).toContain('心法');
   });
 

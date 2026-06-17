@@ -86,7 +86,7 @@ export default function DashboardTab({ onNavigate }: DashboardProps) {
     { key: 'prompt', icon: PenLine, title: '提示词管理', desc: '编辑系统提示词，控制 AI 角色和输出格式', stat: '1', statLabel: '活跃模板', color: 'bg-purple-50 text-purple-600' },
     { key: 'model', icon: Cpu, title: '模型配置', desc: '配置默认模型和可用模型白名单', stat: String(totalModels), statLabel: '可用模型', color: 'bg-green-50 text-green-600' },
     { key: 'rag', icon: SlidersHorizontal, title: 'RAG 参数', desc: '调整检索参数，优化知识库检索效果', stat: '7', statLabel: '可配置项', color: 'bg-amber-50 text-amber-600' },
-    { key: 'metadata', icon: Tags, title: '元数据管理', desc: '按 Skill 维度浏览 chunk 分布', stat: String(skillCount), statLabel: 'Skill 数', color: 'bg-rose-50 text-rose-600' },
+    { key: 'metadata', icon: Tags, title: '元数据管理', desc: '按分类维度浏览 chunk 分布', stat: String(skillCount), statLabel: '分类数', color: 'bg-rose-50 text-rose-600' },
   ];
 
   const allActivity = activityLog.slice(0, 5);

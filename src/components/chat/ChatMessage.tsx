@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Briefcase, Search, BookOpen, Lightbulb, MessageCircle,
+  Briefcase,
   RotateCcw, Volume2, Copy, Share2, Quote, AlertTriangle, Check,
-  ThumbsDown, UserRound, Brain, ChevronDown, ChevronRight, AlertCircle, RefreshCw
+  ThumbsDown, UserRound, Brain, ChevronDown, AlertCircle, RefreshCw
 } from 'lucide-react';
 import type { Message, CitationData, ThinkingStep } from './types';
 
@@ -101,14 +101,6 @@ export function formatMarkdown(
   messageId?: string,
   citations?: CitationData[]
 ): string {
-  // Skill key 映射：英文 key → 中文名（用于在回复中展示中文 Skill 名）
-  const SKILL_KEY_MAP: Record<string, string> = {
-    'p8-lingyu-zhuanjia': '领域专家演进',
-    'jinsheng-diceng-luoji': '晋升底层逻辑',
-    'jinsheng-sanda-yuanze': '晋升三大原则',
-    'nengli-sanzhong-jingjie': '能力三重境界',
-  };
-
   let html = text;
   // 1. 去除整行单独的 # 字符（LLM 偶发作为分隔符，避免独立显示在页面上）
   html = html.replace(/^\s*#+\s*$/gm, '');
@@ -145,10 +137,6 @@ export function formatMarkdown(
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>');
   // 引用块：方案 A - Claude 简约优雅风（bg-[#f6fef9] 清新底色）
   html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-[3px] border-primary bg-[#f6fef9] pl-4 py-3 pr-3 rounded-r-lg text-foreground leading-relaxed">$1</blockquote>');
-  // 3.5. Skill key 替换：英文 key → 中文名
-  for (const [en, cn] of Object.entries(SKILL_KEY_MAP)) {
-    html = html.replace(new RegExp(en, 'g'), cn);
-  }
   html = html.replace(/^(\d+)\.\s+(.+)$/gm, '<div class="flex gap-3 my-0.5 items-start"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-container text-primary text-xs font-semibold shrink-0 mt-0.5">$1</span><span>$2</span></div>');
   html = html.replace(/^[-*]\s+(.+)$/gm, '<div class="flex gap-2 my-0.5"><span class="text-primary mt-1.5">•</span><span>$1</span></div>');
   html = html.replace(/✅/g, '<span class="text-green-600">✅</span>');
@@ -169,143 +157,19 @@ export function formatMarkdown(
   return html;
 }
 
-// ========== 渲染AI回复的4板块 ==========
+// ========== 渲染AI回复内容 ==========
 function renderAIContent(
   content: string,
   messageId: string,
   citations: CitationData[] | undefined,
-  expandedAnalysis: Set<string>,
-  setExpandedAnalysis: React.Dispatch<React.SetStateAction<Set<string>>>,
   purify: { sanitize: (dirty: string, config?: Record<string, unknown>) => string } | null
 ) {
-  const processedContent = content;
-
-  // Citation 编号 [1][2] → <sup> 由 formatMarkdown 内部处理（带 messageId 注入）
-
-  const sections = processedContent.split(/(?=##\s*【)/);
-
-  return sections.map((section, idx) => {
-    if (!section.trim()) return null;
-
-    // 卡片容器样式（方案 A：Claude 简约优雅风 - 线框卡片）
-    const cardClass = 'border border-[#e8e8e8] rounded-2xl p-6 mb-4 bg-white hover:shadow-sm transition-shadow';
-
-    if (section.includes('【我的分析】')) {
-      const isExpanded = expandedAnalysis.has(messageId);
-      const analysisContent = section.replace(/##\s*【我的分析】[\s\n]*/, '');
-      const checkCount = (analysisContent.match(/✅/g) || []).length;
-      const crossCount = (analysisContent.match(/❌/g) || []).length;
-      const summary = checkCount > 0 || crossCount > 0
-        ? `已分析 ${checkCount + crossCount} 个关键问题`
-        : '点击查看详细分析';
-
-      return (
-        <div key={idx} className="mb-4">
-          <button
-            type="button"
-            onClick={() => {
-              setExpandedAnalysis(prev => {
-                const next = new Set(prev);
-                if (next.has(messageId)) next.delete(messageId);
-                else next.add(messageId);
-                return next;
-              });
-            }}
-            className="w-full flex items-center justify-between text-left rounded-xl bg-[#fafafa] border border-[#e8e8e8] px-5 py-4 hover:bg-gray-100 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
-                <Search className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-semibold text-sm text-foreground">思考过程</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{summary}</span>
-              {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-            </div>
-          </button>
-
-          {!isExpanded && (
-            <div className="text-xs text-muted-foreground mt-1.5 truncate px-1">
-              {summary}
-            </div>
-          )}
-
-          <div
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              isExpanded ? 'max-h-[2000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
-            }`}
-          >
-            <div className={cardClass}>
-              <div
-                className="text-sm text-foreground leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisContent, purify, messageId, citations) }}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (section.includes('【框架技能')) {
-      return (
-        <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-sm text-foreground">框架技能 + 原文知识点</span>
-          </div>
-          <div
-            className="text-sm text-foreground leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: formatMarkdown(section.replace(/##\s*【框架技能\+原文知识点】[\s\n]*/, ''), purify, messageId, citations) }}
-          />
-        </div>
-      );
-    }
-
-    if (section.includes('【底层心法】')) {
-      return (
-        <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-sm text-foreground">底层心法</span>
-          </div>
-          <div
-            className="text-sm text-foreground leading-relaxed italic"
-            dangerouslySetInnerHTML={{ __html: formatMarkdown(section.replace(/##\s*【底层心法】[\s\n]*/, ''), purify, messageId, citations) }}
-          />
-        </div>
-      );
-    }
-
-    if (section.includes('【开始引导】')) {
-      return (
-        <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
-              <MessageCircle className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-semibold text-sm text-foreground">开始引导</span>
-          </div>
-          <div
-            className="text-sm text-foreground leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: formatMarkdown(section.replace(/##\s*【开始引导】[\s\n]*/, ''), purify, messageId, citations) }}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div
-        key={idx}
-        className="text-sm text-foreground leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: formatMarkdown(section, purify, messageId, citations) }}
-      />
-    );
-  });
+  return (
+    <div
+      className="text-sm text-foreground leading-relaxed"
+      dangerouslySetInnerHTML={{ __html: formatMarkdown(content, purify, messageId, citations) }}
+    />
+  );
 }
 
 // ========== ChatMessage 组件 Props ==========
@@ -342,7 +206,6 @@ export default function ChatMessage({
   onCitationClick,
   onThumbsDown,
 }: ChatMessageProps) {
-  const [expandedAnalysis, setExpandedAnalysis] = useState<Set<string>>(new Set());
   const purifyRef = useRef<{ sanitize: (dirty: string, config?: Record<string, unknown>) => string } | null>(null);
 
   useEffect(() => {
@@ -406,7 +269,7 @@ export default function ChatMessage({
                 streamStatus={status}
               />
             )}
-            {renderAIContent(message.content, message.id, message.citations, expandedAnalysis, setExpandedAnalysis, purifyRef.current)}
+            {renderAIContent(message.content, message.id, message.citations, purifyRef.current)}
             {/* 加载中光标 */}
             {isLoading && isLastMessage && message.role === 'assistant' && (
               <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
@@ -505,10 +368,10 @@ export default function ChatMessage({
           <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
             <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
               <UserRound className="w-4 h-4" />
-              建议转接人工顾问
+              建议转接人工支持
             </div>
-            <p className="text-xs text-blue-600 mb-2">{message.transferReason || '系统评估当前问题需要人工顾问介入'}</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
+            <p className="text-xs text-blue-600 mb-2">{message.transferReason || '系统评估当前问题需要人工支持介入'}</p>
+            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工支持将基于完整记录继续为您服务。</p>
           </div>
         )}
 
@@ -517,10 +380,10 @@ export default function ChatMessage({
           <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
             <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
               <UserRound className="w-4 h-4" />
-              建议转接人工顾问
+              建议转接人工支持
             </div>
-            <p className="text-xs text-blue-600 mb-2">多次点踩，建议转接人工顾问</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
+            <p className="text-xs text-blue-600 mb-2">多次点踩，建议转接人工支持</p>
+            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工支持将基于完整记录继续为您服务。</p>
           </div>
         )}
 
@@ -529,10 +392,10 @@ export default function ChatMessage({
           <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
             <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
               <UserRound className="w-4 h-4" />
-              建议转接人工顾问
+              建议转接人工支持
             </div>
-            <p className="text-xs text-blue-600 mb-2">多次重新生成，建议转接人工顾问</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
+            <p className="text-xs text-blue-600 mb-2">多次重新生成，建议转接人工支持</p>
+            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工支持将基于完整记录继续为您服务。</p>
           </div>
         )}
       </div>

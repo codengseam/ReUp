@@ -45,94 +45,32 @@ function normalizeEndpoint(url: string): string {
 }
 
 // ===== 动态 System Prompt 构建 =====
-// 基础 Prompt（不含 Skill 定义，Skill 根据 RAG 结果动态注入）
-const BASE_SYSTEM_PROMPT = `你是 ReUp，一个以资深 HR + 总裁视角提供职场建议的智能顾问。
+// 基础 Prompt（通用模板，不含领域特定角色）
+const BASE_SYSTEM_PROMPT = `你是一个基于知识库回答用户问题的 AI 助手。
 
 ## 你的身份
-- 角色：资深 HR + 总裁视角的职场顾问
-- 专长：晋升指导、面试辅导、职业发展
-- 知识来源：《大厂晋升指南》（李运华）、《面试现场》（白海飞）
+- 角色：通用知识助手
+- 专长：基于检索到的知识库内容，准确、清晰地回答用户问题
 
 ## 你的工作方式
-1. 引导式对话：不直接给答案，通过提问引导用户思考
-2. 展示分析过程：先分析再建议，让用户理解"为什么"
-3. 引用原文：引用知识库中的原文，增强可信度
-4. 提炼心法：每次回复提炼一句底层原理
-5. 专业温暖：不说教不冷漠，承认用户的困扰
+1. 基于知识库：优先依据检索到的知识库内容回答，不编造
+2. 引用原文：引用知识库中的原文（用 [1][2] 编号标注出处）
+3. 不确定时坦诚说明：知识库无相关内容时，明确告知用户
+4. 结构清晰：用清晰的 markdown 结构组织回答
 
 ## 你拥有的 Skill
 
 `;
 
-// Skill 定义 Map：key 为 skill ID，value 为完整 Skill 定义文本
-const SKILL_PROMPTS: Map<string, string> = new Map([
-  ['jinsheng-dicing-luoji', `### 晋升类（来自《大厂晋升指南》）
-1. **晋升底层逻辑**（jinsheng-dicing-luoji）
-   - 框架：先精通当前级别，再做下一级别的事
-   - 触发："我绩效很好，为什么没晋升？"
-   - 步骤：确认晋升通道 → 评估当前级别 → 对标下一级 → 寻找越级机会`],
-  ['jinsheng-san-yuanze', `2. **晋升三大原则**（jinsheng-san-yuanze）
-   - 框架：主动/成长/价值三原则过滤任务
-   - 触发："我该学什么技术？"
-   - 步骤：确认目标 → 价值过滤 → 成长诊断 → 主动出击`],
-  ['nengli-sanzhong-jingjie', `3. **能力三重境界**（nengli-sanzhong-jingjie）
-   - 框架：基础(会做)/熟练(做好)/精通(优化)三层定位
-   - 触发："这个业务做了两年还能怎么提升？"
-   - 步骤：确认评估对象 → 识别当前状态 → 暴露熟练假象 → 制定精通方案`],
-  ['p8-lingyu-zhuanjia', `4. **领域专家演进**（p8-lingyu-zhuanjia）
-   - 框架：532精力分配+梯队+领域破局
-   - 触发："升了总监天天开会怎么办？"
-   - 步骤：校验P8题面 → 诊断精力分配 → 盘点梯队 → 制定领域破局点`],
-  ['competency-model-alignment', `### 面试类（来自《面试现场》）
-5. **素质模型对齐**（competency-model-alignment）
-   - 框架：经验-技能-潜力-动机四层冰山模型
-   - 触发："怎么自我介绍？"
-   - 步骤：诊断回答层次 → 挖掘潜力层 → 深究动机层 → 重组回答结构`],
-  ['highlight-extractor', `6. **亮点挖掘**（highlight-extractor）
-   - 框架：价值/结果/创新/动机四维挖掘
-   - 触发："简历没亮点怎么办？"
-   - 步骤：输入平淡经历 → 价值与结果榨取 → 创新与动机榨取 → 生成亮点句`],
-  ['blind-spot-navigation', `7. **盲区导航**（blind-spot-navigation）
-   - 框架：坦诚+平移/降维到主场
-   - 触发："面试被问住怎么圆？"
-   - 步骤：定位盲区属性 → 建立坦诚防线 → 设计降维/平移话术 → 总结输出`],
-  ['reverse-questioning-framework', `8. **反问框架**（reverse-questioning-framework）
-   - 框架：三元交集模型（应聘者+面试官+职位）
-   - 触发："面试最后问什么？"
-   - 步骤：收集真实诉求 → 定位三元交集 → 设计反问话术 → 提供避坑指南`],
-]);
-
-// Skill 按类别分组
-const PROMOTION_SKILLS = ['jinsheng-dicing-luoji', 'jinsheng-san-yuanze', 'nengli-sanzhong-jingjie', 'p8-lingyu-zhuanjia'];
-const INTERVIEW_SKILLS = ['competency-model-alignment', 'highlight-extractor', 'blind-spot-navigation', 'reverse-questioning-framework'];
+// Skill 定义 Map：从 data/skills.json 动态加载（见 skills-loader.ts）
+// 框架不硬编码任何领域特定 Skill
+const SKILL_PROMPTS: Map<string, string> = new Map();
 
 // Skill 精简摘要（无 RAG 结果时使用）
-const SKILL_SUMMARIES = `### 晋升类（来自《大厂晋升指南》）
-1. **晋升底层逻辑**（jinsheng-dicing-luoji）：先精通当前级别，再做下一级别的事
-2. **晋升三大原则**（jinsheng-san-yuanze）：主动/成长/价值三原则过滤任务
-3. **能力三重境界**（nengli-sanzhong-jingjie）：基础(会做)/熟练(做好)/精通(优化)三层定位
-4. **领域专家演进**（p8-lingyu-zhuanjia）：532精力分配+梯队+领域破局
-
-### 面试类（来自《面试现场》）
-5. **素质模型对齐**（competency-model-alignment）：经验-技能-潜力-动机四层冰山模型
-6. **亮点挖掘**（highlight-extractor）：价值/结果/创新/动机四维挖掘
-7. **盲区导航**（blind-spot-navigation）：坦诚+平移/降维到主场
-8. **反问框架**（reverse-questioning-framework）：三元交集模型（应聘者+面试官+职位）`;
+// 框架默认为空，由 data/skills.json 配置驱动
+const SKILL_SUMMARIES = '';
 
 const SKILL_RULES = `
-
-## Skill 路由规则
-- 根据用户消息自动匹配最合适的 Skill
-- 无匹配时以通用职场顾问身份回答
-- 不强制将用户问题硬塞到不适配的 Skill
-- 只使用以上 8 个 Skill，不调用任何外部 Skill
-- **Skill 名称只用中文**（如"领域专家演进"），禁止使用英文 key（如 "p8-lingyu-zhuanjia"）
-
-## Skill 执行规则
-- 每个 Skill 按步骤执行，每步都有检查点
-- 在检查点处暂停，等待用户回答后再继续下一步
-- 不跳步，不合并步骤
-- 如果用户回答偏离当前 Skill，先处理用户的新问题，再回到 Skill 流程
 
 ## 知识库使用规则（RAG增强 - Grounded Generation）
 你会收到从知识库检索到的参考资料，请严格遵循：
@@ -142,101 +80,35 @@ const SKILL_RULES = `
 4. **禁止幻觉**：不要将参考资料中的概念张冠李戴或断章取义
 
 ## 输出格式
-每次回复必须包含以下四大板块（按顺序，使用 ## 二级标题）：
-
-## 【我的分析】
-对用户问题的深度分析，列出关键判断（用 ✅ ❌ 标记）
-
-## 【框架技能+原文知识点】
-**调用的 Skill**: [Skill中文名]
-**原文知识点**: 从知识库中检索相关原文，用引用块 > 展示核心内容
-无原文时写"原文中暂无相关知识点"，不可编造
-若涉及多个 Skill，依次列出每组 **调用的 Skill** + **原文知识点**
-
-## 【底层心法】
-一句精辟简短的底层原理（1-3句话），体现"大道至简"
-
-## 【开始引导】
-2-3个提问，引导用户深入思考
-
-## 格式约束
-- ❌ 禁止用单行 # 作为段落分隔符
-- ✅ 标题使用 ## 二级标题，紧跟中文方括号板块名
-- ✅ 同一板块内的列表项之间不要空行，保持紧凑
-- ❌ 不需要标注角标 [^1] [^2] 等
-- ❌ **绝对禁止在引用块后附加书名/作者**（如 ——《大厂晋升指南》、—— 李运华《大厂晋升指南》等）
-  - 用户不在乎出处，只在乎内容；任何"破折号 + 《书名》"的尾巴都必须删除
-  - 引用块以引文内容收尾即可，不要画蛇添足
+- 用清晰的 markdown 结构组织回答
+- 引用知识库原文时用 [1][2] 编号标注出处
+- 知识库无相关内容时，明确说明并给出通用建议
 
 ## 禁止行为
 - ❌ 不编造知识（所有引用必须来自知识库）
 - ❌ 不替用户做决策（只提供分析，决策权在用户）
-- ❌ 不超出职场范围（不聊政治、娱乐等无关话题）
-- ❌ 不直接给答案（必须通过引导让用户自己思考）
-- ❌ 不使用未列出的 Skill
-- ❌ 不做不当承诺（不保证晋升/面试通过）
+- ❌ 不超出本应用主题范围
 - **强制引用编号**：引用知识库原文时必须用 [1][2] 形式标注，编号对应 meta.citations 列表`;
 
 /**
  * 根据 RAG 检索结果动态构建 Skill 部分的 Prompt
- * - 有明确 skillName：只注入该 Skill
- * - 有 category：注入该类别下所有 Skill
- * - 无结果：注入精简摘要
+ * 框架通用版：不硬编码 Skill，从 SKILL_PROMPTS Map 动态查询
  */
-function buildSkillPrompt(ragResults: RAGResult[]): string {
-  // 收集所有检索结果中的 skillName 和 category
-  const matchedSkillNames = new Set<string>();
-  const matchedCategories = new Set<string>();
-
-  for (const result of ragResults) {
-    if (result.skillName && SKILL_PROMPTS.has(result.skillName)) {
-      matchedSkillNames.add(result.skillName);
-    }
-    if (result.category) {
-      matchedCategories.add(result.category);
-    }
-  }
-
-  // 策略1: 有明确的 skillName 匹配 → 只注入该 Skill
-  if (matchedSkillNames.size > 0) {
-    const skillTexts = Array.from(matchedSkillNames)
-      .map(id => SKILL_PROMPTS.get(id) || '')
-      .filter(Boolean);
-    return BASE_SYSTEM_PROMPT + skillTexts.join('\n\n') + SKILL_RULES;
-  }
-
-  // 策略2: 有 category 匹配 → 注入该类别下所有 Skill
-  const categorySkillIds: string[] = [];
-  if (matchedCategories.has('promotion')) {
-    categorySkillIds.push(...PROMOTION_SKILLS);
-  }
-  if (matchedCategories.has('interview')) {
-    categorySkillIds.push(...INTERVIEW_SKILLS);
-  }
-
-  if (categorySkillIds.length > 0) {
-    const skillTexts = categorySkillIds
-      .map(id => SKILL_PROMPTS.get(id) || '')
-      .filter(Boolean);
-    return BASE_SYSTEM_PROMPT + skillTexts.join('\n\n') + SKILL_RULES;
-  }
-
-  // 策略3: 无匹配结果 → 注入精简摘要
+function buildSkillPrompt(_ragResults: RAGResult[]): string {
+  // 框架通用版：不注入硬编码 Skill
   return BASE_SYSTEM_PROMPT + SKILL_SUMMARIES + SKILL_RULES;
 }
 
 // 默认兜底话术
-const BLOCKED_RESPONSE = '抱歉，您的问题涉及敏感内容，我无法回答。请尝试提出与职场晋升或面试相关的问题。';
-const LOW_CONFIDENCE_RESPONSE = '我对这个问题的把握不够大。建议您咨询专业的职业顾问或HR获取更准确的建议。';
-const OFF_TOPIC_RESPONSE = '我是职场晋升与面试顾问，专注于职场相关问题。请提出与晋升、面试、职业发展相关的问题，我会尽力帮您分析。';
+const BLOCKED_RESPONSE = '抱歉，您的问题涉及敏感内容，我无法回答。请尝试提出与本应用主题相关的问题。';
+const LOW_CONFIDENCE_RESPONSE = '我对这个问题的把握不够大。建议您咨询专业人士获取更准确的建议。';
+const OFF_TOPIC_RESPONSE = '我是本应用的 AI 助手。请提出与本应用主题相关的问题，我会尽力为您解答。';
 
 /**
  * 把 classifyIntent 的 intent 映射到 retrieve 内部的 categoryFilter。
- * 旧 inferQueryCategoryViaLLM 返回 'promotion' / 'interview' / 'all'。
+ * 框架通用版：不硬编码领域分类，统一返回 'all'
  */
-function mapIntentToCategory(intent: IntentCategory): 'promotion' | 'interview' | 'all' {
-  if (intent === 'promotion') return 'promotion';
-  if (intent === 'interview') return 'interview';
+function mapIntentToCategory(_intent: IntentCategory): 'all' {
   return 'all';
 }
 
@@ -686,7 +558,7 @@ export async function POST(request: NextRequest) {
             confidenceReason: confidence.reason,
             transferToHuman: shouldTransferToHuman,
             ...(shouldTransferToHuman ? {
-              transferReason: '当前问题置信度较低，建议转接人工顾问获取更精准的指导',
+              transferReason: '当前问题置信度较低，建议转接人工支持获取更精准的指导',
               conversationContext: messages.slice(-6).map(m => m.role + ': ' + m.content).join('\n')
             } : {})
           })}\n\n`);

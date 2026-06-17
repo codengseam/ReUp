@@ -4,41 +4,37 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'ReUp | 职场晋升与面试顾问',
-    template: '%s | ReUp',
+    default: 'AI Chat | 通用 AI 对话框架',
+    template: '%s | AI Chat',
   },
   description:
-    'ReUp — 以资深 HR + 总裁视角，帮你解决晋升困惑与面试难题。',
+    '基于知识库的通用 AI 对话框架，支持 RAG 检索增强、多模型切换、管理后台配置。',
   keywords: [
-    '职场晋升',
-    '面试辅导',
-    '晋升指南',
-    '大厂晋升',
-    '职业发展',
-    '绩效管理',
-    'ReUp',
-    'AI 职场顾问',
-    '简历优化',
-    '面试准备',
+    'AI Chat',
+    '知识库问答',
+    'RAG',
+    'LLM',
+    'AI 对话框架',
+    '智能助手',
   ],
-  authors: [{ name: 'ReUp Team' }],
-  generator: 'ReUp',
+  authors: [{ name: 'AI Chat' }],
+  generator: 'AI Chat',
   // icons: {
   //   icon: '',
   // },
   openGraph: {
-    title: 'ReUp | 职场晋升与面试顾问',
+    title: 'AI Chat | 通用 AI 对话框架',
     description:
-      '以资深 HR + 总裁视角，帮你解决晋升困惑与面试难题。基于《大厂晋升指南》与《面试现场》。',
-    siteName: 'ReUp',
+      '基于知识库的通用 AI 对话框架，支持 RAG 检索增强、多模型切换与管理后台配置。',
+    siteName: 'AI Chat',
     locale: 'zh_CN',
     type: 'website',
   },
   // twitter: {
   //   card: 'summary_large_image',
-  //   title: 'ReUp | 职场晋升与面试顾问',
+  //   title: 'AI Chat | 通用 AI 对话框架',
   //   description:
-  //     '以资深 HR + 总裁视角，帮你解决晋升困惑与面试难题。基于《大厂晋升指南》与《面试现场》。',
+  //     '基于知识库的通用 AI 对话框架，支持 RAG 检索增强、多模型切换与管理后台配置。',
   //   // images: [''],
   // },
   robots: {

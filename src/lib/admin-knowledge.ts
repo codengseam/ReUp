@@ -65,7 +65,7 @@ export interface KnowledgeChunkSummary {
 export interface FrameworkSkill {
   id: string;
   name: string;
-  category: 'promotion' | 'interview';
+  category: string;
   trigger: string;
   framework: string;
   steps: string[];

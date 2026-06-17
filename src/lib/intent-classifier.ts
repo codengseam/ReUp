@@ -11,15 +11,10 @@
 
 import { LLMClient, type InvokeOptions } from './llm-client';
 
-export type IntentCategory =
-  | 'promotion'
-  | 'interview'
-  | 'general'
-  | 'off_topic'
-  | 'jailbreak'
-  | 'resume_qa'
-  | 'match_analysis'
-  | 'gap_analysis';
+// 框架级意图分类：只保留通用三值。
+// 领域特定分类（如晋升/面试/简历问答等）由调用方基于自身知识库自行扩展，
+// 不在框架内硬编码；本分类器输出的 intent 仅用于框架级路由（通用/越界/越狱）。
+export type IntentCategory = 'general' | 'off_topic' | 'jailbreak';
 
 export type IntentStrategy = 'direct' | 'multiquery' | 'hyde';
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -34,16 +29,7 @@ export interface IntentResult {
   category?: string;
 }
 
-const VALID_INTENTS: readonly IntentCategory[] = [
-  'promotion',
-  'interview',
-  'general',
-  'off_topic',
-  'jailbreak',
-  'resume_qa',
-  'match_analysis',
-  'gap_analysis',
-];
+const VALID_INTENTS: readonly IntentCategory[] = ['general', 'off_topic', 'jailbreak'];
 const VALID_STRATEGIES: readonly IntentStrategy[] = ['direct', 'multiquery', 'hyde'];
 const VALID_RISK_LEVELS: readonly RiskLevel[] = ['low', 'medium', 'high'];
 
@@ -113,7 +99,7 @@ const INTENT_PROMPT = `你是一个查询分析 + 安全审核 AI。一次输出
 
 ## 任务
 分析用户查询，同时完成以下事：
-1. intent: 话题意图（promotion=晋升 / interview=面试 / general=通用职场 / off_topic=非职场 / jailbreak=越狱 / resume_qa=简历问答 / match_analysis=匹配度分析 / gap_analysis=差距分析）
+1. intent: 话题意图（general=通用问题 / off_topic=话题越界（与知识库无关） / jailbreak=越狱或恶意请求）
 2. strategy: 检索策略（direct / multiquery / hyde）
 3. rewrittenQuery: 标准化后的查询（口语→正式，补全指代）
 4. subQueries: 多子问题时给 2-3 个子查询；其他策略给 []

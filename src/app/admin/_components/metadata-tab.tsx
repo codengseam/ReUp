@@ -1,9 +1,9 @@
 'use client';
 // src/app/admin/_components/metadata-tab.tsx
-// ReUp v2 Phase 2E: 分类浏览 tab（基于 L2 细分类 + book×category 交叉表）。
+// 分类浏览 tab（基于 L2 细分类 + book×category 交叉表）。
 //
 // 设计要点（参考 docs/superpowers/specs/2026-06-15-knowledge-metadata-restructure-design.md §3.5）：
-//   - 顶部 4 张统计卡：晋升 / 面试 / 通用 / 总计
+//   - 顶部 4 张统计卡：书目数 / 分类数 / 通用 / 总计
 //   - 两个视图：按分类（细粒度） / 按书 × 分类（交叉表）
 //   - 数据来源：/api/admin/knowledge?action=stats & ?action=topic-summary & ?action=by-category
 //   - 移除原"按 Skill 维度"（已拆出到 framework-skills tab）
@@ -56,14 +56,14 @@ const GENERIC_CATEGORY = '通用';
 
 /** 用作 4 张统计卡图标的预设颜色 token（沿用 knowledge-tab 的视觉风格）。 */
 const ICON_BG: Record<string, string> = {
-  promotion: 'bg-emerald-50',
-  interview: 'bg-blue-50',
+  books: 'bg-emerald-50',
+  categories: 'bg-blue-50',
   generic: 'bg-amber-50',
   total: 'bg-purple-50',
 };
 const ICON_FG: Record<string, string> = {
-  promotion: 'text-emerald-600',
-  interview: 'text-blue-600',
+  books: 'text-emerald-600',
+  categories: 'text-blue-600',
   generic: 'text-amber-600',
   total: 'text-purple-600',
 };
@@ -127,19 +127,13 @@ export default function MetadataTab() {
     fetchAll();
   }, [fetchAll]);
 
-  /** 按书名查 chunk 数（不区分大小写），用于"晋升/面试"卡片。 */
-  const countForBook = (bookName: string): number => {
-    if (!stats) return 0;
-    const hit = stats.byBook.find((b) => b.name === bookName);
-    return hit?.count ?? 0;
-  };
-
-  const promotionCount = countForBook('大厂晋升指南');
-  const interviewCount = countForBook('面试现场');
+  /** 4 张统计卡：书目数 / 分类数 / 通用 / 总计。 */
+  const booksCount = stats?.byBook.length ?? 0;
+  const categoriesCount = stats?.byCategory.length ?? 0;
   const genericCount = topicSummary?.genericCount ?? 0;
   const totalCount = stats?.total ?? 0;
 
-  /** 4 张统计卡（按 spec §3.5：晋升 / 面试 / 通用 / 总计）。 */
+  /** 4 张统计卡（按 spec §3.5：书目数 / 分类数 / 通用 / 总计）。 */
   const statCards: Array<{
     key: string;
     label: string;
@@ -150,20 +144,20 @@ export default function MetadataTab() {
     muted?: boolean;
   }> = [
     {
-      key: 'promotion',
-      label: '晋升类',
-      value: promotionCount,
+      key: 'books',
+      label: '书目数',
+      value: booksCount,
       icon: BookOpen,
-      colorKey: 'promotion',
-      hint: '大厂晋升指南',
+      colorKey: 'books',
+      hint: '按书聚合',
     },
     {
-      key: 'interview',
-      label: '面试类',
-      value: interviewCount,
-      icon: BookOpen,
-      colorKey: 'interview',
-      hint: '面试现场',
+      key: 'categories',
+      label: '分类数',
+      value: categoriesCount,
+      icon: FolderTree,
+      colorKey: 'categories',
+      hint: 'L2 细分类',
     },
     {
       key: 'generic',

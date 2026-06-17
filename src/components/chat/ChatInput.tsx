@@ -70,7 +70,7 @@ export default function ChatInput({
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入你的职场问题..."
+            placeholder="输入你的问题..."
             rows={1}
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none max-h-[150px] py-1.5"
             disabled={isLoading}

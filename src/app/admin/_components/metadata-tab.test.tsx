@@ -1,5 +1,5 @@
 // src/app/admin/_components/metadata-tab.test.tsx
-// ReUp v2 Phase 2E: 分类浏览 tab 组件测试。
+// 分类浏览 tab 组件测试。
 //
 // 覆盖点（参考 2026-06-15 spec §3.5）：
 //   (a) 初次渲染 loading 状态
@@ -22,13 +22,13 @@ const STATS_FIXTURE = {
   total: 608,
   dimension: 1024,
   byBook: [
-    { name: '大厂晋升指南', count: 274 },
-    { name: '面试现场', count: 334 },
+    { name: '示例书目一', count: 274 },
+    { name: '示例书目二', count: 334 },
   ],
   byCategory: [
-    { name: '晋升答辩', count: 60 },
-    { name: '能力模型', count: 48 },
-    { name: '自我介绍', count: 40 },
+    { name: '分类一', count: 60 },
+    { name: '分类二', count: 48 },
+    { name: '分类三', count: 40 },
     { name: '通用', count: 36 },
   ],
   bySkill: [],
@@ -39,27 +39,27 @@ const STATS_FIXTURE = {
 const TOPIC_SUMMARY_FIXTURE = {
   byBookCategory: [
     {
-      book: '大厂晋升指南',
+      book: '示例书目一',
       categories: [
-        { category: '晋升答辩', count: 60 },
-        { category: '能力模型', count: 48 },
+        { category: '分类一', count: 60 },
+        { category: '分类二', count: 48 },
         { category: '通用', count: 20 },
       ],
     },
     {
-      book: '面试现场',
+      book: '示例书目二',
       categories: [
-        { category: '自我介绍', count: 40 },
+        { category: '分类三', count: 40 },
         { category: '通用', count: 16 },
       ],
     },
   ],
   byBook: [
-    { name: '大厂晋升指南', total: 274 },
-    { name: '面试现场', total: 334 },
+    { name: '示例书目一', total: 274 },
+    { name: '示例书目二', total: 334 },
   ],
   byCategory: [
-    { name: '晋升答辩', total: 60 },
+    { name: '分类一', total: 60 },
     { name: '通用', total: 36 },
   ],
   genericCount: 36,
@@ -68,19 +68,19 @@ const TOPIC_SUMMARY_FIXTURE = {
 const CATEGORY_GROUPS_FIXTURE = {
   groups: [
     {
-      name: '晋升答辩',
+      name: '分类一',
       count: 60,
-      sample: { preview: '答辩话术...', book: '大厂晋升指南', sectionTitle: '晋升答辩' },
+      sample: { preview: '示例预览一...', book: '示例书目一', sectionTitle: '分类一' },
     },
     {
-      name: '自我介绍',
+      name: '分类三',
       count: 40,
-      sample: { preview: '开场白...', book: '面试现场', sectionTitle: '自我介绍' },
+      sample: { preview: '示例预览二...', book: '示例书目二', sectionTitle: '分类三' },
     },
     {
       name: '通用',
       count: 36,
-      sample: { preview: '通用知识...', book: '大厂晋升指南', sectionTitle: '前言' },
+      sample: { preview: '通用知识...', book: '示例书目一', sectionTitle: '前言' },
     },
   ],
 };
@@ -128,8 +128,8 @@ describe('MetadataTab', () => {
     render(<MetadataTab />);
 
     // 4 个统计卡占位符
-    expect(screen.getByTestId('stat-promotion')).toHaveTextContent('-');
-    expect(screen.getByTestId('stat-interview')).toHaveTextContent('-');
+    expect(screen.getByTestId('stat-books')).toHaveTextContent('-');
+    expect(screen.getByTestId('stat-categories')).toHaveTextContent('-');
     expect(screen.getByTestId('stat-generic')).toHaveTextContent('-');
     expect(screen.getByTestId('stat-total')).toHaveTextContent('-');
 
@@ -148,9 +148,9 @@ describe('MetadataTab', () => {
     render(<MetadataTab />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('stat-promotion')).toHaveTextContent('274');
+      expect(screen.getByTestId('stat-books')).toHaveTextContent('2');
     });
-    expect(screen.getByTestId('stat-interview')).toHaveTextContent('334');
+    expect(screen.getByTestId('stat-categories')).toHaveTextContent('4');
     expect(screen.getByTestId('stat-generic')).toHaveTextContent('36');
     expect(screen.getByTestId('stat-total')).toHaveTextContent('608');
   });
@@ -161,12 +161,12 @@ describe('MetadataTab', () => {
     render(<MetadataTab />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('category-row-晋升答辩')).toBeInTheDocument();
+      expect(screen.getByTestId('category-row-分类一')).toBeInTheDocument();
     });
 
-    // 分类表格应包含 3 行（晋升答辩 / 自我介绍 / 通用）
-    expect(screen.getByTestId('category-row-晋升答辩')).toBeInTheDocument();
-    expect(screen.getByTestId('category-row-自我介绍')).toBeInTheDocument();
+    // 分类表格应包含 3 行（分类一 / 分类三 / 通用）
+    expect(screen.getByTestId('category-row-分类一')).toBeInTheDocument();
+    expect(screen.getByTestId('category-row-分类三')).toBeInTheDocument();
     expect(screen.getByTestId('category-row-通用')).toBeInTheDocument();
 
     // 视图按钮处于按分类高亮
@@ -181,7 +181,7 @@ describe('MetadataTab', () => {
     render(<MetadataTab />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('category-row-晋升答辩')).toBeInTheDocument();
+      expect(screen.getByTestId('category-row-分类一')).toBeInTheDocument();
     });
 
     // 切换到交叉表
@@ -190,18 +190,18 @@ describe('MetadataTab', () => {
 
     // 交叉表行出现
     await waitFor(() => {
-      expect(screen.getByTestId('crosstab-book-大厂晋升指南')).toBeInTheDocument();
+      expect(screen.getByTestId('crosstab-book-示例书目一')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('crosstab-book-面试现场')).toBeInTheDocument();
+    expect(screen.getByTestId('crosstab-book-示例书目二')).toBeInTheDocument();
     expect(
-      screen.getByTestId('crosstab-cell-大厂晋升指南-晋升答辩')
+      screen.getByTestId('crosstab-cell-示例书目一-分类一')
     ).toBeInTheDocument();
     expect(
-      screen.getByTestId('crosstab-cell-面试现场-自我介绍')
+      screen.getByTestId('crosstab-cell-示例书目二-分类三')
     ).toBeInTheDocument();
 
     // 此时分类表格不应再渲染
-    expect(screen.queryByTestId('category-row-晋升答辩')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('category-row-分类一')).not.toBeInTheDocument();
 
     // 按钮高亮切换
     expect(crosstabButton).toHaveAttribute('aria-pressed', 'true');
@@ -258,9 +258,9 @@ describe('MetadataTab', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /按书 × 分类/ }));
     await waitFor(() => {
-      expect(screen.getByTestId('crosstab-book-大厂晋升指南')).toBeInTheDocument();
+      expect(screen.getByTestId('crosstab-book-示例书目一')).toBeInTheDocument();
     });
-    const genericCell = screen.getByTestId('crosstab-cell-大厂晋升指南-通用');
+    const genericCell = screen.getByTestId('crosstab-cell-示例书目一-通用');
     expect(genericCell.className).toContain('border-dashed');
     expect(within(genericCell).getByText('（兜底）')).toBeInTheDocument();
   });

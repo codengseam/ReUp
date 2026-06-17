@@ -15,79 +15,17 @@ describe('formatMarkdown', () => {
     expect(result).toContain('Line1<br/>Line2<br/>Line3');
   });
 
-  it('replaces english skill key with chinese name', () => {
-    const input = '**调用的 Skill**: p8-lingyu-zhuanjia';
+  it('preserves plain text without transformation', () => {
+    const input = '**调用的 Skill**: 示例技能';
     const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('p8-lingyu-zhuanjia');
-    expect(result).toContain('领域专家演进');
+    expect(result).toContain('示例技能');
   });
 
-  it('removes author prefix from citation', () => {
-    const input = '> 《大厂晋升指南》, 李运华。P8需具备532精力分配';
+  it('preserves citation content without book name removal (generic)', () => {
+    const input = '> 这是一条参考文档的引用内容';
     const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).not.toContain('李运华');
-    expect(result).toContain('P8需具备532精力分配');
-  });
-
-  it('removes book-author prefix variations', () => {
-    const input = '> — 李运华,《大厂晋升指南》。P8需具备532精力分配';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('李运华');
-    expect(result).toContain('P8需具备532精力分配');
-  });
-
-  it('removes em-dash book citation at end of quote', () => {
-    const input = '> "先精通当前级别，再做下一级别的事。" —— 《大厂晋升指南》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).not.toContain('——');
-    expect(result).toContain('先精通当前级别');
-  });
-
-  it('removes em-dash book citation with author', () => {
-    const input = '> 主动/成长/价值三原则过滤任务 —— 李运华《大厂晋升指南》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).not.toContain('李运华');
-    expect(result).toContain('主动/成长/价值');
-  });
-
-  it('removes em-dash book citation in inline context', () => {
-    const input = '原文知识点：> "先精通当前级别，再做下一级别的事。" —— 《大厂晋升指南》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).toContain('原文知识点');
-  });
-
-  it('renders skill badge with chinese name', () => {
-    const input = '**调用的 Skill**: jinsheng-diceng-luoji';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('jinsheng-diceng-luoji');
-    expect(result).toContain('晋升底层逻辑');
-  });
-
-  it('removes trailing book name without em-dash', () => {
-    const input = '> 先精通当前级别，再做下一级别的事。《大厂晋升指南》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).toContain('先精通当前级别');
-  });
-
-  it('removes other book name variations', () => {
-    const input = '> 一些引文内容 —— 《进阶指南》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《进阶指南》');
-    expect(result).toContain('一些引文内容');
-  });
-
-  it('removes multiple book citations in one message', () => {
-    const input = '> 第一条引用 —— 《大厂晋升指南》\n> 第二条引用 —— 《另一本书》';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).not.toContain('《大厂晋升指南》');
-    expect(result).not.toContain('《另一本书》');
-    expect(result).toContain('第一条引用');
-    expect(result).toContain('第二条引用');
+    expect(result).toContain('参考文档');
+    expect(result).toContain('引用内容');
   });
 
   it('preserves content without book citation', () => {
@@ -134,27 +72,18 @@ describe('formatMarkdown', () => {
     expect(result).toContain('data-citation="1"');
   });
 
-  // ===== 方案 A：Claude 简约优雅风 样式测试 =====
-  it('renders skill badge with elegant pill border (style A)', () => {
-    const input = '**调用的 Skill**: jinsheng-diceng-luoji';
-    const result = formatMarkdown(input, mockPurify);
-    expect(result).toContain('border');
-    expect(result).toContain('rounded-full');
-    expect(result).toContain('bg-primary-container');
-    expect(result).toContain('晋升底层逻辑');
-  });
-
-  it('renders quote block with f6fef9 background (style A)', () => {
-    const input = '> 先精通当前级别，再做下一级别的事。';
+  // ===== 样式测试 =====
+  it('renders quote block with styled background', () => {
+    const input = '> 这是一条参考引用内容';
     const result = formatMarkdown(input, mockPurify);
     expect(result).toContain('bg-[#f6fef9]');
     expect(result).toContain('border-l-[3px]');
     expect(result).toContain('rounded-r-lg');
-    expect(result).toContain('先精通当前级别');
+    expect(result).toContain('参考引用内容');
   });
 
-  it('renders numbered list with circular badge (style A)', () => {
-    const input = '1. 在答辩中，你认为最被质疑的环节是什么？';
+  it('renders numbered list with circular badge', () => {
+    const input = '1. 第一步：确认问题边界';
     const result = formatMarkdown(input, mockPurify);
     expect(result).toContain('rounded-full');
     expect(result).toContain('bg-primary-container');

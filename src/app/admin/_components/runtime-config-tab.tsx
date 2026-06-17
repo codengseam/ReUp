@@ -153,7 +153,7 @@ export default function RuntimeConfigTab() {
             LLM API Keys
           </CardTitle>
           <CardDescription>
-            管理 ReUp 使用的 LLM 提供商 API 密钥。密钥以掩码形式展示，更改立即生效（下一个 LLM 请求会读新值）。
+            管理 AI Chat 使用的 LLM 提供商 API 密钥。密钥以掩码形式展示，更改立即生效（下一个 LLM 请求会读新值）。
             <br />
             <span className="text-muted-foreground/80">
               优先级：env-var（{`DASHSCOPE_API_KEY`} / {`ZHIPU_API_KEY`}）&gt; 本地配置文件
