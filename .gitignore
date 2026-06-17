@@ -105,6 +105,13 @@ tsconfig.tsbuildinfo
 # 运行时 API key 存储（管理后台可改、含明文 key）
 data/.runtime-config.json
 
-# Prisma
+# Prisma / SQLite 本地数据库 (生产通过 volume 挂载, 不进仓库)
 prisma/dev.db
+dev.db
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/loop-engineering.sqlite
+data/loop-engineering.sqlite-*
 prisma/generated/
