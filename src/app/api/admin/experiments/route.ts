@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/connection';
-import { isAuthConfigured, verifySessionCookie } from '@/lib/admin-auth';
+import { verifyCookie } from '@/lib/admin-auth';
 import {
   collectExperimentStats,
   suggestOptimization,
@@ -14,21 +14,25 @@ import { checkShouldRollback, executeRollback } from '@/lib/experiments/rollback
 
 export const runtime = 'nodejs';
 
+const ADMIN_COOKIE = 'boss_admin_session';
+const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'dev-only-insecure-secret-change-me-please-32chars';
+
 async function requireAdmin(request: NextRequest): Promise<boolean> {
-  if (!isAuthConfigured()) return true;
-  const cookie = request.cookies.get('boss_admin_session')?.value;
+  if (!process.env.ADMIN_SESSION_SECRET) return true;
+  const cookie = request.cookies.get(ADMIN_COOKIE)?.value;
   if (!cookie) return false;
-  return verifySessionCookie(cookie) !== null;
+  return verifyCookie(cookie, SESSION_SECRET);
 }
 
 interface ListResponse {
   experiments: Array<{
-    experiment_id: string;
-    variant: string;
-    started_at: number;
+    id: number;
+    version: string;
+    experiment_id: string | null;
+    traffic: number | null;
     is_active: number;
     is_experiment: number;
-    traffic: number;
+    created_at: number;
   }>;
 }
 
@@ -67,9 +71,9 @@ export async function GET(request: NextRequest) {
       FROM prompt_versions
       WHERE is_experiment = 1 OR experiment_id IS NOT NULL
       ORDER BY created_at DESC
-    `).all() as Array<Record<string, unknown>>;
+    `).all() as ListResponse['experiments'];
 
-    return NextResponse.json({ experiments } satisfies ListResponse);
+    return NextResponse.json({ experiments });
   } catch (error) {
     const message = error instanceof Error ? error.message : '获取实验列表失败';
     console.error('[Admin Experiments API]', message, error);

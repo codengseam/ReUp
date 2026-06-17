@@ -9,7 +9,8 @@ import type { RAGResult } from './types';
 // 也能由 LLM 凭借通用知识给出可靠回答，直接给高置信度，避免对常见问题误触发"转人工"。
 export function assessConfidence(
   results: RAGResult[],
-  query?: string
+  query?: string,
+  thresholds?: { high?: number; medium?: number }
 ): { level: 'high' | 'medium' | 'low'; reason?: string; score: number } {
   if (query && isHotQuery(query)) {
     return { level: 'high', score: 0.9 };
@@ -23,10 +24,12 @@ export function assessConfidence(
   // 线性打分：召回数量 (0..1, topK=5 封顶) × 0.5 + 最高分 × 0.5，结果夹紧到 [0,1]
   const score = Math.min(1, (results.length / 5) * 0.5 + top * 0.5);
 
-  if (score >= 0.7) {
+  const highT = thresholds?.high ?? 0.7;
+  const mediumT = thresholds?.medium ?? 0.4;
+  if (score >= highT) {
     return { level: 'high', score };
   }
-  if (score >= 0.4) {
+  if (score >= mediumT) {
     return { level: 'medium', score, reason: 'partial_match' };
   }
   return { level: 'low', score, reason: 'weak_match' };
