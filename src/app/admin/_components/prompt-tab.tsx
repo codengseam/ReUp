@@ -4,21 +4,11 @@ import { Save, RotateCcw, Check, InfoIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DEFAULT_SYSTEM_PROMPT } from '../_lib/constants';
-import { DEFAULT_MATCH_REPORT_PROMPT } from '@/lib/resume/prompts/match';
-import { DEFAULT_ATS_KEYWORD_SYSTEM } from '@/lib/resume/ats';
 import { useDebouncedCallback } from '@/hooks/use-debounce';
 
 const CONFIG_API = '/api/admin/config';
 
-// Default for the STAR (resume bullet rewriter) system prompt is the empty
-// string — the actual default lives in `prompts/star.ts` and is a complex
-// multi-block system prompt that injects few-shot examples and the 8 Skills
-// list. Importing the system string here would re-implement that logic and
-// would drift over time. Admins can still reset to the built-in prompt by
-// clearing the field (an empty custom prompt falls through to the default
-// at runtime). For convenience we surface a one-line tip in the UI.
-
-type SubTab = 'system' | 'star' | 'ats' | 'match';
+type SubTab = 'system';
 
 interface SubTabSpec {
   key: SubTab;
@@ -26,9 +16,6 @@ interface SubTabSpec {
   label: string;
   description: string;
   defaultPrompt: string;
-  /** True when the default prompt is large / depends on runtime data
-   *  (skills, examples) and resetting to the actual default requires a
-   *  reload rather than an inline copy. The UI shows a different tip. */
   defaultIsRuntime: boolean;
 }
 
@@ -37,32 +24,8 @@ const SUB_TABS: SubTabSpec[] = [
     key: 'system',
     configKey: 'prompt',
     label: '系统主提示词',
-    description: '控制 ReUp 聊天机器人的角色与行为（资深 HR + 总裁视角）',
+    description: '控制 AI 助手的角色与行为',
     defaultPrompt: DEFAULT_SYSTEM_PROMPT,
-    defaultIsRuntime: false,
-  },
-  {
-    key: 'star',
-    configKey: 'resume.starPrompt',
-    label: '简历 STAR 改写',
-    description: 'STAR 法则改写简历 bullet 时的系统提示词',
-    defaultPrompt: '',
-    defaultIsRuntime: true,
-  },
-  {
-    key: 'ats',
-    configKey: 'resume.atsPrompt',
-    label: '简历 JD 关键词',
-    description: '从 JD 中抽取关键词的 LLM 系统提示词',
-    defaultPrompt: DEFAULT_ATS_KEYWORD_SYSTEM,
-    defaultIsRuntime: false,
-  },
-  {
-    key: 'match',
-    configKey: 'resume.matchPrompt',
-    label: '简历匹配报告',
-    description: '生成简历 vs JD 匹配报告（优势/短板/优先级）的系统提示词',
-    defaultPrompt: DEFAULT_MATCH_REPORT_PROMPT,
     defaultIsRuntime: false,
   },
 ];
@@ -73,7 +36,7 @@ export default function PromptTab() {
       <div className="mb-6">
         <h2 className="text-xl font-bold text-foreground">提示词管理</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          编辑系统提示词与简历相关提示词（STAR / ATS / Match），控制 AI 的角色与行为
+          编辑系统提示词，控制 AI 的角色与行为
         </p>
       </div>
       <Tabs defaultValue="system">

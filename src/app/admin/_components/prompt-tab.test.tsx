@@ -1,14 +1,9 @@
 // src/app/admin/_components/prompt-tab.test.tsx
-// ReUp v2 Phase 6 (D1): regression tests for the 4-sub-tab prompt admin
-// editor. Each sub-tab is driven by the same `PromptEditor` instance, so
-// we assert:
-//   - 4 tabs render with their labels
-//   - clicking each tab loads the correct key from /api/admin/config
-//   - editing + saving calls POST with the correct key
-//   - "恢复默认" / "清空" reverts to the spec default and POSTs it
+// 回归测试 for the prompt admin editor. Only the "system" sub-tab remains
+// after genericization (star/ats/match were domain-specific and removed).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import PromptTab from './prompt-tab';
@@ -36,7 +31,7 @@ function mockAdminConfigApi() {
   return { getCalls, postCalls };
 }
 
-describe('PromptTab (resume-parse-jd-prompts D1)', () => {
+describe('PromptTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -44,13 +39,10 @@ describe('PromptTab (resume-parse-jd-prompts D1)', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders all 4 sub-tabs with their labels', async () => {
+  it('renders the system sub-tab', async () => {
     mockAdminConfigApi();
     render(<PromptTab />);
     expect(screen.getByTestId('prompt-tab-system')).toBeInTheDocument();
-    expect(screen.getByTestId('prompt-tab-star')).toBeInTheDocument();
-    expect(screen.getByTestId('prompt-tab-ats')).toBeInTheDocument();
-    expect(screen.getByTestId('prompt-tab-match')).toBeInTheDocument();
   });
 
   it('on mount, loads the "system" sub-tab prompt via /api/admin/config?key=prompt', async () => {
@@ -61,59 +53,34 @@ describe('PromptTab (resume-parse-jd-prompts D1)', () => {
     });
   });
 
-  it('clicking the match tab loads key=resume.matchPrompt', async () => {
-    const { getCalls } = mockAdminConfigApi();
-    const user = userEvent.setup();
-    render(<PromptTab />);
-    await user.click(screen.getByTestId('prompt-tab-match'));
-    await waitFor(() => {
-      expect(getCalls).toContain('resume.matchPrompt');
-    });
-  });
-
-  it('editing + saving the match textarea POSTs the value to key=resume.matchPrompt', async () => {
+  it('editing + saving the system textarea POSTs the value to key=prompt', async () => {
     const { postCalls } = mockAdminConfigApi();
     const user = userEvent.setup();
     render(<PromptTab />);
-    await user.click(screen.getByTestId('prompt-tab-match'));
-    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-match'));
+    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-system'));
     await user.clear(textarea);
-    await user.type(textarea, 'CUSTOM MATCH PROMPT');
-    await user.click(screen.getByTestId('prompt-save-match'));
+    await user.type(textarea, 'CUSTOM SYSTEM PROMPT');
+    await user.click(screen.getByTestId('prompt-save-system'));
     await waitFor(() => {
-      const calls = postCalls.filter((c) => c.key === 'resume.matchPrompt');
+      const calls = postCalls.filter((c) => c.key === 'prompt');
       expect(calls.length).toBeGreaterThan(0);
-      expect(calls.at(-1)?.value.customPrompt).toContain('CUSTOM MATCH PROMPT');
+      expect(calls.at(-1)?.value.customPrompt).toContain('CUSTOM SYSTEM PROMPT');
     });
   });
 
-  it('clicking "恢复默认" on the ats tab POSTs the spec default and toasts', async () => {
+  it('clicking "恢复默认" on the system tab POSTs the spec default and toasts', async () => {
     const { postCalls } = mockAdminConfigApi();
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<PromptTab />);
-    await user.click(screen.getByTestId('prompt-tab-ats'));
-    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-ats'));
-    // Sanity: textarea has the spec default
+    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-system'));
     expect((textarea as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
-    await user.click(screen.getByTestId('prompt-reset-ats'));
+    await user.click(screen.getByTestId('prompt-reset-system'));
     confirmSpy.mockRestore();
     await waitFor(() => {
-      const calls = postCalls.filter((c) => c.key === 'resume.atsPrompt');
+      const calls = postCalls.filter((c) => c.key === 'prompt');
       expect(calls.length).toBeGreaterThan(0);
     });
     expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('the "star" sub-tab defaults to empty (runtime-built default)', async () => {
-    mockAdminConfigApi();
-    const user = userEvent.setup();
-    render(<PromptTab />);
-    await user.click(screen.getByTestId('prompt-tab-star'));
-    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-star'));
-    expect((textarea as HTMLTextAreaElement).value).toBe('');
-    // Reset button label is special-cased for runtime defaults
-    const resetBtn = screen.getByTestId('prompt-reset-star');
-    expect(within(resetBtn).getByText(/清空/)).toBeInTheDocument();
   });
 });
