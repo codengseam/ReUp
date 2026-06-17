@@ -752,6 +752,32 @@ export async function POST(request: NextRequest) {
         safeEnqueue(controller, `data: ${JSON.stringify({ error: errorMessage })}\n\n`);
         safeEnqueue(controller, 'data: [DONE]\n\n');
         void recordChatAPICall(Date.now() - streamStartTime);
+        // 错误埋点 (Loop Engineering 修复: 失败请求也要记, 否则 dashboard 会低估错误率)
+        void (async () => {
+          try {
+            const { randomUUID } = await import('node:crypto');
+            const { insertRequestLog } = await import('@/lib/db/request-logger');
+            insertRequestLog({
+              request_id: randomUUID(),
+              session_id: null,
+              query: latestUserMessage,
+              answer: null,
+              context_text: '',
+              doc_ids: null,
+              has_recall: 0,
+              model_id: model,
+              prompt_version: null,
+              experiment_id: null,
+              variant: 'control',
+              total_tokens: 0,
+              prompt_tokens: 0,
+              completion_tokens: 0,
+              cost: 0,
+              latency_ms: Date.now() - streamStartTime,
+              error: errorMessage.slice(0, 500),
+            });
+          } catch { /* 静默 */ }
+        })();
         controller.close();
       }
     },
