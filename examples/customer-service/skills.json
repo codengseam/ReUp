@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "id": "faq-router",
+      "name": "FAQ 路由",
+      "category": "support",
+      "trigger": "常见问题",
+      "framework": "根据用户问题匹配 FAQ 分类，给出标准答案",
+      "steps": ["识别问题分类", "匹配 FAQ 条目", "返回标准答案"]
+    },
+    {
+      "id": "troubleshooter",
+      "name": "故障排查",
+      "category": "support",
+      "trigger": "报错/异常/不能用",
+      "framework": "收集错误信息 → 定位问题模块 → 给出排查步骤",
+      "steps": ["收集错误信息", "定位问题模块", "给出排查步骤"]
+    }
+  ],
+  "hotQueries": [
+    { "id": 1, "text": "如何重置密码？", "category": "account" },
+    { "id": 2, "text": "如何升级套餐？", "category": "billing" },
+    { "id": 3, "text": "如何导出数据？", "category": "data" }
+  ],
+  "quickEntries": [
+    { "label": "账号问题", "icon": "User", "query": "如何重置密码？" },
+    { "label": "计费咨询", "icon": "CreditCard", "query": "如何升级套餐？" },
+    { "label": "数据导出", "icon": "Download", "query": "如何导出数据？" }
+  ],
+  "suggestions": [
+    "如何重置密码？",
+    "如何升级套餐？",
+    "如何导出数据？",
+    "API 调用频率限制是多少？",
+    "如何添加团队成员？"
+  ]
+}
