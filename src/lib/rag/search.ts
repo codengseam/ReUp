@@ -28,8 +28,8 @@ async function semanticSearch(
   categoryFilter?: string
 ): Promise<RAGResult[]> {
   try {
-    const opts: { category?: 'promotion' | 'interview' } = {};
-    if (categoryFilter === 'promotion' || categoryFilter === 'interview') {
+    const opts: { category?: string } = {};
+    if (categoryFilter && categoryFilter !== 'all') {
       opts.category = categoryFilter;
     }
     const chunks = await knowledgeBase.semanticSearch(query, topK, { ...opts, skipRerank: true });
@@ -45,9 +45,7 @@ async function semanticSearch(
 
     if (categoryFilter && categoryFilter !== 'all') {
       const filtered = results.filter(r =>
-        !r.category || r.category === categoryFilter ||
-        (categoryFilter === 'promotion' && r.category === '晋升类') ||
-        (categoryFilter === 'interview' && r.category === '面试类')
+        !r.category || r.category === categoryFilter
       );
       if (filtered.length > 0) return filtered;
     }
@@ -342,11 +340,11 @@ async function generateHydeAnswer(
   try {
     const llmClient = getLLMClient();
 
-    const hydePrompt = `你是一位职场指导书作者。请根据用户的问题，写一段专业的、像教科书一样的回答。
+    const hydePrompt = `你是一位专业知识库作者。请根据用户的问题，写一段专业的、像教科书一样的回答。
 这段回答将用于从知识库中检索相关文档。
 要求：
-- 使用专业术语，包含晋升、面试、绩效、能力等关键词
-- 内容像《大厂晋升指南》或《面试现场》中的原文风格
+- 使用专业术语，包含与问题相关的核心关键词
+- 内容像知识库原文风格
 - 长度 200-400 字
 - 只输出回答内容，不要任何解释
 

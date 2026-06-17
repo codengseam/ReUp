@@ -1,5 +1,7 @@
-// 阶段 3：skills-loader 单测（RED → GREEN）
+// skills-loader 单测
 // 验证 data/skills.json 启动加载、schema 校验、对外 API
+//
+// 通用化版本：data/skills.json 仅含 1 个示例 Skill，hotQueries/quickEntries/suggestions 为空。
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { loadSkills, getHotQueries, getSkillById, getAllSkills, getQuickEntries, getSuggestions } from '@/lib/skills-loader';
@@ -9,34 +11,27 @@ describe('skills-loader', () => {
     await loadSkills();
   });
 
-  it('loads 8 skills from data/skills.json', () => {
-    expect(getAllSkills().length).toBe(8);
+  it('loads 1 example skill from data/skills.json', () => {
+    expect(getAllSkills().length).toBe(1);
   });
 
-  it('loads 14 hot queries', () => {
-    expect(getHotQueries().length).toBe(14);
+  it('loads 0 hot queries (empty in generic template)', () => {
+    expect(getHotQueries().length).toBe(0);
   });
 
-  it('loads 4 quick entries', () => {
-    expect(getQuickEntries().length).toBe(4);
+  it('loads 0 quick entries (empty in generic template)', () => {
+    expect(getQuickEntries().length).toBe(0);
   });
 
-  it('loads 12 suggestions', () => {
-    expect(getSuggestions().length).toBe(12);
+  it('loads 0 suggestions (empty in generic template)', () => {
+    expect(getSuggestions().length).toBe(0);
   });
 
-  it('finds skill by id (晋升底层逻辑)', () => {
-    const s = getSkillById('jinsheng-dicing-luoji');
+  it('finds skill by id (示例技能)', () => {
+    const s = getSkillById('example-skill');
     expect(s).toBeDefined();
-    expect(s?.name).toBe('晋升底层逻辑');
-    expect(s?.category).toBe('promotion');
-  });
-
-  it('finds skill by id (反问框架)', () => {
-    const s = getSkillById('reverse-questioning-framework');
-    expect(s).toBeDefined();
-    expect(s?.name).toBe('反问框架');
-    expect(s?.category).toBe('interview');
+    expect(s?.name).toBe('示例技能');
+    expect(s?.category).toBe('general');
   });
 
   it('returns undefined for unknown skill id', () => {

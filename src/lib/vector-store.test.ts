@@ -355,20 +355,26 @@ const REAL_DATA = join(process.cwd(), 'data', 'skill-vectors.json');
 
 describe('vector-store: integration with real data/skill-vectors.json', () => {
   let realStore: VectorStore;
+  let realIsEmpty = false;
 
   beforeAll(async () => {
     realStore = createVectorStore();
     await realStore.load(REAL_DATA);
+    // 当 data/skill-vectors.json 被清空为空模板（count=0, vectors=[]）时，
+    // 这些集成测试无法验证真实数据，跳过它们而不是失败。
+    realIsEmpty = realStore.getVectorBuffer().length === 0;
   });
 
-  it('returns the first record in top-1 when queried with its own vector', () => {
+  it('returns the first record in top-1 when queried with its own vector', ({ skip }) => {
+    if (realIsEmpty) skip('skipped: skill-vectors.json is empty');
     const q = realStore.getVectorByIndex(0);
     const top1 = realStore.search(q, 1);
     expect(top1).toHaveLength(1);
     expect(top1[0].id).toBe(realStore.getIdByIndex(0));
   });
 
-  it('all cosine scores are within [-1, 1] for a random unit vector', () => {
+  it('all cosine scores are within [-1, 1] for a random unit vector', ({ skip }) => {
+    if (realIsEmpty) skip('skipped: skill-vectors.json is empty');
     // Deterministic pseudo-random unit vector (avoids flakiness)
     const dimLocal = realStore.getDimension();
     const raw = new Array(dimLocal).fill(0).map((_, i) => Math.sin(i * 0.123) + Math.cos(i * 0.456));

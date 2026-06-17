@@ -95,7 +95,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
     /**
      * book × category 2D 交叉表 + 各维度独立计数（不依赖 store）。
-     * 由 admin metadata tab 用于一眼看出"晋升书里讲答辩有多少 chunk"。
+     * 由 admin metadata tab 用于一眼看出"某本书里某个分类有多少 chunk"。
      */
     case 'topic-summary': {
       const summary = await getTopicSummary();

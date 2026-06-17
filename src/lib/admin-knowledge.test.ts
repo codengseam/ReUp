@@ -12,8 +12,12 @@
 //   - fixture 扩展为 4 条记录（含 1 条 通用），并补 topic 字段
 //   - 增加 byChapter / bySection / byTopic 聚合测试
 //   - 增加 searchKnowledge 的 topic / docTitle / sectionTitle 过滤测试
-//   - 增加 getFrameworkSkills（8 框架 Skill + SKILL.md 读取）测试
+//   - 增加 getFrameworkSkills（1 示例 Skill + SKILL.md 读取）测试
 //   - 增加 getTopicSummary（book × category 交叉表）测试
+//
+// 注：fixture 数据已通用化（alpha / beta / 通用），不再绑定域特定内容。
+// 排序约定：Node.js 默认 localeCompare 在本环境下 ASCII 排在 CJK 前
+// （即 'beta' < '通用'）。
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
@@ -30,84 +34,84 @@ const FIXTURE = {
   vectors: [
     {
       id: 'a',
-      text: '晋升答辩准备清单：项目复盘 + 业绩量化 + 答辩话术',
-      retrieval_text: '晋升 答辩 准备 清单 项目 复盘 业绩 量化',
+      text: 'alpha topic a: overview of alpha approach with key points and examples',
+      retrieval_text: 'alpha topic a overview approach key points examples',
       metadata: JSON.stringify({
-        category: 'promotion',
-        skillName: '晋升答辩',
-        book: '大厂晋升指南',
-        topic: '晋升答辩准备清单',
+        category: 'alpha',
+        skillName: 'alpha-skill',
+        book: 'book-alpha',
+        topic: 'topic-a',
       }),
-      book: '大厂晋升指南',
+      book: 'book-alpha',
       filename: 'file-a.md',
-      doc_title: '晋升答辩',
-      section_title: '答辩准备',
-      title_path: '晋升答辩/答辩准备',
-      keyword_text: '晋升 答辩 项目 复盘 业绩 量化',
-      source_path: '大厂晋升指南/file-a.md',
+      doc_title: 'doc-a',
+      section_title: 'section-a',
+      title_path: 'doc-a/section-a',
+      keyword_text: 'alpha topic a overview approach',
+      source_path: 'book-alpha/file-a.md',
       chunk_index: 0,
       vector: [1, 0, 0, 0],
       sparse_vector: null,
     },
     {
       id: 'b',
-      text: '技术面试现场：算法题、行为面、系统设计三轮考察要点',
-      retrieval_text: '技术 面试 现场 算法 行为 系统设计',
+      text: 'beta topic b: overview of beta approach with key points and examples',
+      retrieval_text: 'beta topic b overview approach key points examples',
       metadata: JSON.stringify({
-        category: 'interview',
-        skillName: '面试现场',
-        book: '面试现场',
-        topic: '面试现场三轮考察',
+        category: 'beta',
+        skillName: 'beta-skill',
+        book: 'book-beta',
+        topic: 'topic-b',
       }),
-      book: '面试现场',
+      book: 'book-beta',
       filename: 'file-b.md',
-      doc_title: '面试现场',
-      section_title: '三轮考察',
-      title_path: '面试现场/三轮考察',
-      keyword_text: '面试 现场 算法 行为 系统设计',
-      source_path: '面试现场/file-b.md',
+      doc_title: 'doc-b',
+      section_title: 'section-b',
+      title_path: 'doc-b/section-b',
+      keyword_text: 'beta topic b overview approach',
+      source_path: 'book-beta/file-b.md',
       chunk_index: 0,
       vector: [0, 1, 0, 0],
       sparse_vector: null,
     },
     {
       id: 'c',
-      text: '晋升通道与职级体系：P6 到 P7 的能力差异与材料撰写',
-      retrieval_text: '晋升 通道 职级 体系 能力 差异',
+      text: 'alpha topic c: deeper dive into alpha methods and detailed examples',
+      retrieval_text: 'alpha topic c deeper dive methods detailed examples',
       metadata: JSON.stringify({
-        category: 'promotion',
-        skillName: '晋升答辩',
-        book: '大厂晋升指南',
-        topic: 'P6-P7 职级体系差异',
+        category: 'alpha',
+        skillName: 'alpha-skill',
+        book: 'book-alpha',
+        topic: 'topic-c',
       }),
-      book: '大厂晋升指南',
+      book: 'book-alpha',
       filename: 'file-c.md',
-      doc_title: '晋升通道',
-      section_title: 'P6-P7 差异',
-      title_path: '晋升通道/P6-P7 差异',
-      keyword_text: '晋升 通道 职级 体系 能力 差异',
-      source_path: '大厂晋升指南/file-c.md',
+      doc_title: 'doc-c',
+      section_title: 'section-c',
+      title_path: 'doc-c/section-c',
+      keyword_text: 'alpha topic c deeper dive methods',
+      source_path: 'book-alpha/file-c.md',
       chunk_index: 1,
       vector: [-1, 0, 0, 0],
       sparse_vector: null,
     },
     {
       id: 'd',
-      text: '面试地图与流程：开场自我介绍、技术深度考察、反向提问收尾',
-      retrieval_text: '面试 地图 流程 开场 自我介绍 深度 反问',
+      text: 'beta topic d: general flow and overview for beta context and notes',
+      retrieval_text: 'beta topic d general flow overview context notes',
       metadata: JSON.stringify({
         category: '通用',
-        skillName: '面试现场',
-        book: '面试现场',
-        topic: '面试地图与流程',
+        skillName: 'beta-skill',
+        book: 'book-beta',
+        topic: 'topic-d',
       }),
-      book: '面试现场',
+      book: 'book-beta',
       filename: 'file-d.md',
-      doc_title: '面试流程',
-      section_title: '面试地图',
-      title_path: '面试流程/面试地图',
-      keyword_text: '面试 地图 流程 开场 自我介绍',
-      source_path: '面试现场/file-d.md',
+      doc_title: 'doc-d',
+      section_title: 'section-d',
+      title_path: 'doc-d/section-d',
+      keyword_text: 'beta topic d general flow overview',
+      source_path: 'book-beta/file-d.md',
       chunk_index: 2,
       vector: [0, 0, 1, 0],
       sparse_vector: null,
@@ -126,12 +130,13 @@ beforeAll(() => {
   mkdirSync(join(tmpDir, 'data'), { recursive: true });
   writeFileSync(join(tmpDir, 'data', 'skill-vectors.json'), JSON.stringify(FIXTURE), 'utf8');
 
-  // 为 getFrameworkSkills 准备 1 个 SKILL.md 文件，覆盖从 process.cwd() 读 skills 的路径
-  const skillDir = join(tmpDir, 'skills', 'jinsheng-dicing-luoji');
+  // 为 getFrameworkSkills 准备 1 个 SKILL.md 文件，覆盖从 process.cwd() 读 skills 的路径。
+  // data/skills.json 通用化后仅含 1 个 example-skill，fixture 在此为其准备 SKILL.md。
+  const skillDir = join(tmpDir, 'skills', 'example-skill');
   mkdirSync(skillDir, { recursive: true });
   writeFileSync(
     join(skillDir, 'SKILL.md'),
-    '---\nname: jinsheng-dicing-luoji\ndescription: 晋升底层逻辑\n---\n\n# 晋升底层逻辑 (test fixture)\n',
+    '---\nname: example-skill\ndescription: 示例 Skill (test fixture)\n---\n\n# 示例 Skill (test fixture)\n',
     'utf8'
   );
 
@@ -178,24 +183,24 @@ describe('admin-knowledge: getKnowledgeStats', () => {
     expect(stats.total).toBe(4);
     expect(stats.dimension).toBe(4);
 
-    // book: 大厂晋升指南=2, 面试现场=2（并列 → 字典序大 < 面）
+    // book: book-alpha=2, book-beta=2（并列 → 字典序 book-alpha < book-beta）
     expect(stats.byBook).toEqual([
-      { name: '大厂晋升指南', count: 2 },
-      { name: '面试现场', count: 2 },
+      { name: 'book-alpha', count: 2 },
+      { name: 'book-beta', count: 2 },
     ]);
 
-    // category: promotion=2, interview=1, 通用=1
-    // 注：Node 默认 Intl.Collator 在 default locale 下 CJK 排 ASCII 前；'通用' < 'interview'
+    // category: alpha=2, beta=1, 通用=1
+    // 注：Node 默认 localeCompare 在本环境下 ASCII 排在 CJK 前；'beta' < '通用'
     expect(stats.byCategory).toEqual([
-      { name: 'promotion', count: 2 },
+      { name: 'alpha', count: 2 },
+      { name: 'beta', count: 1 },
       { name: '通用', count: 1 },
-      { name: 'interview', count: 1 },
     ]);
 
-    // skillName: 晋升答辩=2, 面试现场=2（并列 → 晋 < 面）
+    // skillName: alpha-skill=2, beta-skill=2（并列 → alpha-skill < beta-skill）
     expect(stats.bySkill).toEqual([
-      { name: '晋升答辩', count: 2 },
-      { name: '面试现场', count: 2 },
+      { name: 'alpha-skill', count: 2 },
+      { name: 'beta-skill', count: 2 },
     ]);
   });
 
@@ -207,9 +212,9 @@ describe('admin-knowledge: getKnowledgeStats', () => {
     for (const g of stats.byChapter) {
       expect(g.count).toBe(1);
     }
-    // 按 doc_title 分组：'a'='晋升答辩'、'b'='面试现场'、'c'='晋升通道'、'd'='面试流程'
+    // 按 doc_title 分组：'a'='doc-a'、'b'='doc-b'、'c'='doc-c'、'd'='doc-d'
     const names = stats.byChapter.map((g) => g.name).sort();
-    expect(names).toEqual(['晋升答辩', '面试现场', '晋升通道', '面试流程'].sort());
+    expect(names).toEqual(['doc-a', 'doc-b', 'doc-c', 'doc-d'].sort());
   });
 
   it('returns bySection (group by section_title) with 4 unique sections each count 1', async () => {
@@ -223,14 +228,14 @@ describe('admin-knowledge: getKnowledgeStats', () => {
 });
 
 describe('admin-knowledge: searchKnowledge', () => {
-  it('returns matching chunks for a CJK query, ordered by lexical match score', async () => {
+  it('returns matching chunks for a query, ordered by lexical match score', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升答辩');
+    const results = await searchKnowledge(store, 'alpha');
     expect(results.length).toBeGreaterThan(0);
-    // Both 'a' and 'c' talk about 晋升 — both should appear
+    // Both 'a' and 'c' talk about alpha — both should appear
     const ids = results.map((r) => r.id).sort();
     expect(ids).toEqual(['a', 'c']);
-    // 'b' (interview) and 'd' (通用) should not match
+    // 'b' (beta) and 'd' (通用) should not match
     expect(results.find((r) => r.id === 'b')).toBeUndefined();
     expect(results.find((r) => r.id === 'd')).toBeUndefined();
   });
@@ -243,62 +248,62 @@ describe('admin-knowledge: searchKnowledge', () => {
 
   it('respects opts.book: filters to that book only', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { book: '面试现场' });
-    // '面试现场' has chunks b and d, neither contains 晋升
+    const results = await searchKnowledge(store, 'alpha', { book: 'book-beta' });
+    // 'book-beta' has chunks b and d, neither contains alpha
     expect(results).toEqual([]);
   });
 
   it('respects opts.skillName: filters to that skill only', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { skillName: '晋升答辩' });
+    const results = await searchKnowledge(store, 'alpha', { skillName: 'alpha-skill' });
     expect(results.length).toBeGreaterThan(0);
     for (const r of results) {
-      expect(r.skillName).toBe('晋升答辩');
+      expect(r.skillName).toBe('alpha-skill');
     }
   });
 
   it('respects opts.category: filters to that category only', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { category: 'interview' });
+    const results = await searchKnowledge(store, 'alpha', { category: 'beta' });
     expect(results).toEqual([]);
   });
 
   it('respects opts.topic: filters to that topic (a only)', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { topic: '晋升答辩准备清单' });
-    // 只有 a 的 topic='晋升答辩准备清单'，且其文本含 '晋'/'升'
+    const results = await searchKnowledge(store, 'alpha', { topic: 'topic-a' });
+    // 只有 a 的 topic='topic-a'，且其文本含 'alpha'
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('a');
-    expect(results[0].topic).toBe('晋升答辩准备清单');
+    expect(results[0].topic).toBe('topic-a');
   });
 
   it('respects opts.docTitle: filters to that chapter', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { docTitle: '晋升通道' });
-    // 只有 c 的 docTitle='晋升通道'，且其文本含 '晋'/'升'
+    const results = await searchKnowledge(store, 'alpha', { docTitle: 'doc-c' });
+    // 只有 c 的 docTitle='doc-c'，且其文本含 'alpha'
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('c');
-    expect(results[0].docTitle).toBe('晋升通道');
+    expect(results[0].docTitle).toBe('doc-c');
   });
 
   it('respects opts.sectionTitle: filters to that section', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { sectionTitle: '答辩准备' });
-    // 只有 a 的 sectionTitle='答辩准备'，且其文本含 '晋'/'升'
+    const results = await searchKnowledge(store, 'alpha', { sectionTitle: 'section-a' });
+    // 只有 a 的 sectionTitle='section-a'，且其文本含 'alpha'
     expect(results).toHaveLength(1);
     expect(results[0].id).toBe('a');
-    expect(results[0].sectionTitle).toBe('答辩准备');
+    expect(results[0].sectionTitle).toBe('section-a');
   });
 
   it('caps the result list to opts.limit', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升', { limit: 1 });
+    const results = await searchKnowledge(store, 'alpha', { limit: 1 });
     expect(results).toHaveLength(1);
   });
 
   it('preview is truncated to <= 200 chars', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升');
+    const results = await searchKnowledge(store, 'alpha');
     for (const r of results) {
       expect(r.preview.length).toBeLessThanOrEqual(200);
     }
@@ -306,7 +311,7 @@ describe('admin-knowledge: searchKnowledge', () => {
 
   it('preview is the first 200 chars of the full text', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升');
+    const results = await searchKnowledge(store, 'alpha');
     const a = results.find((r) => r.id === 'a');
     expect(a).toBeDefined();
     expect(a?.preview).toBe(FIXTURE.vectors[0].text.slice(0, 200));
@@ -314,12 +319,12 @@ describe('admin-knowledge: searchKnowledge', () => {
 
   it('returned summary includes the topic field', async () => {
     const store = makeFakeStore(4, 4);
-    const results = await searchKnowledge(store, '晋升');
+    const results = await searchKnowledge(store, 'alpha');
     for (const r of results) {
       expect(typeof r.topic).toBe('string');
     }
     const a = results.find((r) => r.id === 'a');
-    expect(a?.topic).toBe('晋升答辩准备清单');
+    expect(a?.topic).toBe('topic-a');
   });
 });
 
@@ -328,8 +333,8 @@ describe('admin-knowledge: listByGroup', () => {
     const store = makeFakeStore(4, 4);
     const groups = await listByGroup(store, 'book');
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ name: '大厂晋升指南', count: 2 });
-    expect(groups[1]).toMatchObject({ name: '面试现场', count: 2 });
+    expect(groups[0]).toMatchObject({ name: 'book-alpha', count: 2 });
+    expect(groups[1]).toMatchObject({ name: 'book-beta', count: 2 });
     expect(groups[0].sample).toBeDefined();
     expect(groups[0].sample.id).toMatch(/^[a-d]$/);
   });
@@ -338,15 +343,15 @@ describe('admin-knowledge: listByGroup', () => {
     const store = makeFakeStore(4, 4);
     const groups = await listByGroup(store, 'skillName');
     expect(groups).toHaveLength(2);
-    expect(groups[0]).toMatchObject({ name: '晋升答辩', count: 2 });
-    expect(groups[1]).toMatchObject({ name: '面试现场', count: 2 });
+    expect(groups[0]).toMatchObject({ name: 'alpha-skill', count: 2 });
+    expect(groups[1]).toMatchObject({ name: 'beta-skill', count: 2 });
   });
 
   it('groups by category sorted desc by count', async () => {
     const store = makeFakeStore(4, 4);
     const groups = await listByGroup(store, 'category');
     expect(groups).toHaveLength(3);
-    expect(groups[0]).toMatchObject({ name: 'promotion', count: 2 });
+    expect(groups[0]).toMatchObject({ name: 'alpha', count: 2 });
   });
 
   it('groups by docTitle (chapter) — 4 unique chapters', async () => {
@@ -358,7 +363,7 @@ describe('admin-knowledge: listByGroup', () => {
       expect(g.sample.id).toMatch(/^[a-d]$/);
     }
     const names = new Set(groups.map((g) => g.name));
-    expect(names).toEqual(new Set(['晋升答辩', '面试现场', '晋升通道', '面试流程']));
+    expect(names).toEqual(new Set(['doc-a', 'doc-b', 'doc-c', 'doc-d']));
   });
 
   it('groups by sectionTitle — 4 unique sections', async () => {
@@ -366,7 +371,7 @@ describe('admin-knowledge: listByGroup', () => {
     const groups = await listByGroup(store, 'sectionTitle');
     expect(groups).toHaveLength(4);
     const names = new Set(groups.map((g) => g.name));
-    expect(names).toEqual(new Set(['答辩准备', '三轮考察', 'P6-P7 差异', '面试地图']));
+    expect(names).toEqual(new Set(['section-a', 'section-b', 'section-c', 'section-d']));
   });
 
   it('groups by topic — 4 unique topics', async () => {
@@ -375,10 +380,10 @@ describe('admin-knowledge: listByGroup', () => {
     expect(groups).toHaveLength(4);
     const names = new Set(groups.map((g) => g.name));
     expect(names).toEqual(new Set([
-      '晋升答辩准备清单',
-      '面试现场三轮考察',
-      'P6-P7 职级体系差异',
-      '面试地图与流程',
+      'topic-a',
+      'topic-b',
+      'topic-c',
+      'topic-d',
     ]));
   });
 
@@ -386,20 +391,17 @@ describe('admin-knowledge: listByGroup', () => {
     const store = makeFakeStore(4, 4);
     const groups = await listByGroup(store, 'book', { limit: 1 });
     expect(groups).toHaveLength(1);
-    expect(groups[0].name).toBe('大厂晋升指南');
+    expect(groups[0].name).toBe('book-alpha');
   });
 });
 
 // ---------------- Phase 2A: new APIs ----------------
 
 describe('admin-knowledge: getFrameworkSkills', () => {
-  it('returns 8 framework skills (4 promotion + 4 interview) from data/skills.json', async () => {
+  it('returns 1 example skill from data/skills.json', async () => {
     const skills = await getFrameworkSkills();
-    expect(skills).toHaveLength(8);
-    const promo = skills.filter((s) => s.category === 'promotion');
-    const interview = skills.filter((s) => s.category === 'interview');
-    expect(promo).toHaveLength(4);
-    expect(interview).toHaveLength(4);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].id).toBe('example-skill');
   });
 
   it('each skill carries id / name / category / trigger / framework / steps', async () => {
@@ -407,7 +409,7 @@ describe('admin-knowledge: getFrameworkSkills', () => {
     for (const s of skills) {
       expect(s.id).toBeTruthy();
       expect(s.name).toBeTruthy();
-      expect(['promotion', 'interview']).toContain(s.category);
+      expect(['general']).toContain(s.category);
       expect(typeof s.trigger).toBe('string');
       expect(typeof s.framework).toBe('string');
       expect(Array.isArray(s.steps)).toBe(true);
@@ -415,24 +417,23 @@ describe('admin-knowledge: getFrameworkSkills', () => {
     }
   });
 
-  it('reads SKILL.md markdown for the existing fixture skill (jinsheng-dicing-luoji)', async () => {
+  it('reads SKILL.md markdown for the existing fixture skill (example-skill)', async () => {
     const skills = await getFrameworkSkills();
-    const target = skills.find((s) => s.id === 'jinsheng-dicing-luoji');
+    const target = skills.find((s) => s.id === 'example-skill');
     expect(target).toBeDefined();
     expect(target!.markdown).not.toBeNull();
-    expect(target!.markdown).toContain('晋升底层逻辑 (test fixture)');
-    expect(target!.markdownPath).toContain('jinsheng-dicing-luoji');
+    expect(target!.markdown).toContain('示例 Skill (test fixture)');
+    expect(target!.markdownPath).toContain('example-skill');
     expect(target!.markdownPath!.endsWith('SKILL.md')).toBe(true);
   });
 
-  it('returns markdown=null for skills without a SKILL.md file', async () => {
+  it('example-skill has a SKILL.md file (markdown is not null)', async () => {
     const skills = await getFrameworkSkills();
-    // 7 个 skill 没有对应的 SKILL.md（只有 jinsheng-dicing-luoji 被 fixture 准备）
-    const missing = skills.filter((s) => s.id !== 'jinsheng-dicing-luoji');
-    expect(missing.length).toBe(7);
-    for (const s of missing) {
-      expect(s.markdown).toBeNull();
-      expect(s.markdownPath).toBeNull();
+    // 通用化后仅 1 个 example-skill，fixture 已为其准备 SKILL.md
+    expect(skills).toHaveLength(1);
+    for (const s of skills) {
+      expect(s.markdown).not.toBeNull();
+      expect(s.markdownPath).not.toBeNull();
     }
   });
 
@@ -449,39 +450,39 @@ describe('admin-knowledge: getFrameworkSkills', () => {
 });
 
 describe('admin-knowledge: getTopicSummary', () => {
-  it('returns 2 books in byBookCategory cross-tab (大厂晋升指南 + 面试现场)', async () => {
+  it('returns 2 books in byBookCategory cross-tab (book-alpha + book-beta)', async () => {
     const summary = await getTopicSummary();
     expect(summary.byBookCategory).toHaveLength(2);
     const books = summary.byBookCategory.map((b) => b.book).sort();
-    expect(books).toEqual(['大厂晋升指南', '面试现场']);
+    expect(books).toEqual(['book-alpha', 'book-beta']);
   });
 
-  it('大厂晋升指南 has promotion=2; 面试现场 has interview=1 + 通用=1', async () => {
+  it('book-alpha has alpha=2; book-beta has beta=1 + 通用=1', async () => {
     const summary = await getTopicSummary();
-    const promo = summary.byBookCategory.find((b) => b.book === '大厂晋升指南');
-    expect(promo).toBeDefined();
-    const promoMap = new Map(promo!.categories.map((c) => [c.category, c.count]));
-    expect(promoMap.get('promotion')).toBe(2);
+    const alpha = summary.byBookCategory.find((b) => b.book === 'book-alpha');
+    expect(alpha).toBeDefined();
+    const alphaMap = new Map(alpha!.categories.map((c) => [c.category, c.count]));
+    expect(alphaMap.get('alpha')).toBe(2);
 
-    const interview = summary.byBookCategory.find((b) => b.book === '面试现场');
-    expect(interview).toBeDefined();
-    const intMap = new Map(interview!.categories.map((c) => [c.category, c.count]));
-    expect(intMap.get('interview')).toBe(1);
-    expect(intMap.get('通用')).toBe(1);
+    const beta = summary.byBookCategory.find((b) => b.book === 'book-beta');
+    expect(beta).toBeDefined();
+    const betaMap = new Map(beta!.categories.map((c) => [c.category, c.count]));
+    expect(betaMap.get('beta')).toBe(1);
+    expect(betaMap.get('通用')).toBe(1);
   });
 
-  it('byBook totals: 大厂晋升指南=2, 面试现场=2', async () => {
+  it('byBook totals: book-alpha=2, book-beta=2', async () => {
     const summary = await getTopicSummary();
     const map = new Map(summary.byBook.map((b) => [b.name, b.total]));
-    expect(map.get('大厂晋升指南')).toBe(2);
-    expect(map.get('面试现场')).toBe(2);
+    expect(map.get('book-alpha')).toBe(2);
+    expect(map.get('book-beta')).toBe(2);
   });
 
-  it('byCategory totals: promotion=2, interview=1, 通用=1', async () => {
+  it('byCategory totals: alpha=2, beta=1, 通用=1', async () => {
     const summary = await getTopicSummary();
     const map = new Map(summary.byCategory.map((b) => [b.name, b.total]));
-    expect(map.get('promotion')).toBe(2);
-    expect(map.get('interview')).toBe(1);
+    expect(map.get('alpha')).toBe(2);
+    expect(map.get('beta')).toBe(1);
     expect(map.get('通用')).toBe(1);
   });
 

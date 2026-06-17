@@ -176,26 +176,26 @@ describe('knowledge-base: semanticSearch()', () => {
     });
   });
 
-  it('passes through category=promotion to vector-store', async () => {
+  it('passes through category=alpha to vector-store', async () => {
     const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
     mockSearch.mockReturnValue([]);
 
     const kb = createKnowledgeBase({ embed });
-    await kb.semanticSearch('q', 5, { category: 'promotion' });
+    await kb.semanticSearch('q', 5, { category: 'alpha' });
 
     const callOpts = mockSearch.mock.calls[0]![2] as SearchOptions;
-    expect(callOpts.category).toBe('promotion');
+    expect(callOpts.category).toBe('alpha');
   });
 
-  it('passes through category=interview to vector-store', async () => {
+  it('passes through category=beta to vector-store', async () => {
     const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
     mockSearch.mockReturnValue([]);
 
     const kb = createKnowledgeBase({ embed });
-    await kb.semanticSearch('q', 5, { category: 'interview' });
+    await kb.semanticSearch('q', 5, { category: 'beta' });
 
     const callOpts = mockSearch.mock.calls[0]![2] as SearchOptions;
-    expect(callOpts.category).toBe('interview');
+    expect(callOpts.category).toBe('beta');
   });
 
   it('passes through skillName to vector-store', async () => {
@@ -220,16 +220,16 @@ describe('knowledge-base: semanticSearch()', () => {
     expect(callOpts.book).toBe('book-a');
   });
 
-  it('ignores category values other than promotion/interview', async () => {
+  it('passes through arbitrary category strings to vector-store', async () => {
     const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
     mockSearch.mockReturnValue([]);
 
     const kb = createKnowledgeBase({ embed });
-    const opts = { category: 'invalid' } as unknown as SemanticSearchOptions;
+    const opts: SemanticSearchOptions = { category: 'custom-category' };
     await kb.semanticSearch('q', 5, opts);
 
     const callOpts = mockSearch.mock.calls[0]![2] as SearchOptions;
-    expect(callOpts.category).toBeUndefined();
+    expect(callOpts.category).toBe('custom-category');
   });
 
   it('returns empty when vector-store.search() returns empty (no rerank call)', async () => {
@@ -246,8 +246,8 @@ describe('knowledge-base: semanticSearch()', () => {
   it('converts SearchResult to ScoredChunk shape correctly (uses result.score)', async () => {
     const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
     const candidates: SearchResult[] = [
-      makeResult('a', 0.95, 'text-a', { category: 'promotion', book: 'book-a' }),
-      makeResult('b', 0.7, 'text-b', { category: 'interview', book: 'book-b' }),
+      makeResult('a', 0.95, 'text-a', { category: 'alpha', book: 'book-a' }),
+      makeResult('b', 0.7, 'text-b', { category: 'beta', book: 'book-b' }),
     ];
     mockSearch.mockReturnValue(candidates);
 
@@ -259,14 +259,14 @@ describe('knowledge-base: semanticSearch()', () => {
       id: 'a',
       text: 'text-a',
       score: 0.95,
-      category: 'promotion',
+      category: 'alpha',
       book: 'book-a',
     });
     expect(result[1]).toEqual({
       id: 'b',
       text: 'text-b',
       score: 0.7,
-      category: 'interview',
+      category: 'beta',
       book: 'book-b',
     });
   });
@@ -299,11 +299,11 @@ describe('knowledge-base: semanticSearch()', () => {
   it('passes candidates with metadata spread to rerank (preserves arbitrary fields)', async () => {
     const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
     const candidates: SearchResult[] = [
-      makeResult('a', 0.9, 'text-a', { category: 'promotion', custom: 'value' }),
+      makeResult('a', 0.9, 'text-a', { category: 'alpha', custom: 'value' }),
     ];
     mockSearch.mockReturnValue(candidates);
     mockRerank.mockResolvedValueOnce([
-      { id: 'a', text: 'text-a', score: 0.9, category: 'promotion', custom: 'value' },
+      { id: 'a', text: 'text-a', score: 0.9, category: 'alpha', custom: 'value' },
     ]);
 
     const kb = createKnowledgeBase({ embed });
@@ -313,7 +313,7 @@ describe('knowledge-base: semanticSearch()', () => {
     expect(rerankCandidates[0]).toEqual({
       id: 'a',
       text: 'text-a',
-      category: 'promotion',
+      category: 'alpha',
       custom: 'value',
     });
   });
@@ -363,7 +363,7 @@ describe('knowledge-base: hybridSearch()', () => {
     const spy = vi.fn(originalSemanticSearch);
     kb.semanticSearch = spy;
 
-    const opts: SemanticSearchOptions = { category: 'promotion', skillName: 's-1', skipRerank: true };
+    const opts: SemanticSearchOptions = { category: 'alpha', skillName: 's-1', skipRerank: true };
     try {
       await kb.hybridSearch('q', 5, opts);
     } finally {

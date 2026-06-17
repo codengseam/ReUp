@@ -31,7 +31,7 @@ export default function CitationDrawer({ citation, onClose }: CitationDrawerProp
           )}
           {citation.category && (
             <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground text-xs ml-2">
-              {citation.category === 'promotion' ? '晋升类' : '面试类'}
+              {citation.category}
             </div>
           )}
         </div>

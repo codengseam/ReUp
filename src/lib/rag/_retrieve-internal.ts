@@ -36,7 +36,7 @@ export interface PrecomputedIntent {
   rewrittenQuery?: string;
   strategy?: 'direct' | 'multiquery' | 'hyde';
   subQueries?: string[];
-  categoryFilter?: 'promotion' | 'interview' | 'all';
+  categoryFilter?: string | 'all';
 }
 
 export async function retrieve(

@@ -62,12 +62,11 @@ function toScoredChunk(r: SearchResult): ScoredChunk {
 
 /**
  * Build a `SearchOptions` payload for vector-store.search().
- * `category` is restricted to the `'promotion' | 'interview'` union; other
- * values are ignored so a stray runtime value cannot crash the store.
+ * `category` 透传任意字符串值，由调用方自行约定分类语义。
  */
 function buildSearchOptions(opts?: SemanticSearchOptions): SearchOptions {
   const out: SearchOptions = {};
-  if (opts?.category === 'promotion' || opts?.category === 'interview') {
+  if (opts?.category !== undefined) {
     out.category = opts.category;
   }
   if (opts?.skillName !== undefined) {

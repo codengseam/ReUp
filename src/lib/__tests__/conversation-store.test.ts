@@ -40,19 +40,19 @@ describe('conversation-store', () => {
     const userMsg: Message = {
       id: '1',
       role: 'user',
-      content: '作为技术负责人，我该学什么方向才能从P7升到P8？',
+      content: '作为开发者，我该学什么方向才能提升技术能力？',
     };
 
     const updated = addMessageToConversation(conv.id, userMsg);
     expect(updated.messages).toHaveLength(1);
     // 智能标题：清理标点 + 空格后，截断为前 12 字 + …
-    expect(updated.title).toBe('作为技术负责人 我该学什…');
+    expect(updated.title).toBe('作为开发者 我该学什么方…');
   });
 
   it('generateTitle extracts main idea from various inputs', () => {
-    expect(generateTitle('我绩效很好，为什么没晋升？')).toBe('我绩效很好 为什么没晋升');
-    expect(generateTitle('请问晋升P7的关键是什么？')).toBe('晋升P7的关键');
-    expect(generateTitle('面试被问住不会回答怎么圆？')).toBe('面试被问住不会回答');
+    expect(generateTitle('我的项目进展很好，为什么没有产出？')).toBe('我的项目进展很好 为什么…');
+    expect(generateTitle('请问提升技术的关键是什么？')).toBe('提升技术的关键');
+    expect(generateTitle('遇到不懂的问题不会回答怎么处理？')).toBe('遇到不懂的问题不会回答');
     expect(generateTitle('')).toBe('新对话');
     expect(generateTitle('   ')).toBe('新对话');
   });

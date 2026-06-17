@@ -29,7 +29,7 @@
 import { readFile } from 'fs/promises';
 
 export interface SearchOptions {
-  category?: 'promotion' | 'interview';
+  category?: string;
   skillName?: string;
   book?: string;
 }

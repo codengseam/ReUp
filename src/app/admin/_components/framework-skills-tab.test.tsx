@@ -8,24 +8,24 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // 手摇 mock 数据：2 个 skill，让测试跑得快
 const MOCK_SKILLS: FrameworkSkill[] = [
   {
-    id: 'jinsheng-dicing-luoji',
+    id: 'example-skill-a',
     name: '示例 Skill 一',
-    category: 'promotion',
-    trigger: '我绩效很好，为什么没晋升？',
-    framework: '先精通当前级别，再做下一级别的事',
-    steps: ['确认晋升通道', '评估当前级别', '对标下一级', '寻找越级机会'],
-    markdown: '# 示例 Skill 一\n\n## 心法\n\n- 长期主义\n- 跨级别思考',
-    markdownPath: '/abs/path/skills/jinsheng-dicing-luoji/SKILL.md',
+    category: 'alpha',
+    trigger: '示例触发问题一？',
+    framework: '示例框架一：先打基础，再做扩展',
+    steps: ['步骤一', '步骤二', '步骤三', '步骤四'],
+    markdown: '# 示例 Skill 一\n\n## 心法\n\n- 长期主义\n- 跨阶段思考',
+    markdownPath: '/abs/path/skills/example-skill-a/SKILL.md',
   },
   {
-    id: 'highlight-extractor',
+    id: 'example-skill-b',
     name: '示例 Skill 二',
-    category: 'interview',
-    trigger: '简历没亮点怎么办？',
-    framework: '价值/结果/创新/动机四维挖掘',
-    steps: ['输入平淡经历', '价值与结果榨取', '创新与动机榨取', '生成亮点句'],
-    markdown: '## 示例 Skill 二\n\n### 输入\n\n平淡的项目经历',
-    markdownPath: '/abs/path/skills/highlight-extractor/SKILL.md',
+    category: 'beta',
+    trigger: '示例触发问题二？',
+    framework: '示例框架二：四维挖掘',
+    steps: ['输入素材', '提取要点', '归纳结构', '生成结论'],
+    markdown: '## 示例 Skill 二\n\n### 输入\n\n平淡的素材',
+    markdownPath: '/abs/path/skills/example-skill-b/SKILL.md',
   },
 ];
 
@@ -72,8 +72,8 @@ describe('FrameworkSkillsTab', () => {
     });
     expect(screen.getByText('示例 Skill 二')).toBeInTheDocument();
     // 数据来源是 MOCK_SKILLS，包含 2 个
-    expect(screen.getByTestId('skill-card-jinsheng-dicing-luoji')).toBeInTheDocument();
-    expect(screen.getByTestId('skill-card-highlight-extractor')).toBeInTheDocument();
+    expect(screen.getByTestId('skill-card-example-skill-a')).toBeInTheDocument();
+    expect(screen.getByTestId('skill-card-example-skill-b')).toBeInTheDocument();
   });
 
   it('(c) 统计卡显示正确的数量（mock 数据 2 个）', async () => {
@@ -93,16 +93,16 @@ describe('FrameworkSkillsTab', () => {
     globalThis.fetch = buildFetchMock();
 
     render(<FrameworkSkillsTab />);
-    const card = await waitFor(() => screen.getByTestId('skill-card-jinsheng-dicing-luoji'));
+    const card = await waitFor(() => screen.getByTestId('skill-card-example-skill-a'));
     // 展开前 markdown 容器不应存在
-    expect(screen.queryByTestId('skill-markdown-jinsheng-dicing-luoji')).toBeNull();
+    expect(screen.queryByTestId('skill-markdown-example-skill-a')).toBeNull();
     fireEvent.click(card);
     // 展开后渲染 markdown
     await waitFor(() => {
-      expect(screen.getByTestId('skill-markdown-jinsheng-dicing-luoji')).toBeInTheDocument();
+      expect(screen.getByTestId('skill-markdown-example-skill-a')).toBeInTheDocument();
     });
     // markdown 容器里出现「示例 Skill 一」（# 标题被渲染为 h1）
-    const md = screen.getByTestId('skill-markdown-jinsheng-dicing-luoji');
+    const md = screen.getByTestId('skill-markdown-example-skill-a');
     expect(md.textContent).toContain('示例 Skill 一');
     expect(md.textContent).toContain('心法');
   });
@@ -111,14 +111,14 @@ describe('FrameworkSkillsTab', () => {
     globalThis.fetch = buildFetchMock();
 
     render(<FrameworkSkillsTab />);
-    const card = await waitFor(() => screen.getByTestId('skill-card-highlight-extractor'));
+    const card = await waitFor(() => screen.getByTestId('skill-card-example-skill-b'));
     fireEvent.click(card);
     await waitFor(() => {
-      expect(screen.getByTestId('skill-markdown-highlight-extractor')).toBeInTheDocument();
+      expect(screen.getByTestId('skill-markdown-example-skill-b')).toBeInTheDocument();
     });
     fireEvent.click(card);
     await waitFor(() => {
-      expect(screen.queryByTestId('skill-markdown-highlight-extractor')).toBeNull();
+      expect(screen.queryByTestId('skill-markdown-example-skill-b')).toBeNull();
     });
   });
 

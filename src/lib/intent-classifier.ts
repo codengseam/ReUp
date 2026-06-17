@@ -12,7 +12,7 @@
 import { LLMClient, type InvokeOptions } from './llm-client';
 
 // 框架级意图分类：只保留通用三值。
-// 领域特定分类（如晋升/面试/简历问答等）由调用方基于自身知识库自行扩展，
+// 领域特定分类由调用方基于自身知识库自行扩展，
 // 不在框架内硬编码；本分类器输出的 intent 仅用于框架级路由（通用/越界/越狱）。
 export type IntentCategory = 'general' | 'off_topic' | 'jailbreak';
 

@@ -49,14 +49,14 @@ describe('feedback-store', () => {
   // Phase 5 E3: positive feedback (thumbsUp) variant.
   it('records and persists positive feedback with reason "good"', async () => {
     const fb = await recordFeedback({
-      messageId: 'sec-STAR改写',
-      conversationId: 'resume',
+      messageId: 'sec-alpha',
+      conversationId: 'conv-alpha',
       reason: 'good',
       response: 'improve bullet 1 ...',
     });
     expect(fb.reason).toBe('good');
-    expect(fb.messageId).toBe('sec-STAR改写');
-    expect(fb.conversationId).toBe('resume');
+    expect(fb.messageId).toBe('sec-alpha');
+    expect(fb.conversationId).toBe('conv-alpha');
     expect(fb.response).toContain('improve bullet 1');
 
     const list = await listFeedback();

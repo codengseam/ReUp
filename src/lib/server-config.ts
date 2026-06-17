@@ -48,31 +48,6 @@ export interface ServerConfig {
   knowledgeBaseId?: string;
   /** 知识库名称 */
   knowledgeBaseName?: string;
-  /**
-   * 简历模块运行时配置（ReUp v2 Phase 3+）。
-   * 子字段独立持久化：每个子键的 POST 只覆盖对应槽位，不影响其他槽位。
-   */
-  resume?: {
-    /** STAR 改写 / 评估的运行时参数 */
-    config?: {
-      topK?: number;
-      confidenceChars?: number;
-      fewShotIds?: string[];
-      sectionOrder?: string[];
-    };
-    /** 隐私 / 强制本地模式 */
-    privacy?: {
-      forcedLocal?: boolean;
-    };
-    /** STAR 改写自定义 system prompt（字符串） */
-    starPrompt?: string;
-    /** STAR few-shot 字符串（行分隔的示例 ID 或样例文本） */
-    starFewShot?: string;
-    /** ATS 评分自定义 prompt */
-    atsPrompt?: string;
-    /** JD 匹配自定义 prompt */
-    matchPrompt?: string;
-  };
   /** 更新时间 */
   updatedAt?: string;
 }

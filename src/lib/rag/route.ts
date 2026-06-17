@@ -102,11 +102,9 @@ async function inferQueryCategoryViaLLM(
     const llmClient = new LLMClient();
 
     const prompt = `判断以下用户查询属于哪个类别：
-- promotion: 晋升相关（晋升、升职、绩效、能力提升、技术学习、管理）
-- interview: 面试相关（面试、简历、自我介绍、亮点、反问、被问住）
-- all: 无法确定或两者都涉及
+- all: 通用查询
 
-只返回一个类别词（promotion/interview/all），不要其他内容。
+只返回一个类别词（all），不要其他内容。
 
 用户查询：${query}`;
 
@@ -121,8 +119,7 @@ async function inferQueryCategoryViaLLM(
 
     if (response && response.content) {
       const text = response.content.trim().toLowerCase();
-      if (text.includes('promotion')) return 'promotion';
-      if (text.includes('interview')) return 'interview';
+      if (text.includes('all')) return 'all';
     }
   } catch (error) {
     console.log('[RAG] LLM类别推断失败，使用本地规则降级:', error instanceof Error ? error.message : String(error));
@@ -133,11 +130,9 @@ async function inferQueryCategoryViaLLM(
 }
 
 function inferQueryCategoryLocal(query: string): string {
-  const promotionKeywords = /晋升|升职|绩效|能力|技术|管理|总监|P7|P8|晋升指南|三重境界|领域专家/;
-  const interviewKeywords = /面试|简历|自我介绍|亮点|反问|问住|被问|盲区|素质模型|跳槽/;
-
-  if (promotionKeywords.test(query) && !interviewKeywords.test(query)) return 'promotion';
-  if (interviewKeywords.test(query) && !promotionKeywords.test(query)) return 'interview';
+  // 框架通用化后：不再硬编码领域关键词，统一返回 'all'（不做分类过滤）。
+  // 调用方可基于自身知识库自行扩展领域分类逻辑。
+  void query;
   return 'all';
 }
 

@@ -66,9 +66,9 @@ describe('GET /api/admin/knowledge', () => {
     mockGetKnowledgeStats.mockResolvedValueOnce({
       total: 608,
       dimension: 1024,
-      byBook: [{ name: '大厂晋升指南', count: 274 }, { name: '面试现场', count: 334 }],
-      byCategory: [{ name: 'promotion', count: 274 }, { name: 'interview', count: 334 }],
-      bySkill: [{ name: '晋升答辩', count: 100 }],
+      byBook: [{ name: 'book-alpha', count: 274 }, { name: 'book-beta', count: 334 }],
+      byCategory: [{ name: 'alpha', count: 274 }, { name: 'beta', count: 334 }],
+      bySkill: [{ name: 'category-alpha', count: 100 }],
     });
     const res = await GET(makeReq('/api/admin/knowledge?action=stats') as unknown as Parameters<typeof GET>[0]);
     expect(res.status).toBe(200);
@@ -76,21 +76,21 @@ describe('GET /api/admin/knowledge', () => {
     expect(body.total).toBe(608);
     expect(body.dimension).toBe(1024);
     expect(body.byBook).toEqual([
-      { name: '大厂晋升指南', count: 274 },
-      { name: '面试现场', count: 334 },
+      { name: 'book-alpha', count: 274 },
+      { name: 'book-beta', count: 334 },
     ]);
   });
 
   it('returns 200 with { results: [...] } when ?action=search&q=...', async () => {
     mockSearchKnowledge.mockResolvedValueOnce([
-      { id: 'x', preview: '晋升答辩', book: 'b', category: 'promotion', skillName: 's', sourcePath: 'sp', docTitle: 'd', sectionTitle: 's', chunkIndex: 0 },
+      { id: 'x', preview: '示例文本', book: 'b', category: 'alpha', skillName: 's', sourcePath: 'sp', docTitle: 'd', sectionTitle: 's', chunkIndex: 0 },
     ]);
-    const res = await GET(makeReq('/api/admin/knowledge?action=search&q=%E6%99%8B%E5%8D%87&limit=10') as unknown as Parameters<typeof GET>[0]);
+    const res = await GET(makeReq('/api/admin/knowledge?action=search&q=%E7%A4%BA%E4%BE%8B&limit=10') as unknown as Parameters<typeof GET>[0]);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.results).toHaveLength(1);
     expect(body.results[0].id).toBe('x');
-    expect(mockSearchKnowledge).toHaveBeenCalledWith(expect.anything(), '晋升', expect.objectContaining({ limit: 10 }));
+    expect(mockSearchKnowledge).toHaveBeenCalledWith(expect.anything(), '示例', expect.objectContaining({ limit: 10 }));
   });
 
   it('returns 200 with { groups: [...] } when ?action=by-book', async () => {
@@ -141,8 +141,8 @@ describe('GET /api/admin/knowledge', () => {
     const sample = (id: string, docTitle: string) => ({
       id,
       preview: '',
-      book: '大厂晋升指南',
-      category: '晋升答辩',
+      book: 'book-alpha',
+      category: 'category-alpha',
       skillName: '',
       topic: '',
       sourcePath: '',
@@ -151,16 +151,16 @@ describe('GET /api/admin/knowledge', () => {
       chunkIndex: 0,
     });
     mockListByGroup.mockResolvedValueOnce([
-      { name: '第10章 优化版', count: 2, sample: sample('c1', '第10章 优化版') },
-      { name: '加餐一 优化版', count: 1, sample: sample('c2', '加餐一 优化版') },
+      { name: 'chapter-10', count: 2, sample: sample('c1', 'chapter-10') },
+      { name: 'chapter-extra-1', count: 1, sample: sample('c2', 'chapter-extra-1') },
     ]);
     const res = await GET(makeReq('/api/admin/knowledge?action=by-chapter&limit=20') as unknown as Parameters<typeof GET>[0]);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.groups).toHaveLength(2);
     expect(body.groups.map((g: { name: string }) => g.name)).toEqual([
-      '第10章 优化版',
-      '加餐一 优化版',
+      'chapter-10',
+      'chapter-extra-1',
     ]);
     expect(body.groups[0].count).toBe(2);
     expect(body.groups[1].count).toBe(1);
@@ -176,8 +176,8 @@ describe('GET /api/admin/knowledge', () => {
     const sample = (id: string, sectionTitle: string) => ({
       id,
       preview: '',
-      book: '大厂晋升指南',
-      category: '晋升答辩',
+      book: 'book-alpha',
+      category: 'category-alpha',
       skillName: '',
       topic: '',
       sourcePath: '',
@@ -186,8 +186,8 @@ describe('GET /api/admin/knowledge', () => {
       chunkIndex: 0,
     });
     mockListByGroup.mockResolvedValueOnce([
-      { name: '晋升 PPT 写作', count: 2, sample: sample('s1', '晋升 PPT 写作') },
-      { name: '晋升流程入门', count: 1, sample: sample('s2', '晋升流程入门') },
+      { name: 'section-alpha', count: 2, sample: sample('s1', 'section-alpha') },
+      { name: 'section-beta', count: 1, sample: sample('s2', 'section-beta') },
     ]);
     const res = await GET(makeReq('/api/admin/knowledge?action=by-section&limit=20') as unknown as Parameters<typeof GET>[0]);
     expect(res.status).toBe(200);
@@ -204,8 +204,8 @@ describe('GET /api/admin/knowledge', () => {
     const sample = (id: string, topic: string) => ({
       id,
       preview: '',
-      book: '面试现场',
-      category: '面试流程',
+      book: 'book-beta',
+      category: 'category-delta',
       skillName: '',
       topic,
       sourcePath: '',
@@ -214,8 +214,8 @@ describe('GET /api/admin/knowledge', () => {
       chunkIndex: 0,
     });
     mockListByGroup.mockResolvedValueOnce([
-      { name: '面试流程总览', count: 2, sample: sample('t1', '面试流程总览') },
-      { name: '面试前准备', count: 1, sample: sample('t2', '面试前准备') },
+      { name: 'topic-alpha', count: 2, sample: sample('t1', 'topic-alpha') },
+      { name: 'topic-beta', count: 1, sample: sample('t2', 'topic-beta') },
     ]);
     const res = await GET(makeReq('/api/admin/knowledge?action=by-topic') as unknown as Parameters<typeof GET>[0]);
     expect(res.status).toBe(200);
@@ -233,27 +233,27 @@ describe('GET /api/admin/knowledge', () => {
     mockGetTopicSummary.mockResolvedValueOnce({
       byBookCategory: [
         {
-          book: '大厂晋升指南',
+          book: 'book-alpha',
           categories: [
-            { category: '晋升答辩', count: 50 },
-            { category: '晋升流程', count: 30 },
+            { category: 'category-alpha', count: 50 },
+            { category: 'category-gamma', count: 30 },
           ],
         },
         {
-          book: '面试现场',
+          book: 'book-beta',
           categories: [
-            { category: '面试流程', count: 80 },
-            { category: '自我介绍', count: 20 },
+            { category: 'category-delta', count: 80 },
+            { category: 'category-beta', count: 20 },
           ],
         },
       ],
       byBook: [
-        { name: '大厂晋升指南', total: 80 },
-        { name: '面试现场', total: 100 },
+        { name: 'book-alpha', total: 80 },
+        { name: 'book-beta', total: 100 },
       ],
       byCategory: [
-        { name: '面试流程', total: 80 },
-        { name: '晋升答辩', total: 50 },
+        { name: 'category-delta', total: 80 },
+        { name: 'category-alpha', total: 50 },
       ],
       genericCount: 0,
     });
@@ -263,11 +263,11 @@ describe('GET /api/admin/knowledge', () => {
     // 关键：验证 byBookCategory 是 2D 矩阵
     expect(Array.isArray(body.byBookCategory)).toBe(true);
     expect(body.byBookCategory).toHaveLength(2);
-    expect(body.byBookCategory[0].book).toBe('大厂晋升指南');
+    expect(body.byBookCategory[0].book).toBe('book-alpha');
     expect(Array.isArray(body.byBookCategory[0].categories)).toBe(true);
-    expect(body.byBookCategory[0].categories[0]).toEqual({ category: '晋升答辩', count: 50 });
-    expect(body.byBookCategory[1].book).toBe('面试现场');
-    expect(body.byBookCategory[1].categories[0]).toEqual({ category: '面试流程', count: 80 });
+    expect(body.byBookCategory[0].categories[0]).toEqual({ category: 'category-alpha', count: 50 });
+    expect(body.byBookCategory[1].book).toBe('book-beta');
+    expect(body.byBookCategory[1].categories[0]).toEqual({ category: 'category-delta', count: 80 });
     // 独立维度也有
     expect(body.byBook).toHaveLength(2);
     expect(body.byCategory).toHaveLength(2);

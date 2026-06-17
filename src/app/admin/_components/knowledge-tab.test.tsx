@@ -8,47 +8,47 @@ const STATS_RESPONSE = {
   total: 608,
   dimension: 1024,
   byBook: [
-    { name: '大厂晋升指南', count: 274 },
-    { name: '面试现场', count: 334 },
+    { name: 'book-alpha', count: 274 },
+    { name: 'book-beta', count: 334 },
   ],
   byCategory: [
-    { name: '晋升答辩', count: 88 },
-    { name: '自我介绍', count: 50 },
+    { name: 'category-alpha', count: 88 },
+    { name: 'category-beta', count: 50 },
   ],
   bySkill: [], // 保留字段，Phase 2D 后已为空
   byChapter: [
-    { name: '大厂晋升指南（第10章优化版）', count: 18 },
-    { name: '大厂晋升指南（加餐一优化版）', count: 12 },
+    { name: 'book-alpha（第10章）', count: 18 },
+    { name: 'book-alpha（加餐一）', count: 12 },
   ],
   bySection: [
-    { name: '加餐一｜晋升等级：不同的职级体系如何对标？', count: 5 },
-    { name: '开篇词｜为什么讲技术人的职场发展？', count: 3 },
+    { name: '加餐一｜主题 alpha', count: 5 },
+    { name: '开篇词｜主题 beta', count: 3 },
   ],
 };
 
 const SAMPLE_HITS = [
   {
     id: 'chunk-1',
-    preview: '晋升答辩要先把故事讲清楚，再讲数据。',
-    book: '大厂晋升指南',
-    category: '晋升答辩',
+    preview: '示例文本一：先把故事讲清楚，再讲数据。',
+    book: 'book-alpha',
+    category: 'category-alpha',
     skillName: '',
-    topic: '晋升答辩的叙事结构',
-    sourcePath: 'book/promotion/10.md',
-    docTitle: '大厂晋升指南（第10章优化版）',
-    sectionTitle: '10.1 答辩叙事',
+    topic: '主题 alpha 的叙事结构',
+    sourcePath: 'book/alpha/10.md',
+    docTitle: 'book-alpha（第10章）',
+    sectionTitle: '10.1 叙事',
     chunkIndex: 0,
   },
   {
     id: 'chunk-2',
-    preview: 'STAR 法则让自我介绍更聚焦。',
-    book: '面试现场',
-    category: '自我介绍',
+    preview: '示例文本二：结构化表达更聚焦。',
+    book: 'book-beta',
+    category: 'category-beta',
     skillName: '',
-    topic: '开场的 30 秒钩子',
-    sourcePath: 'book/interview/02.md',
-    docTitle: '面试现场（第2章优化版）',
-    sectionTitle: '2.1 自我介绍',
+    topic: '开场的结构化钩子',
+    sourcePath: 'book/beta/02.md',
+    docTitle: 'book-beta（第2章）',
+    sectionTitle: '2.1 开场',
     chunkIndex: 1,
   },
 ];
@@ -94,7 +94,7 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     render(<KnowledgeTab />);
 
     // 等待 stats 加载完成 → 表格行出现
-    await screen.findByText('大厂晋升指南（第10章优化版）');
+    await screen.findByText('book-alpha（第10章）');
 
     const bookTab = screen.getByTestId('group-tab-book');
     const categoryTab = screen.getByTestId('group-tab-category');
@@ -108,17 +108,17 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     expect(sectionTab.className).not.toContain('bg-primary');
 
     // 默认 tab 下渲染的是 stats.byChapter 的数据（而不是 byBook）
-    expect(screen.getByText('大厂晋升指南（第10章优化版）')).toBeInTheDocument();
-    expect(screen.getByText('大厂晋升指南（加餐一优化版）')).toBeInTheDocument();
+    expect(screen.getByText('book-alpha（第10章）')).toBeInTheDocument();
+    expect(screen.getByText('book-alpha（加餐一）')).toBeInTheDocument();
     // byBook 的内容不会出现在按章 tab 下
-    expect(screen.queryByText('面试现场')).toBeNull();
+    expect(screen.queryByText('book-beta')).toBeNull();
   });
 
   it('(c) 点击「按分类」切换 active tab，并展示 byCategory 数据', async () => {
     globalThis.fetch = mockFetchOnce(STATS_RESPONSE) as unknown as typeof globalThis.fetch;
 
     render(<KnowledgeTab />);
-    await screen.findByText('大厂晋升指南（第10章优化版）');
+    await screen.findByText('book-alpha（第10章）');
 
     const categoryTab = screen.getByTestId('group-tab-category');
     fireEvent.click(categoryTab);
@@ -128,8 +128,8 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     });
 
     // byCategory 数据出现
-    expect(screen.getByText('晋升答辩')).toBeInTheDocument();
-    expect(screen.getByText('自我介绍')).toBeInTheDocument();
+    expect(screen.getByText('category-alpha')).toBeInTheDocument();
+    expect(screen.getByText('category-beta')).toBeInTheDocument();
 
     // 按章 tab 不再 active
     const chapterTab = screen.getByTestId('group-tab-docTitle');
@@ -142,7 +142,7 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     } as unknown as Response);
     globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
 
-    fireEvent.click(screen.getByText('晋升答辩'));
+    fireEvent.click(screen.getByText('category-alpha'));
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalled();
@@ -164,11 +164,11 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     }) as unknown as typeof globalThis.fetch;
 
     render(<KnowledgeTab />);
-    await screen.findByText('大厂晋升指南（第10章优化版）');
+    await screen.findByText('book-alpha（第10章）');
 
     // 触发搜索
     const input = screen.getByPlaceholderText(/关键词/);
-    fireEvent.change(input, { target: { value: '晋升' } });
+    fireEvent.change(input, { target: { value: '示例' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
 
     // 等待搜索结果渲染
@@ -178,11 +178,11 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     // 每条结果都有 `book / doc_title` 头部
     const topicLines = screen.getAllByTestId('search-hit-topic');
     expect(topicLines).toHaveLength(2);
-    expect(topicLines[0]!.textContent).toContain('大厂晋升指南');
-    expect(topicLines[0]!.textContent).toContain('大厂晋升指南（第10章优化版）');
+    expect(topicLines[0]!.textContent).toContain('book-alpha');
+    expect(topicLines[0]!.textContent).toContain('book-alpha（第10章）');
     expect(topicLines[0]!.textContent).toContain('/');
-    expect(topicLines[1]!.textContent).toContain('面试现场');
-    expect(topicLines[1]!.textContent).toContain('面试现场（第2章优化版）');
+    expect(topicLines[1]!.textContent).toContain('book-beta');
+    expect(topicLines[1]!.textContent).toContain('book-beta（第2章）');
 
     // 头部使用 mono 字体
     expect(topicLines[0]!.className).toContain('font-mono');
@@ -199,15 +199,15 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     });
 
     render(<KnowledgeTab />);
-    await screen.findByText('大厂晋升指南（第10章优化版）');
+    await screen.findByText('book-alpha（第10章）');
 
     const input = screen.getByPlaceholderText(/关键词/);
-    fireEvent.change(input, { target: { value: '晋升' } });
+    fireEvent.change(input, { target: { value: '示例' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
 
     const subtitles = await screen.findAllByTestId('search-hit-subtitle');
     expect(subtitles).toHaveLength(2);
-    expect(subtitles[0]!.textContent).toBe('晋升答辩的叙事结构');
-    expect(subtitles[1]!.textContent).toBe('开场的 30 秒钩子');
+    expect(subtitles[0]!.textContent).toBe('主题 alpha 的叙事结构');
+    expect(subtitles[1]!.textContent).toBe('开场的结构化钩子');
   });
 });
