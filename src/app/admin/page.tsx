@@ -14,6 +14,8 @@ import {
   LogOut,
   Lock,
   User,
+  BarChart3,
+  FlaskConical,
 } from 'lucide-react';
 import DashboardTab from './_components/dashboard-tab';
 import KnowledgeTab from './_components/knowledge-tab';
@@ -23,6 +25,8 @@ import ModelTab from './_components/model-tab';
 import RAGTab from './_components/rag-tab';
 import MetadataTab from './_components/metadata-tab';
 import RuntimeConfigTab from './_components/runtime-config-tab';
+import EvalDashboardTab from './_components/eval-dashboard-tab';
+import ExperimentsTab from './_components/experiments-tab';
 import type { TabKey } from './_lib/types';
 
 const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
@@ -34,6 +38,8 @@ const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }>
   { key: 'rag', label: 'RAG 参数', icon: SlidersHorizontal },
   { key: 'metadata', label: '分类', icon: Tags },
   { key: 'runtime-config', label: 'API Keys', icon: KeyRound },
+  { key: 'eval-dashboard', label: '评估看板', icon: BarChart3 },
+  { key: 'experiments', label: '实验管理', icon: FlaskConical },
 ];
 
 // ===== 阶段 3：鉴权迁后端 =====
@@ -294,6 +300,12 @@ export default function AdminPage() {
           </TabsContent>
           <TabsContent value="runtime-config">
             <RuntimeConfigTab />
+          </TabsContent>
+          <TabsContent value="eval-dashboard">
+            <EvalDashboardTab />
+          </TabsContent>
+          <TabsContent value="experiments">
+            <ExperimentsTab />
           </TabsContent>
         </Tabs>
       </main>

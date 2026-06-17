@@ -695,6 +695,64 @@ export async function POST(request: NextRequest) {
             } : {})
           })}\n\n`);
 
+        // ===== Loop Engineering M2: 埋点地基 (1.x - request_logs + eval_jobs 入队) =====
+        // 只在服务端写日志, 不阻塞流
+        void (async () => {
+          try {
+            const { randomUUID } = await import('node:crypto');
+            const { insertRequestLog } = await import('@/lib/db/request-logger');
+            const { enqueueEvalJob } = await import('@/lib/db/eval-jobs');
+            const requestId = randomUUID();
+            const latencyMs = Date.now() - streamStartTime;
+            // I4 修复: 存真实进 LLM 的 RAG 拼接文本, 不是 doc_ids
+            const contextText = ragContext || '';
+            // 计算 has_recall (空召回检测)
+            const hasRecall = ragResults && ragResults.length > 0 && contextText.length > 0 ? 1 : 0;
+            // 计算 cost (粗略: input 0.0008/1k, output 0.002/1k token)
+            const inputTokens = Math.ceil((contextText.length + latestUserMessage.length) / 4);
+            const outputTokens = Math.ceil(fullOutput.length / 4);
+            const cost = (inputTokens * 0.0008 + outputTokens * 0.002) / 1000;
+            insertRequestLog({
+              request_id: requestId,
+              session_id: null,
+              query: latestUserMessage,
+              answer: fullOutput,
+              context_text: contextText,
+              context_doc_ids: (ragResults as RAGResult[] | undefined)?.map(r => r.id).join(',') ?? null,
+              has_recall: hasRecall,
+              model_id: modelId,
+              prompt_version: null,
+              experiment_id: null,
+              variant: 'control',
+              total_tokens: inputTokens + outputTokens,
+              prompt_tokens: inputTokens,
+              completion_tokens: outputTokens,
+              cost,
+              rag_latency_ms: null,
+              llm_latency_ms: latencyMs,
+              confidence_level: confidence.level,
+              hallucination_detected: hallucinationResult ? (hallucinationResult.faithful ? 0 : 1) : 0,
+              input_risk_level: 'safe',
+              output_safe: outputSafety.safe ? 1 : 0,
+              status: 'success',
+              error_message: null,
+              metadata: JSON.stringify({ confidence_score: confidence.score, transfer_to_human: shouldTransferToHuman }),
+            });
+            // RLS 抽样: 10% 概率 或 空召回强制入队
+            if (Math.random() < 0.10 || hasRecall === 0) {
+              enqueueEvalJob({
+                request_id: requestId,
+                priority: hasRecall === 0 ? 10 : 5, // 空召回高优先级
+                max_retries: 3,
+                metadata: JSON.stringify({ sampled_reason: hasRecall === 0 ? 'empty_recall' : 'random' }),
+              });
+            }
+          } catch (err) {
+            // 埋点失败不能影响用户, 静默记录
+            console.warn('[Chat] 埋点失败:', err);
+          }
+        })();
+
         safeEnqueue(controller, 'data: [DONE]\n\n');
         void recordChatAPICall(Date.now() - streamStartTime);
         controller.close();

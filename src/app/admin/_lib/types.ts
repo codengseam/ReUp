@@ -52,5 +52,17 @@ export interface ActivityLog {
  * - rag: RAG 参数
  * - metadata: 分类（L2 浏览，19 个细分类 + 1 个通用兜底）
  * - runtime-config: API Keys（管理 DashScope / Zhipu 密钥，运行时热替换）
+ * - eval-dashboard: 评估看板 (M2: RAGAS 指标 + 队列状态)
+ * - experiments: 实验管理 (M3: HITL 半自动闭环)
  */
-export type TabKey = 'dashboard' | 'knowledge' | 'framework-skills' | 'prompt' | 'model' | 'rag' | 'metadata' | 'runtime-config';
+export type TabKey =
+  | 'dashboard'
+  | 'knowledge'
+  | 'framework-skills'
+  | 'prompt'
+  | 'model'
+  | 'rag'
+  | 'metadata'
+  | 'runtime-config'
+  | 'eval-dashboard'
+  | 'experiments';
