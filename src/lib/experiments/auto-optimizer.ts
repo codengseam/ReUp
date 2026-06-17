@@ -205,14 +205,14 @@ export function applySuggestion(suggestion: OptimizationSuggestion, approvedBy: 
  * 这是一个 meta-metric, 用 Pearson correlation between judge and human (golden set)
  */
 export function judgeConsistencyScore(): { correlation: number; sample: number } {
-  // 复用 calibrateJudge 一样的逻辑, 但只取一个简化值
+  // 修复 N+1 + 缺 idx_request_logs_query 索引: 用单次 join + GROUP BY
   const db = getDb();
   const rows = db.prepare(`
-    SELECT g.expected_faithfulness AS h,
-           CAST((SELECT AVG(er.faithfulness_score) FROM eval_results er
-                JOIN request_logs rl ON er.request_id = rl.request_id
-                WHERE rl.query = g.query) AS REAL) AS j
+    SELECT g.expected_faithfulness AS h, AVG(er.faithfulness_score) AS j
     FROM golden_tests g
+    LEFT JOIN request_logs rl ON rl.query = g.query
+    LEFT JOIN eval_results er ON er.request_id = rl.request_id
+    GROUP BY g.id, g.expected_faithfulness
     LIMIT 50
   `).all() as Array<{ h: number; j: number | null }>;
 

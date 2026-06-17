@@ -79,3 +79,63 @@ export function isAssignmentStable(
   }
   return true;
 }
+
+import { getActivePrompt, getExperimentPrompts, type PromptVersion } from '@/lib/db/prompt-versions';
+
+export interface PromptPick {
+  prompt_version: string | null;
+  experiment_id: string | null;
+  variant: 'control' | string;
+  in_experiment: boolean;
+  prompt_content: string | null;
+}
+
+/**
+ * chat 调用: 根据 user_id 决定使用哪个 prompt 版本
+ * - 若无 active prompt → 返回 null
+ * - 若无实验 prompt → 全 control
+ * - 若有实验 prompt → 用稳定哈希分桶
+ *
+ * 这是 C-5 修复: 之前 chat 写死 variant='control', A/B 数据流断裂
+ */
+export function pickPromptForUser(userId: string): PromptPick {
+  const active = getActivePrompt();
+  const experiments = getExperimentPrompts();
+  const controlVersion = active?.version ?? null;
+
+  if (experiments.length === 0) {
+    return {
+      prompt_version: controlVersion,
+      experiment_id: null,
+      variant: 'control',
+      in_experiment: false,
+      prompt_content: active?.prompt_content ?? null,
+    };
+  }
+
+  // 取第一个 active experiment (实际应用可支持多实验轮转, 当前单实验)
+  const exp = experiments[0];
+  const assignment = assignVariant(userId, {
+    experiment_id: exp.experiment_id ?? exp.version,
+    variants: [{ name: exp.version, traffic: exp.experiment_traffic }],
+  });
+
+  if (assignment.variant === 'control') {
+    return {
+      prompt_version: controlVersion,
+      experiment_id: exp.experiment_id,
+      variant: 'control',
+      in_experiment: false,
+      prompt_content: active?.prompt_content ?? null,
+    };
+  }
+
+  // 实验流量: 用 experiment 版本的 prompt
+  return {
+    prompt_version: exp.version,
+    experiment_id: exp.experiment_id,
+    variant: assignment.variant,
+    in_experiment: true,
+    prompt_content: exp.prompt_content,
+  };
+}

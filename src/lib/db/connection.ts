@@ -20,10 +20,13 @@ export function getDb(): Database.Database {
   mkdirSync(DB_DIR, { recursive: true });
   const db = new Database(DB_PATH);
   // 性能与并发: WAL 模式, NORMAL 同步, 5MB 内存 cache
+  // busy_timeout: 5s 内若遇 SQLITE_BUSY 自动重试, 避免 chat 进程与 worker 进程互踩
+  // (Critical 修复: 单写者冲突)
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('cache_size = -5000');
   db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
   // 初始化 schema (IF NOT EXISTS 幂等)
   db.exec(SCHEMA);
   _db = db;

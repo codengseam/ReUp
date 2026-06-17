@@ -1,9 +1,13 @@
 // src/app/api/admin/experiments/route.ts
 // M3: 实验管理 API - 列出 / 详情 / 决策 / 应用 (HITL)
+// 修复:
+// - requireAdmin 收紧 (env 缺失不开放)
+// - force_rollback 必须带 approved_by + reason
+// - 500 错误统一 generic
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db/connection';
-import { verifyCookie } from '@/lib/admin-auth';
+import { requireAdmin, unauthorizedResponse, internalErrorResponse } from '@/lib/admin-auth-helper';
 import {
   collectExperimentStats,
   suggestOptimization,
@@ -13,16 +17,6 @@ import {
 import { checkShouldRollback, executeRollback } from '@/lib/experiments/rollback';
 
 export const runtime = 'nodejs';
-
-const ADMIN_COOKIE = 'boss_admin_session';
-const SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'dev-only-insecure-secret-change-me-please-32chars';
-
-async function requireAdmin(request: NextRequest): Promise<boolean> {
-  if (!process.env.ADMIN_SESSION_SECRET) return true;
-  const cookie = request.cookies.get(ADMIN_COOKIE)?.value;
-  if (!cookie) return false;
-  return verifyCookie(cookie, SESSION_SECRET);
-}
 
 interface ListResponse {
   experiments: Array<{
@@ -37,16 +31,13 @@ interface ListResponse {
 }
 
 export async function GET(request: NextRequest) {
-  if (!(await requireAdmin(request))) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
+  if (!requireAdmin(request)) return unauthorizedResponse();
   try {
     const db = getDb();
     const url = new URL(request.url);
     const experimentId = url.searchParams.get('id');
 
     if (experimentId) {
-      // 详情 + 建议
       const stats = collectExperimentStats(experimentId);
       if (!stats) {
         return NextResponse.json({ error: 'experiment not found' }, { status: 404 });
@@ -64,7 +55,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ stats, suggestion, rollback_check: rollbackCheck });
     }
 
-    // 列表: 所有实验版本 + 元数据
     const experiments = db.prepare(`
       SELECT id, version, experiment_id, experiment_traffic AS traffic,
              is_active, is_experiment, created_at
@@ -75,16 +65,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ experiments });
   } catch (error) {
-    const message = error instanceof Error ? error.message : '获取实验列表失败';
-    console.error('[Admin Experiments API]', message, error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return internalErrorResponse('[Admin Experiments API]', error);
   }
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await requireAdmin(request))) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
+  if (!requireAdmin(request)) return unauthorizedResponse();
   try {
     const body = await request.json() as {
       action: 'apply_suggestion' | 'force_rollback';
@@ -95,7 +81,8 @@ export async function POST(request: NextRequest) {
     };
 
     if (body.action === 'apply_suggestion') {
-      if (!body.suggestion || !body.approved_by) {
+      // I-1 修复: approved_by 必填, 不接受空字符串
+      if (!body.suggestion || !body.approved_by?.trim()) {
         return NextResponse.json({ error: '缺少 suggestion 或 approved_by' }, { status: 400 });
       }
       const result = applySuggestion(body.suggestion, body.approved_by);
@@ -103,20 +90,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'force_rollback') {
+      // I-1 修复: force_rollback 必须带 approved_by + reason
       if (!body.experiment_id) {
         return NextResponse.json({ error: '缺少 experiment_id' }, { status: 400 });
       }
-      const result = executeRollback(
-        body.experiment_id,
-        body.reason ?? `manual rollback by ${body.approved_by ?? 'unknown'}`,
-      );
+      if (!body.approved_by?.trim()) {
+        return NextResponse.json({ error: 'force_rollback 必须带 approved_by (审计必填)' }, { status: 400 });
+      }
+      if (!body.reason?.trim()) {
+        return NextResponse.json({ error: 'force_rollback 必须带 reason' }, { status: 400 });
+      }
+      const result = executeRollback(body.experiment_id, `manual rollback by ${body.approved_by}: ${body.reason}`);
       return NextResponse.json(result);
     }
 
     return NextResponse.json({ error: `unknown action: ${body.action}` }, { status: 400 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : '执行操作失败';
-    console.error('[Admin Experiments POST]', message, error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return internalErrorResponse('[Admin Experiments POST]', error);
   }
 }

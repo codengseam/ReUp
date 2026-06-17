@@ -153,11 +153,13 @@ export function checkShouldRollback(input: RollbackCheckInput): RollbackCheckRes
 
 /**
  * 执行回滚: 把 prompt_versions 表中实验的 is_active=0, is_experiment=0
- * 同时把 control 重新设为 is_active=1
+ * 同时把 control 重新设为 is_active=1 (C-5 修复: 防止出现"无 active prompt"状态)
+ * 用事务保证原子性
  */
 export function executeRollback(experimentId: string, reason: string): {
   rolled_back: boolean;
   affected_versions: string[];
+  control_reactivated: string | null;
 } {
   const db = getDb();
   const variants = db
@@ -165,18 +167,46 @@ export function executeRollback(experimentId: string, reason: string): {
     .all(experimentId) as Array<{ version: string }>;
 
   if (variants.length === 0) {
-    return { rolled_back: false, affected_versions: [] };
+    return { rolled_back: false, affected_versions: [], control_reactivated: null };
   }
 
+  let controlReactivated: string | null = null;
   const tx = db.transaction(() => {
-    // 关闭所有实验变体
+    // 1) 关闭所有实验变体的 is_active (防止之前误激活)
+    // 2) 关闭所有实验变体的 is_experiment + experiment_traffic
     db.prepare(
-      'UPDATE prompt_versions SET is_experiment = 0, experiment_traffic = 0 WHERE experiment_id = ?',
+      `UPDATE prompt_versions
+       SET is_experiment = 0, experiment_traffic = 0, is_active = 0
+       WHERE experiment_id = ?`,
     ).run(experimentId);
-    // 记录回滚原因 (写到 feedback? 暂时写到一个新表: 暂用 eval_results 字段 hack, 实际生产应建 audit_log)
-    console.log(`[Rollback] experiment=${experimentId} reason=${reason}`);
+
+    // 3) 找一个 control 版本 (同 experiment_id 下非实验) 重新激活
+    //    优先: 同 experiment_id 的非实验版
+    //    兜底: 全表最新非实验版
+    const control = db
+      .prepare(
+        `SELECT version FROM prompt_versions
+         WHERE is_experiment = 0 AND is_active = 0
+         ORDER BY (experiment_id = ?) DESC, created_at DESC
+         LIMIT 1`,
+      )
+      .get(experimentId) as { version: string } | undefined;
+
+    if (control) {
+      // 先清空所有 active (避免多个 active 冲突)
+      db.prepare(`UPDATE prompt_versions SET is_active = 0`).run();
+      db.prepare(`UPDATE prompt_versions SET is_active = 1 WHERE version = ?`).run(control.version);
+      controlReactivated = control.version;
+    }
+
+    // 4) 记录回滚原因 (审计)
+    console.log(`[Rollback] experiment=${experimentId} reason=${reason} control=${controlReactivated}`);
   });
   tx();
 
-  return { rolled_back: true, affected_versions: variants.map(v => v.version) };
+  return {
+    rolled_back: true,
+    affected_versions: variants.map(v => v.version),
+    control_reactivated: controlReactivated,
+  };
 }

@@ -81,11 +81,19 @@ describe('ragas metrics (with mocked LLM)', () => {
     expect(result.score).toBe(0.7);
   });
 
-  it('evaluateFaithfulness with empty claims array returns 1 (vacuous truth)', async () => {
+  it('evaluateFaithfulness with empty claims array returns -1 (I1: no more vacuous truth)', async () => {
     mockInvoke.mockResolvedValueOnce({ content: JSON.stringify({ claims: [] }) });
     const result = await evaluateFaithfulness('answer', 'context');
-    expect(result.score).toBe(1);
+    expect(result.score).toBe(-1);
     expect(result.claims).toHaveLength(0);
+    expect(result.error).toBeTruthy();
+  });
+
+  it('evaluateFaithfulness with invalid JSON returns -1 (I1)', async () => {
+    mockInvoke.mockResolvedValueOnce({ content: 'not valid json' });
+    const result = await evaluateFaithfulness('answer', 'context');
+    expect(result.score).toBe(-1);
+    expect(result.error).toContain('JSON');
   });
 
   it('handles empty input gracefully (no LLM call)', async () => {

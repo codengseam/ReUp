@@ -100,8 +100,13 @@ ${answer}
     );
     const parsed = extractJson<{ claims?: FaithfulnessClaim[] }>(response.content);
     const claims = parsed?.claims ?? [];
+    // I1 修复: 解析失败/空 claims 时 score=null, 不再静默给 1.0 (vacuous truth)
     if (claims.length === 0) {
-      return { score: 1, claims: [] };
+      return {
+        score: -1,
+        claims: [],
+        error: parsed ? 'empty claims array' : 'JSON parse failed',
+      };
     }
     const supported = claims.filter(c => c.supported).length;
     return { score: supported / claims.length, claims };
