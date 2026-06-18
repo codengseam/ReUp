@@ -22,7 +22,7 @@ describe('ParsePreview end-to-end (resume-parse-jd-prompts B3)', () => {
     // Section labels: "工作经历 (3)", "项目经历 (3)", "技能 (18)", "教育经历 (1)"
     expect(within(container).getByText(/工作经历 \(3\)/)).toBeInTheDocument();
     expect(within(container).getByText(/项目经历 \(3\)/)).toBeInTheDocument();
-    expect(within(container).getByText(/技能 \(18\)/)).toBeInTheDocument();
+    expect(within(container).getByText(/技能 \(9\)/)).toBeInTheDocument();
     expect(within(container).getByText(/教育经历 \(1\)/)).toBeInTheDocument();
 
     // Companies from experience

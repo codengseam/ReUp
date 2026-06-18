@@ -30,7 +30,7 @@ function mockAnalyzeSuccess(): ReturnType<typeof vi.fn> {
         keywords: [], raw: '前端 JD',
       },
       diagnostics: { issues: [], summary: { total: 0, bySeverity: { high: 0, medium: 0, low: 0 } } },
-      atsResult: { jdKeywords: [{ term: 'react', weight: 1 }], coverage: { hits: 1, total: 1, percentage: 100 }, missing: [] },
+      ats: { jdKeywords: [{ term: 'react', weight: 1 }], coverage: { hits: 1, total: 1, percentage: 100 }, missing: [] },
     }),
   });
   vi.stubGlobal('fetch', fetchMock);

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-16T01:17:38.359Z",
+  "updatedAt": "2026-06-18T01:49:30.366Z",
   "defaultModelId": "qwen3.6-plus-2026-04-02",
   "customModels": [],
   "ragParams": {
@@ -12,5 +12,11 @@
     "cacheTTL": 15,
     "confidenceHighThreshold": 0.32,
     "confidenceMediumThreshold": 0.1
+  },
+  "prompt": "CUSTOM SYSTEM PROMPT",
+  "resume": {
+    "starPrompt": "CUSTOM STAR",
+    "atsPrompt": "CUSTOM ATS",
+    "matchPrompt": "MATCH-V1"
   }
 }

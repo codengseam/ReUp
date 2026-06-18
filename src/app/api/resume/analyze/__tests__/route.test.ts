@@ -2,11 +2,38 @@
 // @vitest-environment node
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import PDFDocumentImport from 'pdfkit';
 import { POST } from '../route';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+type PdfDoc = {
+  on(event: 'data', cb: (chunk: Buffer) => void): unknown;
+  on(event: 'end', cb: () => void): unknown;
+  on(event: 'error', cb: (err: Error) => void): unknown;
+  text(content: string): unknown;
+  end(): unknown;
+};
+const PDFDocument = PDFDocumentImport as unknown as new () => PdfDoc;
+
+function renderPdf(text: string): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    const end = new Promise<Buffer>((r) => doc.on('end', () => r(Buffer.concat(chunks))));
+    doc.on('error', reject);
+    doc.text(text);
+    doc.end();
+    end.then((b) => {
+      const ab = new ArrayBuffer(b.length);
+      new Uint8Array(ab).set(b);
+      resolve(ab);
+    }, reject);
+  });
+}
 
 function makeRequest(form: FormData): Request {
   return new Request('http://localhost:8080/api/resume/analyze', {
@@ -72,6 +99,59 @@ describe('POST /api/resume/analyze', () => {
     expect(body.ats.jdKeywords.length).toBeGreaterThan(0);
     expect(body.match.priorities.length).toBe(3);
     expect(body.elapsed).toBeTypeOf('number');
+  });
+
+  it('analyzes a PDF resume without JD and returns diagnostics', async () => {
+    const resumeText =
+      '张辰\n高级测试开发工程师\nPython Pytest MySQL Linux\n字节跳动 业务负责人 2022-至今\n搭建接口自动化体系';
+    const pdfBytes = await renderPdf(resumeText);
+    const fd = new FormData();
+    fd.append('resumeFile', new File([pdfBytes], 'resume.pdf', { type: 'application/pdf' }));
+    const res = await POST(makeRequest(fd) as unknown as Parameters<typeof POST>[0]);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.diagnostics).toBeDefined();
+    expect(body.diagnostics.summary).toBeDefined();
+    expect(body.ats).toBeNull();
+    expect(body.match).toBeNull();
+    expect(body.elapsed).toBeTypeOf('number');
+  });
+
+  it('analyzes a PDF resume with JD text and returns ATS + match', async () => {
+    const resumeText =
+      '张辰\n高级测试开发工程师\nPython Pytest MySQL Linux\n字节跳动 业务负责人 2022-至今\n搭建接口自动化体系';
+    const jdText =
+      '招聘高级测试开发工程师。熟悉 Python、Pytest、MySQL、接口自动化。有 Kubernetes 经验者优先。';
+    const pdfBytes = await renderPdf(resumeText);
+    const fd = new FormData();
+    fd.append('resumeFile', new File([pdfBytes], 'resume.pdf', { type: 'application/pdf' }));
+    fd.append('jdText', jdText);
+    const res = await POST(makeRequest(fd) as unknown as Parameters<typeof POST>[0]);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.diagnostics).toBeDefined();
+    expect(body.ats).not.toBeNull();
+    expect(body.match).not.toBeNull();
+    expect(body.ats.coverage).toBeDefined();
+    expect(body.ats.jdKeywords.length).toBeGreaterThan(0);
+    expect(body.match.priorities.length).toBe(3);
+    expect(body.elapsed).toBeTypeOf('number');
+  });
+
+  it('falls back to file extension when PDF MIME type is empty', async () => {
+    const resumeText =
+      '张辰\n高级测试开发工程师\nPython Pytest MySQL Linux\n字节跳动 业务负责人 2022-至今\n搭建接口自动化体系';
+    const pdfBytes = await renderPdf(resumeText);
+    const fd = new FormData();
+    // Some browsers/servers send an empty type for PDF uploads.
+    fd.append('resumeFile', new File([pdfBytes], 'resume.pdf', { type: '' }));
+    const res = await POST(makeRequest(fd) as unknown as Parameters<typeof POST>[0]);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.diagnostics).toBeDefined();
   });
 
   it('returns 400 when file is too large', async () => {

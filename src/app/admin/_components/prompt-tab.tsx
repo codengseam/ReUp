@@ -1,71 +1,25 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, RotateCcw, Check, InfoIcon } from 'lucide-react';
+import { Save, RotateCcw, Check, InfoIcon, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DEFAULT_SYSTEM_PROMPT } from '../_lib/constants';
-import { DEFAULT_MATCH_REPORT_PROMPT } from '@/features/resume/match';
-import { DEFAULT_ATS_KEYWORD_SYSTEM } from '@/features/resume/ats';
+import { getAllPromptSpecs, type PromptSpec } from '@/lib/prompts/registry';
 import { useDebouncedCallback } from '@/hooks/use-debounce';
 
 const CONFIG_API = '/api/admin/config';
+const VERSIONS_API = '/api/admin/prompt-versions';
 
-// Default for the STAR (resume bullet rewriter) system prompt is the empty
-// string — the actual default lives in `prompts/star.ts` and is a complex
-// multi-block system prompt that injects few-shot examples and the 8 Skills
-// list. Importing the system string here would re-implement that logic and
-// would drift over time. Admins can still reset to the built-in prompt by
-// clearing the field (an empty custom prompt falls through to the default
-// at runtime). For convenience we surface a one-line tip in the UI.
+type PromptVersion = {
+  id: number;
+  version: string;
+  prompt_hash: string;
+  change_description: string | null;
+  author: string | null;
+  is_active: number;
+  created_at: number;
+};
 
-type SubTab = 'system' | 'star' | 'ats' | 'match';
-
-interface SubTabSpec {
-  key: SubTab;
-  configKey: string;
-  label: string;
-  description: string;
-  defaultPrompt: string;
-  /** True when the default prompt is large / depends on runtime data
-   *  (skills, examples) and resetting to the actual default requires a
-   *  reload rather than an inline copy. The UI shows a different tip. */
-  defaultIsRuntime: boolean;
-}
-
-const SUB_TABS: SubTabSpec[] = [
-  {
-    key: 'system',
-    configKey: 'prompt',
-    label: '系统主提示词',
-    description: '控制 ReUp 聊天机器人的角色与行为（资深 HR + 总裁视角）',
-    defaultPrompt: DEFAULT_SYSTEM_PROMPT,
-    defaultIsRuntime: false,
-  },
-  {
-    key: 'star',
-    configKey: 'resume.starPrompt',
-    label: '简历 STAR 改写',
-    description: 'STAR 法则改写简历 bullet 时的系统提示词',
-    defaultPrompt: '',
-    defaultIsRuntime: true,
-  },
-  {
-    key: 'ats',
-    configKey: 'resume.atsPrompt',
-    label: '简历 JD 关键词',
-    description: '从 JD 中抽取关键词的 LLM 系统提示词',
-    defaultPrompt: DEFAULT_ATS_KEYWORD_SYSTEM,
-    defaultIsRuntime: false,
-  },
-  {
-    key: 'match',
-    configKey: 'resume.matchPrompt',
-    label: '简历匹配报告',
-    description: '生成简历 vs JD 匹配报告（优势/短板/优先级）的系统提示词',
-    defaultPrompt: DEFAULT_MATCH_REPORT_PROMPT,
-    defaultIsRuntime: false,
-  },
-];
+const SUB_TABS = getAllPromptSpecs();
 
 export default function PromptTab() {
   return (
@@ -73,7 +27,7 @@ export default function PromptTab() {
       <div className="mb-6">
         <h2 className="text-xl font-bold text-foreground">提示词管理</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          编辑系统提示词与简历相关提示词（STAR / ATS / Match），控制 AI 的角色与行为
+          编辑系统提示词与简历相关提示词（STAR / ATS / Match），控制 AI 的角色与行为。保存时会自动在 prompt_versions 表中注册一个新版本。
         </p>
       </div>
       <Tabs defaultValue="system">
@@ -94,12 +48,14 @@ export default function PromptTab() {
   );
 }
 
-function PromptEditor({ spec }: { spec: SubTabSpec }) {
+function PromptEditor({ spec }: { spec: PromptSpec }) {
   const [prompt, setPrompt] = useState<string>(spec.defaultPrompt);
   const [localPrompt, setLocalPrompt] = useState<string>(spec.defaultPrompt);
   const localPromptRef = useRef<string>(spec.defaultPrompt);
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [versions, setVersions] = useState<PromptVersion[]>([]);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -130,6 +86,18 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
+
+  const loadVersions = async () => {
+    try {
+      const res = await fetch(`${VERSIONS_API}?key=${encodeURIComponent(spec.key)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data.all) ? (data.all as PromptVersion[]) : [];
+      setVersions(list.slice(0, 5));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const persistToServer = async (value: string) => {
     try {
@@ -165,7 +133,7 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
     setSaved(true);
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
-    toast.success('提示词已保存到服务端');
+    toast.success('提示词已保存到服务端并已注册版本');
   };
 
   const handleReset = () => {
@@ -176,9 +144,37 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
     setLocalPrompt(next);
     localPromptRef.current = next;
     void persistToServer(next);
-    toast.success(spec.defaultIsRuntime
-      ? '已清空自定义提示词（将回落到内置默认）'
-      : '已恢复默认提示词');
+    toast.success('已恢复默认提示词');
+  };
+
+  const handleRestoreVersion = async (version: string) => {
+    if (!confirm(`确定激活版本 ${version}？当前未保存的修改将丢失。`)) return;
+    try {
+      const res = await fetch(VERSIONS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'activate', version, prompt_key: spec.key }),
+      });
+      if (!res.ok) throw new Error('activate failed');
+      // 激活后重新加载生效配置
+      const getRes = await fetch(`${CONFIG_API}?key=${encodeURIComponent(spec.configKey)}`);
+      if (getRes.ok) {
+        const data = await getRes.json();
+        const restored = typeof data.customPrompt === 'string' ? data.customPrompt : spec.defaultPrompt;
+        setPrompt(restored);
+        setLocalPrompt(restored);
+        localPromptRef.current = restored;
+      }
+      toast.success(`已激活版本 ${version}`);
+      void loadVersions();
+    } catch {
+      toast.error('版本激活失败');
+    }
+  };
+
+  const toggleVersions = () => {
+    if (!versionsOpen) void loadVersions();
+    setVersionsOpen((v) => !v);
   };
 
   const outline = (localPrompt ?? '')
@@ -196,12 +192,21 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
         <div className="flex gap-2">
           <button
             type="button"
+            onClick={toggleVersions}
+            data-testid={`prompt-versions-${spec.key}`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-white"
+          >
+            <History className="w-3.5 h-3.5" />
+            版本历史
+          </button>
+          <button
+            type="button"
             onClick={handleReset}
             data-testid={`prompt-reset-${spec.key}`}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-white"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            {spec.defaultIsRuntime ? '清空（用内置默认）' : '恢复默认'}
+            恢复默认
           </button>
           <button
             type="button"
@@ -265,13 +270,38 @@ function PromptEditor({ spec }: { spec: SubTabSpec }) {
             )}
           </div>
 
+          {versionsOpen && (
+            <div className="bg-white border border-border rounded-xl p-4 shadow-sm" data-testid={`prompt-version-list-${spec.key}`}>
+              <h4 className="text-xs font-semibold text-foreground mb-3">最近版本</h4>
+              {versions.length === 0 ? (
+                <p className="text-xs text-muted-foreground">暂无历史版本</p>
+              ) : (
+                <ul className="space-y-2">
+                  {versions.map((v) => (
+                    <li key={v.id} className="flex items-center justify-between text-xs">
+                      <span className="truncate max-w-[140px]" title={v.version}>
+                        {v.version}
+                        {v.is_active ? <span className="ml-1 text-green-600">●</span> : null}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreVersion(v.version)}
+                        className="text-primary hover:underline"
+                      >
+                        激活
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
             <div className="flex gap-2">
               <InfoIcon className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-600 leading-relaxed">
-                {spec.defaultIsRuntime
-                  ? 'STAR 改写提示词默认会注入 8 Skills 摘要和 few-shot 示例，运行时由代码拼接。留空时自动回落到内置默认。'
-                  : '保存后的提示词存储在服务端，所有用户共享。支持完整的 Markdown 格式、指令结构和代码块。保存后立即生效。'}
+                保存后的提示词存储在服务端，所有用户共享。支持完整的 Markdown 格式、指令结构和代码块。保存时会在 prompt_versions 表中注册一个新版本，方便后续审计与回滚。
               </p>
             </div>
           </div>

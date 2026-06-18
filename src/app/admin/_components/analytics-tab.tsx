@@ -123,7 +123,7 @@ export default function AnalyticsTab() {
       data.starRewrites +
       data.interviewSessions +
       data.transcriptUploads +
-      (data.exports.pdf + data.exports.docx + data.exports.md)
+      ((data.exports?.pdf ?? 0) + (data.exports?.docx ?? 0) + (data.exports?.md ?? 0))
     );
   }, [data]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Database, RefreshCw, Search, BookOpen, FolderTree, Sparkles,
   Loader2, FileText, ChevronDown, ChevronRight, BookText, Heading2,
@@ -63,7 +63,11 @@ function pickGroups(stats: KnowledgeStats | null, key: GroupTab): Array<{ name: 
   }
 }
 
-export default function KnowledgeTab() {
+interface KnowledgeTabProps {
+  initialFilter?: { group: GroupTab; name: string; book?: string } | null;
+}
+
+export default function KnowledgeTab({ initialFilter }: KnowledgeTabProps = {}) {
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -141,7 +145,25 @@ export default function KnowledgeTab() {
     }
   };
 
-  // 展开某分组：搜索该 group name 作为 query（与旧实现保持一致）
+  // 按分组拉取 chunk，支持 metadata 跳转时传入 book 过滤
+  const loadGroupChunks = useCallback(
+    async (name: string, group: GroupTab, bookOverride?: string) => {
+      const params = new URLSearchParams({
+        action: 'search',
+        q: name,
+        limit: '10',
+      });
+      if (group === 'book') params.set('book', name);
+      if (group === 'category') params.set('category', name);
+      if (bookOverride) params.set('book', bookOverride);
+      const res = await fetch(`${KNOWLEDGE_API}?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '加载分组 chunk 失败');
+      return (data.results ?? []) as ChunkHit[];
+    },
+    []
+  );
+
   const handleToggleGroup = useCallback(
     async (key: string) => {
       if (expandedKey === key) {
@@ -153,20 +175,41 @@ export default function KnowledgeTab() {
       setLoadingGroup(true);
       setGroupChunks([]);
       try {
-        const res = await fetch(
-          `${KNOWLEDGE_API}?action=search&q=${encodeURIComponent(key)}&limit=10`
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '加载分组 chunk 失败');
-        setGroupChunks(data.results ?? []);
+        const chunks = await loadGroupChunks(key, activeGroup);
+        setGroupChunks(chunks);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : '加载分组 chunk 失败');
       } finally {
         setLoadingGroup(false);
       }
     },
-    [expandedKey]
+    [expandedKey, activeGroup, loadGroupChunks]
   );
+
+  // 从 metadata tab 跳转过来时自动展开对应分组
+  const appliedFilterRef = useRef<string | null>(null);
+  const filterKey = initialFilter
+    ? `${initialFilter.group}|${initialFilter.name}|${initialFilter.book ?? ''}`
+    : null;
+  useEffect(() => {
+    if (!filterKey || filterKey === appliedFilterRef.current || loadingStats || !stats) return;
+    if (!initialFilter) return;
+    appliedFilterRef.current = filterKey;
+    setActiveGroup(initialFilter.group);
+    setExpandedKey(initialFilter.name);
+    setLoadingGroup(true);
+    setGroupChunks([]);
+    loadGroupChunks(initialFilter.name, initialFilter.group, initialFilter.book)
+      .then((chunks) => {
+        setGroupChunks(chunks);
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : '加载分组 chunk 失败');
+      })
+      .finally(() => {
+        setLoadingGroup(false);
+      });
+  }, [filterKey, loadingStats, stats, initialFilter, loadGroupChunks]);
 
   const currentGroups = pickGroups(stats, activeGroup);
 

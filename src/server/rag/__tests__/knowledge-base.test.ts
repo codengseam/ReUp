@@ -4,7 +4,7 @@
 //
 // TDD: tests written before implementation.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { VectorStore, SearchResult, SearchOptions } from '../vector-store';
 import type { Chunk, ScoredChunk } from '../reranker';
 
@@ -15,7 +15,7 @@ const { mockSearch, mockEnsureVectorStoreLoaded } = vi.hoisted(() => ({
   mockEnsureVectorStoreLoaded: vi.fn(),
 }));
 
-vi.mock('./rag-init', () => ({
+vi.mock('../rag-init', () => ({
   ensureVectorStoreLoaded: mockEnsureVectorStoreLoaded,
   _resetForTest: vi.fn(),
 }));
@@ -24,9 +24,28 @@ const { mockRerank } = vi.hoisted(() => ({
   mockRerank: vi.fn(),
 }));
 
-vi.mock('./reranker', () => ({
+vi.mock('../reranker', () => ({
   rerank: mockRerank,
 }));
+
+// The reranker loads @xenova/transformers via a runtime Function closure;
+// vi.mock cannot intercept that. Provide a global shim so tests that
+// accidentally hit the real reranker do not fail with "dynamic import callback".
+interface ShimGlobal {
+  __reupXenovaShim?: () => Promise<{
+    pipeline: (task: 'text-classification', model: string) => Promise<unknown>;
+  }>;
+}
+
+beforeEach(() => {
+  (globalThis as unknown as ShimGlobal).__reupXenovaShim = async () => ({
+    pipeline: vi.fn().mockResolvedValue({ score: 0.5 }),
+  });
+});
+
+afterEach(() => {
+  delete (globalThis as unknown as ShimGlobal).__reupXenovaShim;
+});
 
 // ---------------- Imports (must come after vi.mock) ----------------
 

@@ -26,11 +26,13 @@ interface AnalyzeResponse {
   resume?: ResumeDocument;
   jd?: JDDocument;
   diagnostics?: DiagnosticResult;
-  atsResult?: ATSResult;
+  ats?: ATSResult;
+  match?: MatchReport;
   error?: string;
 }
 
 export function ResumeAnalyzer() {
+  const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState(0);
   const [rawText, setRawText] = useState('');
@@ -44,7 +46,7 @@ export function ResumeAnalyzer() {
   const [atsResult, setAtsResult] = useState<ATSResult | null>(null);
   const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const hasInput = rawText.trim().length > 0 && jdText.trim().length > 0;
+  const hasInput = (file !== null || rawText.trim().length > 0) && jdText.trim().length > 0;
 
   useEffect(() => {
     safeTrack({ type: 'page_view', page: '/resume/analyzer' });
@@ -56,10 +58,14 @@ export function ResumeAnalyzer() {
     setAtsResult(null); setMatchReport(null);
   }, []);
 
-  const handleFile = useCallback(async (file: File) => {
-    setFileName(file.name);
-    setFileSize(file.size);
-    setRawText(await file.text());
+  const handleFile = useCallback(async (uploaded: File) => {
+    setFile(uploaded);
+    setFileName(uploaded.name);
+    setFileSize(uploaded.size);
+    const isBinary =
+      uploaded.type === 'application/pdf' ||
+      uploaded.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    setRawText(isBinary ? `[已上传 ${uploaded.name}]` : await uploaded.text());
     if (!jdText.trim()) setState('idle');
   }, [jdText]);
 
@@ -95,9 +101,14 @@ export function ResumeAnalyzer() {
     safeTrack({ type: 'jd_parse', data: { source: 'paste' } });
 
     try {
+      const formData = new FormData();
+      const resumeFile = file ?? new File([rawText], 'pasted-resume.txt', { type: 'text/plain' });
+      formData.append('resumeFile', resumeFile);
+      if (jdText.trim()) formData.append('jdText', jdText.trim());
+
       const res = await fetch('/api/resume/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText, jdText }),
+        method: 'POST',
+        body: formData,
       });
       const json = (await res.json()) as AnalyzeResponse;
       clearInterval(timer); setProgress(100);
@@ -105,14 +116,14 @@ export function ResumeAnalyzer() {
       setResume(json.resume ?? null);
       setJd(json.jd ?? null);
       setDiagnostics(json.diagnostics ?? null);
-      setAtsResult(json.atsResult ?? null);
-      if (json.resume && json.atsResult) {
-        setMatchReport({ strengths: [], gaps: [], priorities: [] });
+      setAtsResult(json.ats ?? null);
+      if (json.resume && json.ats) {
+        setMatchReport(json.match ?? { strengths: [], gaps: [], priorities: [] });
       }
       setState('done');
 
       // Track match_analysis: score comes from ATS coverage.
-      const score = json.atsResult?.coverage?.percentage ?? 0;
+      const score = json.ats?.coverage?.percentage ?? 0;
       safeTrack({ type: 'match_analysis', data: { score: Math.round(score) } });
     } catch (err) {
       clearInterval(timer);
@@ -127,7 +138,7 @@ export function ResumeAnalyzer() {
         },
       });
     }
-  }, [hasInput, rawText, jdText, fileName, fileSize]);
+  }, [hasInput, file, rawText, jdText, fileName, fileSize]);
 
   const dragClass = isDragging
     ? 'border-primary bg-primary/5'
@@ -157,14 +168,14 @@ export function ResumeAnalyzer() {
                 <UploadCloud className="w-[18px] h-[18px] text-primary" />
               </div>
               <p className="text-[13px] font-medium text-foreground">拖放或点击上传简历</p>
-              <p className="text-[11px] text-muted-foreground">纯文本 / Markdown</p>
+              <p className="text-[11px] text-muted-foreground">纯文本 / Markdown / PDF / Word</p>
               {fileName && (
                 <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-md bg-primary-container text-[11px] text-accent-foreground">
                   <FileText className="w-3 h-3" />{fileName}
                 </span>
               )}
               <label htmlFor="resume-file-input-v2" className="cursor-pointer text-[11px] text-primary hover:underline mt-1">选择文件</label>
-              <input id="resume-file-input-v2" type="file" accept=".txt,.md,.markdown,text/plain" onChange={onFileInputChange} className="hidden" />
+              <input id="resume-file-input-v2" type="file" accept=".txt,.md,.markdown,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onFileInputChange} className="hidden" />
             </div>
 
             <div className="flex flex-col gap-1.5">

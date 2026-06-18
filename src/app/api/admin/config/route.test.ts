@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vites
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { _resetDbForTest } from '@/lib/db/connection';
 
 // ---------------- Temp dir lifecycle ----------------
 
@@ -23,6 +24,8 @@ let GET: typeof import('./route').GET;
 let POST: typeof import('./route').POST;
 
 beforeAll(async () => {
+  process.env.LOOP_ENGINEERING_DB = ':memory:';
+  _resetDbForTest();
   tmp = mkdtempSync(join(tmpdir(), 'reup-admin-config-'));
   process.chdir(tmp);
   // Force re-import of ./route → ./server-config under the new cwd.
@@ -35,6 +38,10 @@ afterAll(() => {
   if (tmp && existsSync(tmp)) {
     rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+beforeEach(() => {
+  _resetDbForTest();
 });
 
 function configFile(): string {

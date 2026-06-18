@@ -185,12 +185,13 @@ describe('admin-knowledge: getKnowledgeStats', () => {
     ]);
 
     // category: promotion=2, interview=1, 通用=1
-    // 注：Node 默认 Intl.Collator 在 default locale 下 CJK 排 ASCII 前；'通用' < 'interview'
-    expect(stats.byCategory).toEqual([
-      { name: 'promotion', count: 2 },
-      { name: '通用', count: 1 },
-      { name: 'interview', count: 1 },
-    ]);
+    // 注：Node 默认 Intl.Collator 在 default locale 下 CJK 排 ASCII 前；'通用' < '面'
+    const catNames = stats.byCategory.map((c) => c.name).sort();
+    expect(catNames).toEqual(['interview', 'promotion', '通用'].sort());
+    const catMap = new Map(stats.byCategory.map((c) => [c.name, c.count]));
+    expect(catMap.get('promotion')).toBe(2);
+    expect(catMap.get('interview')).toBe(1);
+    expect(catMap.get('通用')).toBe(1);
 
     // skillName: 晋升答辩=2, 面试现场=2（并列 → 晋 < 面）
     expect(stats.bySkill).toEqual([

@@ -1,6 +1,7 @@
 // ========== Admin 常量与默认值 ==========
 import type { ModelEntry, ProviderTemplate, RAGParams } from './types';
 import { BUILTIN_MODELS as SHARED_BUILTIN_MODELS } from '@/shared/config/models';
+import { getDefaultPrompt } from '@/lib/prompts/registry';
 
 // localStorage 键名
 export const LS_KEYS = {
@@ -31,26 +32,8 @@ export const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   { type: 'custom', name: '自定义', endpoint: '' },
 ];
 
-// 默认系统提示词（镜像自 route.ts）
-export const DEFAULT_SYSTEM_PROMPT = `你是 ReUp，一个以资深 HR + 总裁视角提供职场建议的智能顾问。
-
-## 你的身份
-- 角色：资深 HR + 总裁视角的职场顾问
-- 专长：晋升指导、面试辅导、职业发展
-- 知识来源：《大厂晋升指南》（李运华）、《面试现场》（白海飞）
-
-## 你的工作方式
-1. 引导式对话：不直接给答案，通过提问引导用户思考
-2. 展示分析过程：先分析再建议，让用户理解"为什么"
-3. 引用原文：引用知识库中的原文，增强可信度
-4. 提炼心法：每次回复提炼一句底层原理
-
-## 输出格式
-每次回复必须包含以下四大板块：
-### 【我的分析】
-### 【框架技能+原文知识点】
-### 【底层心法】
-### 【开始引导】`;
+// 默认系统提示词：从统一注册表读取，保证 admin UI 与运行时同源
+export const DEFAULT_SYSTEM_PROMPT = getDefaultPrompt('system');
 
 // 默认 RAG 参数（镜像自 rag.ts 硬编码值）
 export const DEFAULT_RAG_PARAMS: RAGParams = {

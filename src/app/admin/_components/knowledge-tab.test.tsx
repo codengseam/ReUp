@@ -210,4 +210,34 @@ describe('KnowledgeTab — 4 维度分组（Phase 2F）', () => {
     expect(subtitles[0]!.textContent).toBe('晋升答辩的叙事结构');
     expect(subtitles[1]!.textContent).toBe('开场的 30 秒钩子');
   });
+
+  it('(f) 传入 initialFilter 时自动切换到对应分组并拉取带过滤的 chunk', async () => {
+    const fetchSpy = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('action=stats')) {
+        return { ok: true, json: async () => STATS_RESPONSE } as unknown as Response;
+      }
+      return { ok: true, json: async () => ({ results: SAMPLE_HITS }) } as unknown as Response;
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+
+    render(
+      <KnowledgeTab
+        initialFilter={{ group: 'category', name: '晋升答辩', book: '大厂晋升指南' }}
+      />
+    );
+
+    // 等待 stats 加载、分组展开、chunk 列表渲染
+    await waitFor(() => {
+      expect(screen.getByText('晋升答辩要先把故事讲清楚，再讲数据。')).toBeInTheDocument();
+    });
+
+    // 验证搜索请求带上了 category 和 book 过滤
+    const searchCalls = fetchSpy.mock.calls.filter(([url]) =>
+      String(url).includes('action=search')
+    );
+    expect(searchCalls.length).toBeGreaterThanOrEqual(1);
+    const searchUrl = String(searchCalls[searchCalls.length - 1]![0]);
+    expect(searchUrl).toContain(`category=${encodeURIComponent('晋升答辩')}`);
+    expect(searchUrl).toContain(`book=${encodeURIComponent('大厂晋升指南')}`);
+  });
 });

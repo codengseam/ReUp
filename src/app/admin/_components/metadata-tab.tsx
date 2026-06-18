@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { TabKey, KnowledgeFilter } from '../_lib/types';
 
 const KNOWLEDGE_API = '/api/admin/knowledge';
 
@@ -68,7 +69,11 @@ const ICON_FG: Record<string, string> = {
   total: 'text-purple-600',
 };
 
-export default function MetadataTab() {
+interface MetadataTabProps {
+  onNavigate?: (tab: TabKey, filter?: KnowledgeFilter) => void;
+}
+
+export default function MetadataTab({ onNavigate }: MetadataTabProps = {}) {
   const [stats, setStats] = useState<StatsSummary | null>(null);
   const [topicSummary, setTopicSummary] = useState<TopicSummary | null>(null);
   const [categories, setCategories] = useState<CategoryGroup[]>([]);
@@ -279,9 +284,9 @@ export default function MetadataTab() {
                 加载分类数据...
               </div>
             ) : view === 'category' ? (
-              <CategoryView groups={categories} />
+              <CategoryView groups={categories} onNavigate={onNavigate} />
             ) : (
-              <CrosstabView summary={topicSummary} />
+              <CrosstabView summary={topicSummary} onNavigate={onNavigate} />
             )}
           </div>
         </CardContent>
@@ -294,10 +299,11 @@ export default function MetadataTab() {
 
 interface CategoryViewProps {
   groups: CategoryGroup[];
+  onNavigate?: (tab: TabKey, filter?: KnowledgeFilter) => void;
 }
 
 /** 按分类细粒度视图：分类名 + chunk 数 + 1 条 sample preview。 */
-function CategoryView({ groups }: CategoryViewProps) {
+function CategoryView({ groups, onNavigate }: CategoryViewProps) {
   if (groups.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">暂无分类数据</p>
@@ -319,7 +325,8 @@ function CategoryView({ groups }: CategoryViewProps) {
             <tr
               key={g.name || '(空)'}
               data-testid={`category-row-${g.name || 'empty'}`}
-              className={`border-b border-border/50 ${isGeneric ? 'bg-muted/20 text-muted-foreground' : 'hover:bg-muted/10'}`}
+              onClick={() => onNavigate?.('knowledge', { group: 'category', name: g.name })}
+              className={`border-b border-border/50 cursor-pointer ${isGeneric ? 'bg-muted/20 text-muted-foreground hover:bg-muted/30' : 'hover:bg-muted/10'}`}
             >
               <td className="px-5 py-3 font-mono text-xs">
                 <span className={isGeneric ? 'text-muted-foreground' : 'text-foreground'}>
@@ -345,10 +352,11 @@ function CategoryView({ groups }: CategoryViewProps) {
 
 interface CrosstabViewProps {
   summary: TopicSummary | null;
+  onNavigate?: (tab: TabKey, filter?: KnowledgeFilter) => void;
 }
 
 /** 按书 × 分类交叉表视图：每个 book 一行展开，所有 category 平铺列出。 */
-function CrosstabView({ summary }: CrosstabViewProps) {
+function CrosstabView({ summary, onNavigate }: CrosstabViewProps) {
   if (!summary || summary.byBookCategory.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">暂无交叉表数据</p>
@@ -376,7 +384,8 @@ function CrosstabView({ summary }: CrosstabViewProps) {
                   <div
                     key={c.category}
                     data-testid={`crosstab-cell-${row.book}-${c.category}`}
-                    className={`rounded-lg border px-3 py-2 ${
+                    onClick={() => onNavigate?.('knowledge', { group: 'category', name: c.category, book: row.book })}
+                    className={`rounded-lg border px-3 py-2 cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all ${
                       isGeneric
                         ? 'border-dashed border-border bg-muted/30 text-muted-foreground'
                         : 'border-border bg-white'

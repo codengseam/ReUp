@@ -56,7 +56,7 @@ describe('dequeueEvalJob (C8 + I10)', () => {
     expect(job?.status).toBe('running');
     expect(job?.started_at).toBeGreaterThan(0);
     expect(job?.attempts).toBe(1);
-    const row = getDb().prepare('SELECT status, started_at, attempts FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status, started_at, attempts FROM eval_jobs WHERE id=?').get(id) as { status: string; started_at: number; attempts: number };
     expect(row.status).toBe('running');
     expect(row.started_at).toBeGreaterThan(0);
     expect(row.attempts).toBe(1);
@@ -81,7 +81,7 @@ describe('failEvalJob (C1 重试逻辑)', () => {
     const id = enqueueEvalJob('req-1');
     dequeueEvalJob(); // attempts=1
     failEvalJob(id, 'oops');
-    const row = getDb().prepare('SELECT status, attempts, error FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status, attempts, error FROM eval_jobs WHERE id=?').get(id) as { status: string; attempts: number; error: string };
     expect(row.status).toBe('pending');
     expect(row.error).toBe('oops');
   });
@@ -95,7 +95,7 @@ describe('failEvalJob (C1 重试逻辑)', () => {
     failEvalJob(id, 'second');
     dequeueEvalJob(); // attempts=3
     failEvalJob(id, 'third');
-    const row = getDb().prepare('SELECT status, attempts FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status, attempts FROM eval_jobs WHERE id=?').get(id) as { status: string; attempts: number };
     expect(row.status).toBe('failed');
     expect(row.attempts).toBe(3);
   });
@@ -103,7 +103,7 @@ describe('failEvalJob (C1 重试逻辑)', () => {
   it('truncates long error message to 1000 chars', () => {
     const id = enqueueEvalJob('req-1');
     failEvalJob(id, 'x'.repeat(2000));
-    const row = getDb().prepare('SELECT error FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT error FROM eval_jobs WHERE id=?').get(id) as { error: string };
     expect(row.error.length).toBe(1000);
   });
 });
@@ -113,7 +113,7 @@ describe('completeEvalJob', () => {
     const id = enqueueEvalJob('req-1');
     dequeueEvalJob();
     completeEvalJob(id);
-    const row = getDb().prepare('SELECT status, completed_at FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status, completed_at FROM eval_jobs WHERE id=?').get(id) as { status: string; completed_at: number };
     expect(row.status).toBe('done');
     expect(row.completed_at).toBeGreaterThan(0);
   });
@@ -128,7 +128,7 @@ describe('resetStuckJobs (C-2 崩溃恢复)', () => {
     getDb().prepare('UPDATE eval_jobs SET last_attempt_at = ? WHERE id = ?').run(longAgo, id);
     const reaped = resetStuckJobs(300);
     expect(reaped).toBe(1);
-    const row = getDb().prepare('SELECT status FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status FROM eval_jobs WHERE id=?').get(id) as { status: string };
     expect(row.status).toBe('pending');
   });
 
@@ -137,7 +137,7 @@ describe('resetStuckJobs (C-2 崩溃恢复)', () => {
     dequeueEvalJob(); // last_attempt_at=now
     const reaped = resetStuckJobs(300);
     expect(reaped).toBe(0);
-    const row = getDb().prepare('SELECT status FROM eval_jobs WHERE id=?').get(id) as any;
+    const row = getDb().prepare('SELECT status FROM eval_jobs WHERE id=?').get(id) as { status: string };
     expect(row.status).toBe('running');
   });
 });

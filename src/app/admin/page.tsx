@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { safeTrack } from '@/shared/utils/analytics-helpers';
 import {
@@ -26,7 +26,7 @@ import RAGTab from './_components/rag-tab';
 import MetadataTab from './_components/metadata-tab';
 import RuntimeConfigTab from './_components/runtime-config-tab';
 import AnalyticsTab from './_components/analytics-tab';
-import type { TabKey } from './_lib/types';
+import type { TabKey, KnowledgeFilter } from './_lib/types';
 
 const TAB_CONFIG: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
   { key: 'dashboard', label: '概览', icon: LayoutDashboard },
@@ -50,12 +50,20 @@ const LEGACY_OBSERVATION_END = '2026-06-20';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
+  const [knowledgeFilter, setKnowledgeFilter] = useState<KnowledgeFilter | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [backendConfigured, setBackendConfigured] = useState<boolean | null>(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleNavigate = useCallback((tab: TabKey, filter?: KnowledgeFilter) => {
+    setActiveTab(tab);
+    if (tab === 'knowledge' && filter) {
+      setKnowledgeFilter(filter);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,10 +288,10 @@ export default function AdminPage() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <DashboardTab onNavigate={setActiveTab} />
+            <DashboardTab onNavigate={handleNavigate} />
           </TabsContent>
           <TabsContent value="knowledge">
-            <KnowledgeTab />
+            <KnowledgeTab initialFilter={knowledgeFilter} />
           </TabsContent>
           <TabsContent value="framework-skills">
             <FrameworkSkillsTab />
@@ -298,7 +306,7 @@ export default function AdminPage() {
             <RAGTab />
           </TabsContent>
           <TabsContent value="metadata">
-            <MetadataTab />
+            <MetadataTab onNavigate={handleNavigate} />
           </TabsContent>
           <TabsContent value="analytics">
             <AnalyticsTab />

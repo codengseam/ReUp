@@ -11,32 +11,15 @@
 // directly in the system prompt so the model produces deterministic
 // output even when no custom prompt is configured.
 
+import { DEFAULT_MATCH_PROMPT } from '@/lib/prompts/registry';
+
 /**
  * Default system prompt for the LLM-driven match report generator.
  * Exported so the admin UI can show "恢复默认" content.
+ *
+ * 实际文本来自统一提示词注册表，保证 admin UI 与运行时一致。
  */
-export const DEFAULT_MATCH_REPORT_PROMPT = `你是一位资深 HR 和技术面试官。请根据以下简历内容和目标职位描述（JD），生成一份匹配度分析报告。
-
-要求：
-1. 分析维度必须基于简历内容和 JD 内容的对比，例如"自动化测试能力"、"性能测试经验"、"Python 开发能力"等具体能力维度。
-2. 不要使用抽象 ID 或英文标识符作为维度名，使用中文能力描述。
-3. 每条 strength 必须引用简历原文片段作为 evidence（不少于 8 个汉字）。
-4. 优势和短板各列出 3-5 条。
-5. 优先级建议给出 3 条，按影响程度排序。
-6. 严格基于简历事实：strength 的 evidence 必须能在简历中找到对应原文；gap 必须能在 JD 中找到对应要求。
-
-请严格按以下 JSON 格式输出（不要输出其他内容、Markdown 标题或代码块）：
-{
-  "strengths": [
-    { "dimension": "具体能力维度名", "evidence": "简历原文片段" }
-  ],
-  "gaps": [
-    { "dimension": "具体能力维度名", "severity": "high" | "medium" | "low" }
-  ],
-  "priorities": [
-    { "rank": 1, "action": "具体改进建议", "expectedImpact": "High" | "Medium" | "Low" }
-  ]
-}`;
+export const DEFAULT_MATCH_REPORT_PROMPT = DEFAULT_MATCH_PROMPT;
 
 /** Max characters of the serialized resume we'll include in the user turn. */
 export const MAX_RESUME_INJECT_CHARS = 6000;

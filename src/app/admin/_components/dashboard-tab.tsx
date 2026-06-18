@@ -4,7 +4,7 @@ import {
   Database, Zap, Activity, Shield, ArrowRight,
   PenLine, Cpu, SlidersHorizontal, Tags,
 } from 'lucide-react';
-import type { TabKey } from '../_lib/types';
+import type { TabKey, KnowledgeFilter } from '../_lib/types';
 import { BUILTIN_MODELS } from '../_lib/constants';
 import { useAdminState } from '../_hooks/use-admin-state';
 import { LS_KEYS } from '../_lib/constants';
@@ -12,7 +12,7 @@ import type { CustomProvider, ActivityLog } from '../_lib/types';
 import { formatRelativeTime } from '../_lib/utils';
 
 interface DashboardProps {
-  onNavigate: (tab: TabKey) => void;
+  onNavigate: (tab: TabKey, filter?: KnowledgeFilter) => void;
 }
 
 interface AdminStats {

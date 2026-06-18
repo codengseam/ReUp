@@ -34,11 +34,12 @@ export async function POST(request: NextRequest) {
     }
     const jd = typeof jdText === 'string' && jdText.trim().length > 0 ? jdText : null;
 
-    // Determine source from MIME type
+    const lowerName = file.name.toLowerCase();
+    // Determine source from MIME type, with extension fallback for empty types.
     const source: ResumeSource =
-      file.type === 'application/pdf' ? 'pdf' :
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ? 'word' :
-      file.type === 'text/markdown' || file.name.endsWith('.md') ? 'md' :
+      file.type === 'application/pdf' || lowerName.endsWith('.pdf') ? 'pdf' :
+      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || lowerName.endsWith('.docx') ? 'word' :
+      file.type === 'text/markdown' || lowerName.endsWith('.md') || lowerName.endsWith('.markdown') ? 'md' :
       'text';
 
     const input = source === 'pdf' || source === 'word'
