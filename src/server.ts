@@ -52,26 +52,31 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-app.prepare().then(() => {
-  server = createServer(async (req, res) => {
-    try {
-      const parsedUrl = parse(req.url || '/', true);
-      await handle(req, res, parsedUrl);
-    } catch (err) {
-      console.error('Error occurred handling', req.url, err);
-      res.statusCode = 500;
-      res.end('Internal server error');
-    }
-  });
-  server.on('error', err => {
-    console.error(err);
+app.prepare()
+  .then(() => {
+    server = createServer(async (req, res) => {
+      try {
+        const parsedUrl = parse(req.url || '/', true);
+        await handle(req, res, parsedUrl);
+      } catch (err) {
+        console.error('Error occurred handling', req.url, err);
+        res.statusCode = 500;
+        res.end('Internal server error');
+      }
+    });
+    server.on('error', err => {
+      console.error(err);
+      process.exit(1);
+    });
+    server.listen(port, hostname, () => {
+      console.log(
+        `> Server listening at http://${hostname}:${port} as ${
+          dev ? 'development' : 'production'
+        }`
+      );
+    });
+  })
+  .catch(err => {
+    console.error('Failed to start server:', err);
     process.exit(1);
   });
-  server.listen(port, () => {
-    console.log(
-      `> Server listening at http://${hostname}:${port} as ${
-        dev ? 'development' : 'production'
-      }`
-    );
-  });
-});

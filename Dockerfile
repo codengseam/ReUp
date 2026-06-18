@@ -74,6 +74,12 @@ RUN pnpm tsup src/server.ts \
     --no-minify
 
 # ============================================================================
+# Stage 2.5: prod-deps — 仅保留生产依赖
+# ============================================================================
+FROM deps AS prod-deps
+RUN pnpm prune --prod
+
+# ============================================================================
 # Stage 3: runner — 最小运行时镜像
 # ============================================================================
 FROM node:${NODE_VERSION}-slim AS runner
@@ -93,8 +99,8 @@ RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 RUN groupadd --system --gid 1001 reup \
     && useradd --system --uid 1001 --gid reup --create-home --shell /bin/bash reup
 
-# 复制生产依赖 (从 deps 阶段剔除 devDependencies)
-COPY --from=deps /app/node_modules ./node_modules
+# 复制生产依赖 (从 prod-deps 阶段已剔除 devDependencies)
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
@@ -105,15 +111,16 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/prisma/generated ./prisma/generated
 
-# 数据: skill-vectors.json (27MB, 已在仓库) + skills.json + book-sources
-COPY --from=builder /app/data ./data
+# 数据模板: skill-vectors.json + skills.json + book-sources
+# 挂载 volume 到 /app/data 会隐藏镜像内文件, 因此保留一份模板用于首次初始化
+COPY --from=builder /app/data ./data-template
 
 # 入口脚本
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # 运行时目录: 数据库 + 模型缓存挂载点
-RUN mkdir -p /app/data /app/.cache/hub /app/.cache/tmp \
+RUN mkdir -p /app/data /app/data-template /app/.cache/hub /app/.cache/tmp \
     && chown -R reup:reup /app
 
 ENV NODE_ENV=production

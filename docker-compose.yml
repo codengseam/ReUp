@@ -31,7 +31,7 @@ services:
       # ---- LLM (必须, 从 .env 注入) ----
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?DASHSCOPE_API_KEY is required, copy .env.local.example to .env}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
-      DASHSCOPE_CHAT_MODEL: ${DASHSCOPE_CHAT_MODEL:-gui-plus-2026-02-26}
+      DASHSCOPE_CHAT_MODEL: ${DASHSCOPE_CHAT_MODEL:-qwen3.6-plus-2026-04-02}
       DASHSCOPE_EMBEDDING_MODEL: ${DASHSCOPE_EMBEDDING_MODEL:-text-embedding-v3}
       LLM_PROVIDER: ${LLM_PROVIDER:-dashscope}
 

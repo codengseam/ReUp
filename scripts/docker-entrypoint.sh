@@ -23,9 +23,16 @@ cd /app
 mkdir -p "$(dirname "${LOOP_ENGINEERING_DB:-/app/data/loop-engineering.sqlite}")"
 mkdir -p "${HF_HOME:-/app/.cache/hub}"
 
-# 2) Prisma migrate deploy (生产环境推荐)
-#    如果 prisma/migrations 不存在, 跳过 (项目当前用 schema-first, 无迁移文件)
-if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+# 1.5) 如果 volume 挂载导致 /app/data 为空, 从镜像模板复制默认数据
+if [ ! -f /app/data/skills.json ] && [ -d /app/data-template ]; then
+  echo "[entrypoint] /app/data is empty (fresh volume), copying default data from template..."
+  cp -r /app/data-template/. /app/data/
+fi
+
+# 2) Prisma schema 应用
+#    - 有迁移文件时优先 prisma migrate deploy (生产推荐)
+#    - 无迁移文件时用 prisma db push 创建 schema (当前项目为 schema-first)
+if [ -d "prisma/migrations" ] && [ -n "$(find prisma/migrations -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
   echo "[entrypoint] Running prisma migrate deploy..."
   if ! pnpm prisma migrate deploy; then
     echo "[entrypoint] ERROR: prisma migrate deploy failed" >&2
@@ -33,7 +40,12 @@ if [ -d "prisma/migrations" ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]
   fi
   echo "[entrypoint] Migrations applied."
 else
-  echo "[entrypoint] No prisma migrations directory found, skipping (schema is applied lazily by better-sqlite3)."
+  echo "[entrypoint] No migrations found, running prisma db push to create schema..."
+  if ! pnpm prisma db push --accept-data-loss; then
+    echo "[entrypoint] ERROR: prisma db push failed" >&2
+    exit 1
+  fi
+  echo "[entrypoint] Schema applied."
 fi
 
 # 3) 确保 prisma client 已生成 (镜像里已 COPY, 但 volume 挂载可能覆盖)
