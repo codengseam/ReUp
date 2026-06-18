@@ -64,3 +64,10 @@ export type TabKey =
   | 'metadata'
   | 'analytics'
   | 'runtime-config';
+
+/** 从 metadata tab 跳转到 knowledge tab 时携带的过滤条件。 */
+export interface KnowledgeFilter {
+  group: 'book' | 'category' | 'docTitle' | 'sectionTitle';
+  name: string;
+  book?: string;
+}

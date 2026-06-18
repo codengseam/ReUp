@@ -139,20 +139,20 @@ describe('parser-text fixtures (resume-parse-jd-prompts A1-A6)', () => {
     const doc = parseTextResume(loadFixture());
     // 3 companies, 3 sub-periods each
     expect(doc.experience.map((e) => e.company)).toEqual([
-      '字节跳动',
-      'K12 - 智慧考试',
-      '科大讯飞',
+      '示例公司 A',
+      '示例公司 B',
+      '示例公司 C',
     ]);
     expect(doc.experience.map((e) => e.role)).toEqual([
-      '懂车帝 - 抖音电商',
-      '团队负责人',
-      'AI教育',
+      '示例业务线',
+      '示例业务线',
+      '示例业务线',
     ]);
     // 3 project sub-blocks (down from 5 before A3 fix)
     expect(doc.projects).toHaveLength(3);
     expect(doc.projects.map((p) => p.name)).toEqual([
-      '懂车帝二手车商城及电商业务',
-      '进校智慧考试和阅卷系统',
+      '示例电商项目',
+      '示例阅卷系统',
       '个人 AI 实践项目',
     ]);
     // 1 education entry with notes

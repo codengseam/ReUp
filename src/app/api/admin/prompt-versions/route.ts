@@ -7,18 +7,28 @@ import {
   registerPromptVersion,
   getAllPromptVersions,
   getActivePrompt,
+  getPromptVersionsByKey,
   activatePromptVersion,
   type PromptVersionInput,
+  type PromptKey,
 } from '@/lib/db/prompt-versions';
 import { requireAdmin, unauthorizedResponse, internalErrorResponse } from '@/lib/admin-auth-helper';
 
 export const runtime = 'nodejs';
 
+const VALID_PROMPT_KEYS: PromptKey[] = ['system', 'star', 'ats', 'match'];
+
+function isPromptKey(v: unknown): v is PromptKey {
+  return typeof v === 'string' && (VALID_PROMPT_KEYS as readonly string[]).includes(v);
+}
+
 export async function GET(request: NextRequest) {
   if (!requireAdmin(request)) return unauthorizedResponse();
   try {
-    const active = getActivePrompt();
-    const all = getAllPromptVersions();
+    const { searchParams } = new URL(request.url);
+    const key = searchParams.get('key');
+    const active = isPromptKey(key) ? getActivePrompt(key) : getActivePrompt();
+    const all = isPromptKey(key) ? getPromptVersionsByKey(key) : getAllPromptVersions();
     return NextResponse.json({ active, all });
   } catch (error) {
     return internalErrorResponse('[Admin PromptVersions API]', error);
@@ -34,7 +44,8 @@ export async function POST(request: NextRequest) {
       if (!body.version) {
         return NextResponse.json({ error: 'version 必填' }, { status: 400 });
       }
-      const ok = activatePromptVersion(body.version);
+      const key = isPromptKey(body.prompt_key) ? body.prompt_key : undefined;
+      const ok = activatePromptVersion(body.version, key);
       return NextResponse.json({ activated: ok });
     }
 
@@ -47,6 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'experiment_traffic 必须在 [0, 1]' }, { status: 400 });
     }
     const id = registerPromptVersion({
+      prompt_key: isPromptKey(body.prompt_key) ? body.prompt_key : '',
       version: body.version,
       prompt_content: body.prompt_content,
       change_description: body.change_description,

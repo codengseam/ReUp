@@ -29,8 +29,36 @@ export function getDb(): Database.Database {
   db.pragma('busy_timeout = 5000');
   // 初始化 schema (IF NOT EXISTS 幂等)
   db.exec(SCHEMA);
+  runMigrations(db);
   _db = db;
   return db;
+}
+
+/** 幂等迁移：为已存在的旧 prompt_versions 表补齐 prompt_key 列与唯一索引 */
+function runMigrations(db: Database.Database): void {
+  const hasKey = db
+    .prepare("SELECT 1 FROM pragma_table_info('prompt_versions') WHERE name = 'prompt_key'")
+    .get();
+  if (!hasKey) {
+    try {
+      db.exec("ALTER TABLE prompt_versions ADD COLUMN prompt_key TEXT NOT NULL DEFAULT ''");
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[db] failed to add prompt_key column:', err);
+    }
+  }
+
+  const hasIndex = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_prompt_versions_key_version'")
+    .get();
+  if (!hasIndex) {
+    try {
+      db.exec('CREATE UNIQUE INDEX idx_prompt_versions_key_version ON prompt_versions(prompt_key, version)');
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[db] failed to create prompt_versions key_version index:', err);
+    }
+  }
 }
 
 /** 测试用: 重置单例 (并关闭连接) */

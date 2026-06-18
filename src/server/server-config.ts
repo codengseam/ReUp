@@ -5,8 +5,15 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
-const CONFIG_DIR = path.join(process.cwd(), 'data');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'server-config.json');
+// 配置路径在运行时根据 process.cwd() 计算，避免模块加载时缓存 cwd。
+// 测试可通过 process.chdir() 切换工作目录以使用隔离的临时目录。
+function getConfigDir(): string {
+  return path.join(process.cwd(), 'data');
+}
+
+function getConfigFile(): string {
+  return path.join(getConfigDir(), 'server-config.json');
+}
 
 // 简单互斥锁，防止并发写入竞态
 let writeLock: Promise<void> = Promise.resolve();
@@ -79,7 +86,7 @@ export interface ServerConfig {
 
 async function ensureDir(): Promise<void> {
   try {
-    await mkdir(CONFIG_DIR, { recursive: true });
+    await mkdir(getConfigDir(), { recursive: true });
   } catch {
     // 目录已存在
   }
@@ -88,7 +95,7 @@ async function ensureDir(): Promise<void> {
 export async function loadConfig(): Promise<ServerConfig> {
   try {
     await ensureDir();
-    const raw = await readFile(CONFIG_FILE, 'utf-8');
+    const raw = await readFile(getConfigFile(), 'utf-8');
     return JSON.parse(raw) as ServerConfig;
   } catch {
     return {};
@@ -99,7 +106,7 @@ export async function saveConfig(partial: Partial<ServerConfig>): Promise<Server
   return withLock(async () => {
     let current: ServerConfig = {};
     try {
-      const raw = await readFile(CONFIG_FILE, 'utf-8');
+      const raw = await readFile(getConfigFile(), 'utf-8');
       current = JSON.parse(raw) as ServerConfig;
     } catch {
       // 文件不存在，使用空对象
@@ -110,7 +117,7 @@ export async function saveConfig(partial: Partial<ServerConfig>): Promise<Server
       updatedAt: new Date().toISOString(),
     };
     await ensureDir();
-    await writeFile(CONFIG_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    await writeFile(getConfigFile(), JSON.stringify(updated, null, 2), 'utf-8');
     return updated;
   });
 }

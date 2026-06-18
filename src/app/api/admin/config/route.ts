@@ -19,6 +19,10 @@ import {
   saveConfig,
   type ServerConfig,
 } from '@/server/server-config';
+import {
+  savePrompt,
+  configKeyToPromptKind,
+} from '@/lib/prompts/config';
 
 export const runtime = 'nodejs';
 
@@ -125,13 +129,33 @@ export async function POST(req: NextRequest): Promise<Response> {
   //    persisting resume.config doesn't clobber resume.privacy, etc.)
   const current = await loadConfig();
 
-  // 4) Per-key value validation + transform into a server-config partial
+  // 4) Prompt kinds (system / star / ats / match) go through the unified
+  //    prompt-config service, which writes server-config.json AND registers
+  //    a version in the prompt_versions table.
+  const promptKind = configKeyToPromptKind(key);
+  if (promptKind) {
+    const cp = value.customPrompt;
+    if (typeof cp !== 'string') {
+      return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    }
+    await savePrompt(promptKind, cp, {
+      changeDescription: typeof value.changeDescription === 'string' ? value.changeDescription : undefined,
+      author: typeof value.author === 'string' ? value.author : undefined,
+    });
+    const updated = await loadConfig();
+    return NextResponse.json(
+      { ok: true, key, persistedAt: updated.updatedAt },
+      { status: 200 }
+    );
+  }
+
+  // 5) Per-key value validation + transform into a server-config partial
   const partial = toServerPartial(key, value, current);
   if ('error' in partial) {
     return NextResponse.json({ error: partial.error }, { status: 400 });
   }
 
-  // 5) Persist (saveConfig merges with the on-disk state)
+  // 6) Persist (saveConfig merges with the on-disk state)
   const updated = await saveConfig(partial);
 
   return NextResponse.json(

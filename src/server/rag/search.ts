@@ -80,7 +80,9 @@ async function keywordAugmentedSearch(
   minScore: number = 0.15
 ): Promise<RAGResult[]> {
   try {
-    const keywords = await extractKeywordsViaLLM(query);
+    // 使用本地关键词提取替代 LLM 调用，避免每次检索都触发一次大模型请求。
+    // vector store 的语义检索已经融合了 dense/keyword/lexical 信号。
+    const keywords = extractKeywordsLocal(query);
     if (!keywords || keywords.length === 0) return [];
 
     // 用关键词组合作为检索query

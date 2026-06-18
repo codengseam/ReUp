@@ -1,11 +1,11 @@
 // src/app/admin/_components/prompt-tab.test.tsx
-// ReUp v2 Phase 6 (D1): regression tests for the 4-sub-tab prompt admin
-// editor. Each sub-tab is driven by the same `PromptEditor` instance, so
-// we assert:
+// ReUp v2 Phase 6 (D1) + 提示词配置化改造：4-sub-tab prompt admin editor。
+// 断言：
 //   - 4 tabs render with their labels
 //   - clicking each tab loads the correct key from /api/admin/config
 //   - editing + saving calls POST with the correct key
-//   - "恢复默认" / "清空" reverts to the spec default and POSTs it
+//   - "恢复默认" reverts to the spec default and POSTs it
+//   - 版本历史按钮可展开
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({
 function mockAdminConfigApi() {
   const getCalls: string[] = [];
   const postCalls: Array<{ key: string; value: { customPrompt: string } }> = [];
+  const versionGetCalls: string[] = [];
   global.fetch = vi.fn(async (url, init) => {
     const u = String(url);
     if (init?.method === 'POST') {
@@ -31,9 +32,13 @@ function mockAdminConfigApi() {
       getCalls.push(new URL(u, 'http://x').searchParams.get('key') ?? '');
       return new Response(JSON.stringify({ customPrompt: '' }), { status: 200 });
     }
+    if (u.includes('/api/admin/prompt-versions')) {
+      versionGetCalls.push(new URL(u, 'http://x').searchParams.get('key') ?? '');
+      return new Response(JSON.stringify({ active: null, all: [] }), { status: 200 });
+    }
     return new Response('{}', { status: 200 });
   }) as typeof fetch;
-  return { getCalls, postCalls };
+  return { getCalls, postCalls, versionGetCalls };
 }
 
 describe('PromptTab (resume-parse-jd-prompts D1)', () => {
@@ -105,15 +110,26 @@ describe('PromptTab (resume-parse-jd-prompts D1)', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
-  it('the "star" sub-tab defaults to empty (runtime-built default)', async () => {
+  it('the "star" sub-tab now shows the registry default prompt', async () => {
     mockAdminConfigApi();
     const user = userEvent.setup();
     render(<PromptTab />);
     await user.click(screen.getByTestId('prompt-tab-star'));
     const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-star'));
-    expect((textarea as HTMLTextAreaElement).value).toBe('');
-    // Reset button label is special-cased for runtime defaults
+    expect((textarea as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
+    expect((textarea as HTMLTextAreaElement).value).toContain('STAR');
+    // Reset button label is now "恢复默认" like the other tabs
     const resetBtn = screen.getByTestId('prompt-reset-star');
-    expect(within(resetBtn).getByText(/清空/)).toBeInTheDocument();
+    expect(within(resetBtn).getByText(/恢复默认/)).toBeInTheDocument();
+  });
+
+  it('clicking "版本历史" on the system tab fetches /api/admin/prompt-versions?key=system', async () => {
+    const { versionGetCalls } = mockAdminConfigApi();
+    const user = userEvent.setup();
+    render(<PromptTab />);
+    await user.click(screen.getByTestId('prompt-versions-system'));
+    await waitFor(() => {
+      expect(versionGetCalls).toContain('system');
+    });
   });
 });

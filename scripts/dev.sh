@@ -40,6 +40,9 @@ kill_port_if_listening() {
     fi
 }
 
+echo "Generating Prisma client..."
+pnpm prisma generate
+
 echo "Clearing port ${DEPLOY_RUN_PORT} before start."
 kill_port_if_listening
 echo "Starting HTTP service on port ${DEPLOY_RUN_PORT} for dev..."

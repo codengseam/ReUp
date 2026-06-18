@@ -228,7 +228,7 @@ describe.skip('resume optimization chain (phase 5 I4)', () => {
     // and multiple UI interactions.
     render(<ResumeUploadPage />);
     // ----- 1. Paste resume text -----
-    const textarea = screen.getByPlaceholderText(/把简历内容粘贴到此处/i) as HTMLTextAreaElement;
+    const textarea = screen.getByPlaceholderText(/粘贴简历文本/i) as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: RESUME_TEXT } });
     expect(textarea.value).toBe(RESUME_TEXT);
 
@@ -352,7 +352,7 @@ describe.skip('resume optimization chain (phase 5 I4)', () => {
 
     // The rehydrated textarea should contain the saved raw text
     await waitFor(() => {
-      const ta = screen.getByPlaceholderText(/把简历内容粘贴到此处/i) as HTMLTextAreaElement;
+      const ta = screen.getByPlaceholderText(/粘贴简历文本/i) as HTMLTextAreaElement;
       expect(ta.value).toContain('Alice');
     });
 

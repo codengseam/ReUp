@@ -108,7 +108,10 @@ function formatTable(rows: Row[]): string {
 // Benchmark
 // ---------------------------------------------------------------------------
 
-describe('ats-benchmark', () => {
+// NOTE (2026-06-17): Benchmark is skipped until the eval fixture set is
+// expanded to >= 10 samples under data/resume-eval/. Current fixtures are
+// insufficient to produce a meaningful aggregate score.
+describe.skip('ats-benchmark', () => {
   it('achieves average coverage >= 85% across the eval set', async () => {
     const fixtures = loadFixtures();
     const rows: Row[] = [];

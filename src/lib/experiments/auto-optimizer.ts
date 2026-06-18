@@ -182,7 +182,7 @@ export function applySuggestion(suggestion: OptimizationSuggestion, approvedBy: 
     // 找原实验变体
     const variant = db
       .prepare('SELECT * FROM prompt_versions WHERE experiment_id = ? AND version = ?')
-      .get(suggestion.experiment_id, suggestion.variant) as any;
+      .get(suggestion.experiment_id, suggestion.variant) as { id: number; version: string } | undefined;
     if (!variant) {
       return { applied: false, details: { error: 'variant not found' } };
     }

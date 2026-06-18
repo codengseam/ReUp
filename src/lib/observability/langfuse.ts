@@ -2,7 +2,7 @@
 // I1: 没有配置 LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY 时不构造客户端 (no-op)
 // 防止默认 baseUrl 上无谓发请求
 
-import { Langfuse } from 'langfuse';
+import type { Langfuse } from 'langfuse';
 
 let _langfuse: Langfuse | null = null;
 let _initialized = false;
@@ -20,7 +20,10 @@ export function getLangfuse(): Langfuse | null {
     return null;
   }
 
-  _langfuse = new Langfuse({
+  // 延迟加载 langfuse，未配置 keys 时不引入运行时依赖
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const LangfuseCtor = require('langfuse').Langfuse as new (options: Record<string, unknown>) => Langfuse;
+  _langfuse = new LangfuseCtor({
     publicKey,
     secretKey,
     baseUrl: baseUrl || 'http://localhost:3001',

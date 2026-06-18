@@ -13,7 +13,8 @@
 // Constraints: TS strict, no any, no helpers for one-shot operations, no
 // modification of pre-existing modules.
 
-import { LLMClient, type Message } from '@/server/llm/llm-client';
+import { LLMClient, type Message } from '@/lib/llm-client';
+import { DEFAULT_ATS_PROMPT } from '@/lib/prompts/registry';
 import type {
   ATSResult,
   ResumeDocument,
@@ -198,9 +199,7 @@ function parseLlmKeywords(content: string): JdKeyword[] | null {
   return out;
 }
 
-export const DEFAULT_ATS_KEYWORD_SYSTEM =
-  '你是 JD 关键词抽取助手。从给定的职位描述中抽取最关键的技术技能、工具、职责关键词，' +
-  '按重要性降序排列。严格输出 JSON 数组，不输出其他内容。';
+export const DEFAULT_ATS_KEYWORD_SYSTEM = DEFAULT_ATS_PROMPT;
 
 const DEFAULT_ATS_KEYWORD_USER_PREFIX =
   '请从以下职位描述中抽取最重要的 {TOPK} 个关键词或短语（技术技能、工具、职责），' +

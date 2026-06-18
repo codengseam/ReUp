@@ -2,9 +2,9 @@
 // ReUp v2 Phase 2C：admin "Skill 框架" 接口测试。
 //
 // 策略：mock @/server/db/admin-knowledge（控制 getFrameworkSkills 返回值），
-// mock next/headers 的 cookies()（控制是否带 cookie），mock @/server/auth/admin-auth
-// 的 verifyCookie（控制签名是否通过）。这样不依赖真实 SESSION_SECRET 和真实
-// skills/<id>/SKILL.md 文件，专注测试路由层的鉴权 + 数据透传。
+// mock @/lib/admin-auth-helper 的 requireAdmin（控制鉴权是否通过）。这样不依赖
+// 真实 SESSION_SECRET、真实 cookie 和真实 skills/<id>/SKILL.md 文件，专注测试
+// 路由层的鉴权 + 数据透传。
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -12,29 +12,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   mockGetFrameworkSkills,
-  mockVerifyCookie,
-  mockCookieStore,
+  mockRequireAdmin,
 } = vi.hoisted(() => ({
   mockGetFrameworkSkills: vi.fn(),
-  mockVerifyCookie: vi.fn(),
-  mockCookieStore: { get: vi.fn() },
+  mockRequireAdmin: vi.fn(),
 }));
 
 vi.mock('@/server/db/admin-knowledge', () => ({
   getFrameworkSkills: mockGetFrameworkSkills,
 }));
 
-vi.mock('@/server/auth/admin-auth', () => ({
-  verifyCookie: mockVerifyCookie,
-}));
-
-vi.mock('next/headers', () => ({
-  cookies: () => mockCookieStore,
+vi.mock('@/lib/admin-auth-helper', () => ({
+  requireAdmin: mockRequireAdmin,
 }));
 
 // ---------------- Imports (must come after vi.mock) ----------------
 
 import { GET } from './route';
+import { NextRequest } from 'next/server';
 
 function fakeSkill(overrides: Partial<{
   id: string;
@@ -62,28 +57,20 @@ function fakeSkill(overrides: Partial<{
 describe('GET /api/admin/skills', () => {
   beforeEach(() => {
     mockGetFrameworkSkills.mockReset();
-    mockVerifyCookie.mockReset();
-    mockCookieStore.get.mockReset();
+    mockRequireAdmin.mockReset();
   });
 
-  it('(a) 401 when no cookie is present', async () => {
-    mockCookieStore.get.mockReturnValueOnce(undefined);
-    const res = await GET();
+  function makeRequest(): NextRequest {
+    return new NextRequest('http://localhost/api/admin/skills');
+  }
+
+  it('(a) 401 when requireAdmin returns false', async () => {
+    mockRequireAdmin.mockReturnValueOnce(false);
+    const res = await GET(makeRequest());
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe('unauthenticated');
     // 鉴权失败时不应触达数据层
-    expect(mockGetFrameworkSkills).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when cookie value fails HMAC verification', async () => {
-    mockCookieStore.get.mockReturnValueOnce({ value: 'tampered-cookie-value' });
-    mockVerifyCookie.mockReturnValueOnce(false);
-    const res = await GET();
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.error).toBe('unauthenticated');
-    expect(mockVerifyCookie).toHaveBeenCalledWith('tampered-cookie-value', expect.any(String));
     expect(mockGetFrameworkSkills).not.toHaveBeenCalled();
   });
 
@@ -99,11 +86,10 @@ describe('GET /api/admin/skills', () => {
       fakeSkill({ id: 'blind-spot-navigation', name: '盲区导航', category: 'interview' }),
       fakeSkill({ id: 'reverse-questioning-framework', name: '反问框架', category: 'interview' }),
     ];
-    mockCookieStore.get.mockReturnValueOnce({ value: 'valid-cookie' });
-    mockVerifyCookie.mockReturnValueOnce(true);
+    mockRequireAdmin.mockReturnValueOnce(true);
     mockGetFrameworkSkills.mockResolvedValueOnce(eight);
 
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
@@ -113,11 +99,10 @@ describe('GET /api/admin/skills', () => {
 
   it('(c) each skill has id, name, category, trigger, framework, steps, markdown, markdownPath', async () => {
     const one = [fakeSkill()];
-    mockCookieStore.get.mockReturnValueOnce({ value: 'valid-cookie' });
-    mockVerifyCookie.mockReturnValueOnce(true);
+    mockRequireAdmin.mockReturnValueOnce(true);
     mockGetFrameworkSkills.mockResolvedValueOnce(one);
 
-    const res = await GET();
+    const res = await GET(makeRequest());
     const body = await res.json();
     const s = body.skills[0];
 
@@ -145,11 +130,10 @@ describe('GET /api/admin/skills', () => {
     const one = [fakeSkill({
       markdown: '# 晋升底层逻辑\n\n## 触发场景\n绩效好但未晋升。\n\n## 框架步骤\n1. 评估当前级别\n2. 对标下一级\n',
     })];
-    mockCookieStore.get.mockReturnValueOnce({ value: 'valid-cookie' });
-    mockVerifyCookie.mockReturnValueOnce(true);
+    mockRequireAdmin.mockReturnValueOnce(true);
     mockGetFrameworkSkills.mockResolvedValueOnce(one);
 
-    const res = await GET();
+    const res = await GET(makeRequest());
     const body = await res.json();
     const s = body.skills[0];
     expect(s.markdown).not.toBeNull();
@@ -166,11 +150,10 @@ describe('GET /api/admin/skills', () => {
   });
 
   it('500 with Chinese error message when getFrameworkSkills throws', async () => {
-    mockCookieStore.get.mockReturnValueOnce({ value: 'valid-cookie' });
-    mockVerifyCookie.mockReturnValueOnce(true);
+    mockRequireAdmin.mockReturnValueOnce(true);
     mockGetFrameworkSkills.mockRejectedValueOnce(new Error('boom'));
 
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(typeof body.error).toBe('string');

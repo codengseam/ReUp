@@ -55,8 +55,10 @@ export async function retrieve(
   const minScore = (params?.minScore as number) ?? 0.2;
   const maxChars = (params?.maxChars as number) ?? 3000;
   const semanticWeight = (params?.semanticWeight as number) ?? 0.7;
-  const hydeEnabled = (params?.hydeEnabled as boolean) ?? true;
-  const rerankEnabled = (params?.rerankEnabled as boolean) ?? true;
+  // 默认关闭 HyDE / LLM Rerank：这两步都会额外触发一次大模型调用，
+  // 是聊天输出前延迟的主要来源。管理员仍可通过 ragParams 显式开启。
+  const hydeEnabled = (params?.hydeEnabled as boolean) ?? false;
+  const rerankEnabled = (params?.rerankEnabled as boolean) ?? false;
   const cacheTTLMinutes = (params?.cacheTTL as number) ?? 5;
 
   // 0. 确保向量索引已加载（spec §5.2：rag/_retrieve-internal.ts 必须显式触发 load）

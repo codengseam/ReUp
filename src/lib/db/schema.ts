@@ -130,7 +130,8 @@ CREATE INDEX IF NOT EXISTS idx_golden_category ON golden_tests(category);
 -- M3: Prompt 版本注册表
 CREATE TABLE IF NOT EXISTS prompt_versions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  version TEXT NOT NULL UNIQUE,
+  prompt_key TEXT NOT NULL DEFAULT '',
+  version TEXT NOT NULL,
   prompt_content TEXT NOT NULL,
   prompt_hash TEXT NOT NULL,
   change_description TEXT,
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
 );
 CREATE INDEX IF NOT EXISTS idx_prompt_versions_active ON prompt_versions(is_active);
 CREATE INDEX IF NOT EXISTS idx_prompt_versions_experiment ON prompt_versions(experiment_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_versions_key ON prompt_versions(prompt_key);
 
 -- M3: Langfuse trace 关联 (内部 request_id ↔ Langfuse trace_id)
 CREATE TABLE IF NOT EXISTS trace_links (

@@ -233,6 +233,45 @@ describe('MetadataTab', () => {
     expect(summaryCalls.length).toBeGreaterThanOrEqual(2);
   });
 
+  // (g) 点击分类行跳转
+  it('(g) 点击分类行会跳转到知识库 tab 并携带分类过滤', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    setupFetchMock();
+    render(<MetadataTab onNavigate={onNavigate} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('category-row-晋升答辩')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('category-row-晋升答辩'));
+    expect(onNavigate).toHaveBeenCalledWith('knowledge', { group: 'category', name: '晋升答辩' });
+  });
+
+  // (h) 点击交叉表单元格跳转
+  it('(h) 点击书 × 分类单元格会跳转到知识库 tab 并携带书名+分类过滤', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    setupFetchMock();
+    render(<MetadataTab onNavigate={onNavigate} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('category-row-晋升答辩')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /按书 × 分类/ }));
+    await waitFor(() => {
+      expect(screen.getByTestId('crosstab-cell-大厂晋升指南-晋升答辩')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('crosstab-cell-大厂晋升指南-晋升答辩'));
+    expect(onNavigate).toHaveBeenCalledWith('knowledge', {
+      group: 'category',
+      name: '晋升答辩',
+      book: '大厂晋升指南',
+    });
+  });
+
   // (f) 通用 count uses muted styling
   it('(f) 通用统计卡使用 muted 样式（虚线边框 + 次要前景色）', async () => {
     setupFetchMock();
