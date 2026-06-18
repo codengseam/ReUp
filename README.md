@@ -447,14 +447,121 @@ pnpm lint           # 看代码规范错误
 
 ## 部署与发布
 
-详见 [Wiki - 配置与部署](file:///Users/dengxiongshihao/Downloads/projects/.qoder/repowiki/zh/content/配置与部署/) 章节。
+项目支持两种部署方式：**Docker 容器部署（推荐）** 和 **裸机脚本部署**。
 
-简要流程：
+### 方式一：Docker 容器部署（推荐）
 
-1. `pnpm validate` 确保 CI 全绿
-2. `pnpm run build` 产出生产产物
-3. `pnpm run start` 启动生产服务
-4. 通过反向代理（Nginx / Caddy）暴露到公网
+一键启动，环境隔离，自带健康检查、优雅退出、模型缓存持久化。
+
+```bash
+# 1. 准备环境变量
+cp .env.local.example .env
+# 编辑 .env，填入 DASHSCOPE_API_KEY
+
+# 2. 构建并启动
+docker compose up -d --build
+
+# 3. 查看日志
+docker compose logs -f reup
+
+# 4. 健康检查
+curl http://localhost:5000/api/health
+# 深度检查（验证向量索引 + 数据库文件）
+curl http://localhost:5000/api/health?deep=1
+
+# 5. 停止 / 重启
+docker compose down        # 停止（保留 volume）
+docker compose down -v     # 停止并清空数据（慎用）
+```
+
+**Volume 说明**：
+
+| Volume | 用途 | 首次大小 |
+|--------|------|----------|
+| `reup-db` | SQLite 数据库（会话/反馈/评估） | 几 KB 起步 |
+| `reup-models` | BGE-M3 (~2GB) + reranker (~250MB) 模型缓存 | ~2.3 GB |
+
+首次启动会从 HuggingFace 下载模型到 `reup-models` volume，之后重启直接复用，冷启动 < 5s。
+
+**镜像结构**（多阶段构建）：
+
+- `deps` 阶段：编译 `better-sqlite3` / `sharp` 原生模块
+- `builder` 阶段：`next build` + `tsup` 打包 server + `prisma generate`
+- `runner` 阶段：最小运行时，非 root 用户，内置 `HEALTHCHECK`
+
+**端口自定义**：修改 `.env` 里的 `REUP_PORT=8080` 或 `docker compose up` 时传 `-e REUP_PORT=8080`。
+
+### 方式二：裸机脚本部署
+
+适用于无法使用 Docker 的环境。
+
+```bash
+pnpm install
+pnpm validate          # ts-check + lint
+pnpm run build         # next build + tsup
+pnpm run start         # node dist/server.js, 端口 5000
+```
+
+生产环境建议配合 **PM2** 或 **systemd** 做进程管理：
+
+```bash
+# PM2 示例
+pm2 start dist/server.js --name reup --env production
+pm2 save && pm2 startup
+```
+
+### 健康检查端点
+
+| 端点 | 用途 |
+|------|------|
+| `GET /api/health` | 轻量探活，返回进程状态 + uptime |
+| `GET /api/health?deep=1` | 深度检查，额外验证向量索引 + 数据库文件可读 |
+
+Nginx / K8s / Docker HEALTHCHECK 配置示例：
+
+```nginx
+location /health {
+  proxy_pass http://127.0.0.1:5000/api/health;
+}
+```
+
+### 反向代理（Nginx）
+
+生产环境建议在前面加 Nginx 做 TLS 终止 + 静态资源缓存：
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate     /etc/ssl/certs/your-cert.pem;
+    ssl_certificate_key /etc/ssl/private/your-key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE 必需：禁用缓冲，支持流式聊天
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+### 向量数据库说明
+
+`data/skill-vectors.json`（27MB，608 chunks，BGE-M3 1024-dim）已直接提交到仓库：
+
+- 体积可控（< GitHub 50MB 警告线），无需 Git LFS
+- 镜像构建时 `COPY` 进去，启动即可用，无需额外下载
+- 如需更新，本地跑 `python scripts/export-vectors.py` 重新导出后 commit
+
+原始 LanceDB（`~/Library/Mobile Documents/.../boss-agent/lancedb_data`）不进仓库，仅作为导出源。
 
 ---
 
