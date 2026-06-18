@@ -1,0 +1,37 @@
+services:
+  ai-chat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-chat-scaffold:latest
+    container_name: ai-chat
+    restart: unless-stopped
+    ports:
+      - "${REUP_PORT:-5000}:5000"
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: file:/app/data/dev.db
+      HF_HOME: /app/data/.cache/hub
+      TRANSFORMERS_CACHE: /app/data/.cache/hub
+      TMPDIR: /app/data/.cache/tmp
+    volumes:
+      - ai-chat-db:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  ai-chat-db:
+    driver: local

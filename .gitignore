@@ -111,3 +111,11 @@ data/resume-eval/
 # Prisma
 prisma/dev.db
 prisma/generated/
+
+# Docker / loop runtime data
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/.cache/
+dist/

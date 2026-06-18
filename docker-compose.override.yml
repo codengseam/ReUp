@@ -1,0 +1,15 @@
+services:
+  ai-chat:
+    command: ["pnpm", "tsx", "watch", "src/server.ts"]
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - /app/dist
+    ports:
+      - "${REUP_DEBUG_PORT:-9229}:9229"
+    healthcheck:
+      start_period: 120s
+      interval: 60s
