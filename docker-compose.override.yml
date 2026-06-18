@@ -1,0 +1,32 @@
+# docker-compose.override.yml — ReUp 开发环境覆盖
+# docker compose 默认自动加载本文件, 与 docker-compose.yml 合并
+# 用途: 热重载 + 调试端口 + 放宽健康检查 (开发环境冷启动慢)
+# 生产部署: make up PROD=1 (显式 -f docker-compose.yml 排除本文件)
+
+services:
+  reup:
+    # 热重载: 直接 tsx watch, 绕过 dev.sh 的宿主端口清理逻辑
+    command: ["pnpm", "tsx", "watch", "src/server.ts"]
+
+    environment:
+      # 仅覆盖 NODE_ENV, 其他环境变量由基础 compose 提供 (override 自动合并)
+      NODE_ENV: development
+
+    volumes:
+      # bind-mount 源码, 实现热重载
+      - .:/app
+      # 匿名卷保护容器内 node_modules, 避免被宿主目录覆盖
+      - /app/node_modules
+      # 匿名卷保护 .next 构建产物
+      - /app/.next
+      # 匿名卷保护 dist 构建产物
+      - /app/dist
+
+    ports:
+      # 额外暴露调试端口 (node --inspect)
+      - "${REUP_DEBUG_PORT:-9229}:9229"
+
+    healthcheck:
+      # 开发环境冷启动慢, 放宽检查周期 (其余字段继承基础 compose)
+      start_period: 120s
+      interval: 60s

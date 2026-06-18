@@ -11,6 +11,11 @@
 
 ARG NODE_VERSION=20
 ARG PNPM_VERSION=9
+# 统一端口来源 (runner 阶段 ENV PORT / EXPOSE / HEALTHCHECK 共用)
+ARG APP_PORT=5000
+# 非 root 用户 UID/GID (需与 volume 挂载宿主目录权限对齐)
+ARG APP_UID=1001
+ARG APP_GID=1001
 
 # ============================================================================
 # Stage 1: deps — 安装所有依赖 (含 devDependencies, 用于构建)
@@ -78,6 +83,10 @@ RUN pnpm tsup src/server.ts \
 # ============================================================================
 FROM node:${NODE_VERSION}-slim AS runner
 ARG PNPM_VERSION
+# ARG 跨阶段不继承, 在 runner 阶段重新声明 (默认值保持现有行为不变)
+ARG APP_PORT=5000
+ARG APP_UID=1001
+ARG APP_GID=1001
 
 WORKDIR /app
 
@@ -90,8 +99,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 # 非 root 用户运行
-RUN groupadd --system --gid 1001 reup \
-    && useradd --system --uid 1001 --gid reup --create-home --shell /bin/bash reup
+RUN groupadd --system --gid ${APP_GID} reup \
+    && useradd --system --uid ${APP_UID} --gid reup --create-home --shell /bin/bash reup
 
 # 复制生产依赖 (从 deps 阶段剔除 devDependencies)
 COPY --from=deps /app/node_modules ./node_modules
@@ -117,7 +126,7 @@ RUN mkdir -p /app/data /app/.cache/hub /app/.cache/tmp \
     && chown -R reup:reup /app
 
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=$APP_PORT
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 # better-sqlite3 数据库路径 (挂载 volume 持久化)
@@ -129,10 +138,10 @@ ENV TMPDIR=/app/.cache/tmp
 
 USER reup
 
-EXPOSE 5000
+EXPOSE ${APP_PORT}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl -fsS http://localhost:5000/api/health || exit 1
+    CMD curl -fsS http://localhost:${PORT}/api/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/server.js"]
