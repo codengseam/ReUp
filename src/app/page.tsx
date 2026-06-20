@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Briefcase, Menu, X, Settings, ChevronRight,
-  Search, Lightbulb, Trash2
+  Search, Lightbulb, Trash2, Mic
 } from 'lucide-react';
 import type { Message, CitationData, ModelConfig, CustomProvider } from '@/components/chat/types';
 import {
@@ -31,6 +31,13 @@ import { Button } from '@/components/ui/button';
 import { classifyError } from '@/server/llm/error-classifier';
 import { recordFeedback } from '@/server/db/feedback-store';
 import {
+  createRecognition,
+  buildSpeechTranscript,
+  joinInputParts,
+  type SpeechRecognitionLike,
+  type SpeechRecognitionEventLike,
+} from '@/lib/voice-input';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -41,24 +48,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-
-// ========== 语音识别辅助函数 ==========
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function createRecognition(): any {
-  const win = window as unknown as {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    SpeechRecognition?: new () => any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    webkitSpeechRecognition?: new () => any;
-  };
-  const SpeechRecognitionCtor = win.SpeechRecognition || win.webkitSpeechRecognition;
-  if (!SpeechRecognitionCtor) return null;
-  const recognition = new SpeechRecognitionCtor();
-  recognition.lang = 'zh-CN';
-  recognition.interimResults = true;
-  recognition.continuous = false;
-  return recognition;
-}
 
 // sessionStorage key 已废弃：对话数据由 conversation-store 写入 localStorage
 
@@ -158,7 +147,8 @@ export default function ChatPage() {
   }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceBaseInputRef = useRef<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestDurations = useRef<number[]>([]);
   const [estimatedSeconds, setEstimatedSeconds] = useState<number | null>(null);
@@ -278,39 +268,75 @@ export default function ChatPage() {
   }, [input]);
 
   // ===== 语音识别 =====
-  const toggleVoiceInput = useCallback(() => {
+  const toggleVoiceInput = useCallback(async () => {
     if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
       setIsListening(false);
       return;
     }
 
+    // 1) 浏览器 API 可用性检查
     const recognition = createRecognition();
     if (!recognition) {
-      alert('您的浏览器不支持语音输入');
+      setStatus('当前浏览器不支持语音输入，请使用 Chrome / Edge / Safari 或手动输入');
       return;
     }
 
-    recognitionRef.current = recognition;
-    setIsListening(true);
+    // 2) 麦克风权限预检（Web Speech API 在某些浏览器需要 HTTPS + 权限）
+    if (navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('Permission denied') || message.includes('NotAllowedError')) {
+          setStatus('麦克风权限被拒绝，请在浏览器地址栏允许麦克风访问');
+        } else {
+          setStatus(`无法访问麦克风：${message}`);
+        }
+        return;
+      }
+    }
 
-    recognition.onresult = (event: Event) => {
-      const srEvent = event as unknown as { results: { [key: number]: { [index: number]: { transcript: string } } } };
-      const transcript = Array.from({ length: Object.keys(srEvent.results).length }, (_, i) => srEvent.results[i]?.[0]?.transcript || '')
-        .join('');
-      setInput(transcript);
+    // 3) 创建新实例并绑定事件
+    recognitionRef.current = recognition;
+    voiceBaseInputRef.current = input;
+    setIsListening(true);
+    setStatus('正在聆听，请说话…');
+
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
+      const { final, interim } = buildSpeechTranscript(event.results);
+      setInput(joinInputParts(voiceBaseInputRef.current, final, interim));
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      setStatus('');
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: { error: string; message: string }) => {
+      const code = event.error;
+      let message = '语音识别失败';
+      if (code === 'not-allowed') message = '麦克风权限被拒绝，请允许后重试';
+      else if (code === 'no-speech') message = '没有检测到语音，请重试';
+      else if (code === 'network') message = '语音识别网络错误，请检查网络后重试';
+      else if (code === 'aborted') message = '';
+      if (message) setStatus(message);
       setIsListening(false);
     };
 
-    recognition.start();
-  }, [isListening]);
+    try {
+      recognition.start();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus(`语音识别启动失败：${message}`);
+      setIsListening(false);
+    }
+  }, [isListening, input]);
 
   // ===== 发送消息 =====
   // 同步 messages 到 conversation-store 的包装器（既支持函数也支持数组）
@@ -1127,22 +1153,22 @@ export default function ChatPage() {
             })}
 
             {/* 状态指示器 */}
-            {isLoading && status && (
+            {(isLoading && status && statusText[status]) || (status && !isLoading) ? (
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 mr-3">
                   <Briefcase className="w-4 h-4 text-primary-foreground" />
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted">
-                  {statusIcon[status]}
+                  {statusIcon[status] ?? <Mic className="w-3.5 h-3.5 text-muted-foreground" />}
                   <span className="text-sm text-muted-foreground">
-                    {statusText[status]}
-                    {estimatedSeconds !== null && (
+                    {statusText[status] ?? status}
+                    {estimatedSeconds !== null && isLoading && (
                       <span className="text-xs opacity-60 ml-1">预计 {estimatedSeconds}s</span>
                     )}
                   </span>
                 </div>
               </div>
-            )}
+            ) : null}
 
             <div ref={messagesEndRef} />
           </div>

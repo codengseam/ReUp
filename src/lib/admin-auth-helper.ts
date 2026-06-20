@@ -5,13 +5,13 @@
 // - 启动时若 NODE_ENV=production 且 ADMIN_SESSION_SECRET 未设 → throw
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyCookie } from '@/lib/admin-auth';
+import { signCookie, verifyCookie } from '@/lib/admin-auth';
 
 export const ADMIN_COOKIE = 'boss_admin_session';
 
 let _cachedSecret: string | null = null;
 
-function getSessionSecret(): string {
+export function getSessionSecret(): string {
   if (_cachedSecret !== null) return _cachedSecret;
   const env = process.env.ADMIN_SESSION_SECRET;
   if (!env) {
@@ -28,6 +28,20 @@ function getSessionSecret(): string {
   return _cachedSecret;
 }
 
+/** Sign a value with the configured admin session secret. */
+export function signAdminCookie(value: string): string {
+  return signCookie(value, getSessionSecret());
+}
+
+/** Verify an admin cookie with the configured session secret. */
+export function verifyAdminCookie(encoded: string): boolean {
+  try {
+    return verifyCookie(encoded, getSessionSecret());
+  } catch {
+    return false;
+  }
+}
+
 export function requireAdmin(request: NextRequest): boolean {
   // C-1 修复: 强制鉴权. 若 env 缺失且 production, 上面的 getSessionSecret 已 throw
   // dev 环境 (无 env) 仍然开放 (本地开发体验)
@@ -36,11 +50,7 @@ export function requireAdmin(request: NextRequest): boolean {
   }
   const cookie = request.cookies.get(ADMIN_COOKIE)?.value;
   if (!cookie) return false;
-  try {
-    return verifyCookie(cookie, getSessionSecret());
-  } catch {
-    return false;
-  }
+  return verifyAdminCookie(cookie);
 }
 
 export function unauthorizedResponse() {
