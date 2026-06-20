@@ -123,7 +123,7 @@ describe('index', () => {
   });
 
   describe('summary', () => {
-    it('should have correct summary when only info-level issues exist', () => {
+    it('should have correct summary when no issues are detected', () => {
       const resume = makeResume({
         raw: '',
         basic: { name: 'Test', title: '工程师', yearsOfExperience: 3 },
@@ -137,7 +137,6 @@ describe('index', () => {
       expect(result.summary.total).toBe(result.issues.length);
       expect(result.summary.errors).toBe(0);
       expect(result.summary.warnings).toBe(0);
-      expect(result.summary.infos).toBeGreaterThanOrEqual(1);
       expect(result.summary.errors + result.summary.warnings + result.summary.infos).toBe(result.summary.total);
     });
 

@@ -59,15 +59,5 @@ export function detectImpactIssues(resume: ResumeDocument): DiagnosticIssue[] {
     }
   }
 
-  if (issues.length === 0 && (resume.experience.length > 0 || resume.projects.length > 0)) {
-    issues.push({
-      type: 'impact',
-      severity: 'info',
-      message: '已检测到量化指标或工作描述较短，建议继续检查关键经历是否都有数据支撑。',
-      location: 'overall',
-      suggestion: '确保至少 3 条核心经历包含可衡量的业务或技术指标。',
-    });
-  }
-
   return issues;
 }

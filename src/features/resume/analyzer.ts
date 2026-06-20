@@ -11,7 +11,7 @@ import type { DiagnosticResult } from './diagnostics';
 import type { LLMClient } from '@/server/llm/llm-client';
 import { runDiagnostics } from './diagnostics';
 import { extractJdKeywords, computeAtsCoverage, suggestSectionForKeyword } from './ats';
-import { generatePriorities, buildMatchReportFromJD } from './matcher';
+import { generatePriorities, buildMatchReportFromJD, computeOverallMatchScore } from './matcher';
 import { analyzeJD, type JDAnalysis } from '@/features/jd/analyzer';
 
 // ---------------------------------------------------------------------------
@@ -75,10 +75,11 @@ export async function analyzeResume(
       // ── Match pipeline (JD-driven) ──
       (async (): Promise<MatchReport> => {
         const partialMatch = buildMatchReportFromJD(resume, jd);
+        const overallScore = computeOverallMatchScore(partialMatch, jd);
         const priorities = await generatePriorities(resume, partialMatch, {
           llmClient: options?.llmClient,
         });
-        return { ...partialMatch, priorities };
+        return { ...partialMatch, priorities, overallScore };
       })(),
       // ── JD expert analysis ──
       (async (): Promise<JDAnalysis> => {

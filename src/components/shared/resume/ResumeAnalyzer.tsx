@@ -103,18 +103,22 @@ export function ResumeAnalyzer() {
     setState('analyzing'); setError(''); setProgress(10);
     const timer = setInterval(() => setProgress((p) => Math.min(p + 5, 90)), 400);
 
-    // Track resume_upload: derive format from filename extension, fall back to 'txt'.
-    const format = (() => {
-      const m = /\.([a-z0-9]+)$/i.exec(fileName);
-      if (!m) return 'txt';
-      const ext = m[1].toLowerCase();
-      if (ext === 'markdown') return 'md';
-      return ext;
-    })();
-    safeTrack({ type: 'resume_upload', data: { format, fileSize } });
+    // Track resume_upload: only when resume input is present.
+    if (hasResumeInput) {
+      const format = (() => {
+        const m = /\.([a-z0-9]+)$/i.exec(fileName);
+        if (!m) return 'txt';
+        const ext = m[1].toLowerCase();
+        if (ext === 'markdown') return 'md';
+        return ext;
+      })();
+      safeTrack({ type: 'resume_upload', data: { format, fileSize } });
+    }
 
-    // Track jd_parse: only fired when JD text is non-empty.
-    safeTrack({ type: 'jd_parse', data: { source: 'paste' } });
+    // Track jd_parse: only when JD text is present.
+    if (hasJdInput) {
+      safeTrack({ type: 'jd_parse', data: { source: 'paste' } });
+    }
 
     try {
       const formData = new FormData();

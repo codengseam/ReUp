@@ -89,7 +89,7 @@ export function DiagnosticsPanel({ diagnostics }: Props) {
             key={type}
             type={type}
             issues={grouped[type]}
-            defaultOpen={type === 'contradiction' || type === 'timeline'}
+            defaultOpen={type === 'contradiction' || type === 'timeline' || type === 'impact' || type === 'career'}
           />
         ))}
       </div>

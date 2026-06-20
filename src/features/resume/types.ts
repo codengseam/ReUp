@@ -83,6 +83,8 @@ export type MatchReport = {
   strengths: Array<{ dimension: string; evidence: string }>;
   gaps: Array<{ dimension: string; severity: 'high' | 'medium' | 'low' }>;
   priorities: Array<{ rank: 1 | 2 | 3; action: string; expectedImpact: string }>;
+  /** Weighted match percentage (0-100) computed from JD dimensions. */
+  overallScore?: number;
 };
 
 /**

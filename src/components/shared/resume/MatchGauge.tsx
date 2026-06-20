@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function MatchGauge({ matchReport, atsResult }: Props) {
-  const matchPercentage = computeMatchPercentage(matchReport);
+  const matchPercentage = matchReport.overallScore ?? computeMatchPercentage(matchReport);
   const atsPercentage = atsResult.coverage.percentage;
 
   return (
