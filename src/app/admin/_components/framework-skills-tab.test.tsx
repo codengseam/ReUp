@@ -154,4 +154,21 @@ describe('FrameworkSkillsTab', () => {
       expect(screen.getByText('服务器内部错误')).toBeInTheDocument();
     });
   });
+
+  it('(g) 请求 /api/admin/skills 时携带 credentials: include', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ skills: MOCK_SKILLS }),
+    } as Response);
+    globalThis.fetch = mockFetch;
+
+    render(<FrameworkSkillsTab />);
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/admin/skills',
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+  });
 });

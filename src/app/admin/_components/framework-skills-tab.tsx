@@ -73,7 +73,7 @@ export default function FrameworkSkillsTab() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(SKILLS_API);
+      const res = await fetch(SKILLS_API, { credentials: 'include' });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `HTTP ${res.status}`);

@@ -30,6 +30,36 @@ describe('prompt registry', () => {
     expect(getDefaultPrompt('star')).toContain('STAR');
   });
 
+  it('each default prompt is longer than 200 chars and contains key directives', () => {
+    const system = getDefaultPrompt('system');
+    expect(system.length).toBeGreaterThan(200);
+    expect(system).toContain('资深 HR');
+    expect(system).toContain('总裁');
+    expect(system).toContain('[1]');
+    expect(system).toContain('8 个 Skill');
+    expect(system).toContain('禁止');
+
+    const star = getDefaultPrompt('star');
+    expect(star.length).toBeGreaterThan(200);
+    expect(star).toContain('Situation');
+    expect(star).toContain('Task');
+    expect(star).toContain('Action');
+    expect(star).toContain('Result');
+    expect(star).toContain('禁止捏造');
+
+    const ats = getDefaultPrompt('ats');
+    expect(ats.length).toBeGreaterThan(200);
+    expect(ats).toContain('JSON');
+    expect(ats).toContain('weight');
+
+    const match = getDefaultPrompt('match');
+    expect(match.length).toBeGreaterThan(200);
+    expect(match).toContain('strengths');
+    expect(match).toContain('gaps');
+    expect(match).toContain('priorities');
+    expect(match).toContain('简历原文');
+  });
+
   it('getPromptSpec returns the correct spec', () => {
     expect(getPromptSpec('system').configKey).toBe('prompt');
     expect(getPromptSpec('star').configKey).toBe('resume.starPrompt');

@@ -19,6 +19,7 @@ import {
   getPromptSpec,
   getDefaultPrompt,
   configKeyToPromptKind,
+  isPlaceholderPrompt,
 } from './registry';
 
 const PROMPT_KEY_TO_KIND: Record<PromptKey, PromptKind> = {
@@ -73,19 +74,32 @@ function buildServerConfigPartial(
   }
 }
 
-/** 获取当前生效提示词：自定义 > 注册表默认 */
+/** 获取当前生效提示词：自定义 > 注册表默认；占位符按默认处理 */
 export async function getEffectivePrompt(kind: PromptKind): Promise<string> {
   const config = await loadConfig();
   const configured = readConfiguredPromptFromConfig(config, kind);
-  if (configured && configured.trim().length > 0) return configured;
+  if (
+    configured &&
+    configured.trim().length > 0 &&
+    !isPlaceholderPrompt(kind, configured)
+  ) {
+    return configured;
+  }
   return getDefaultPrompt(kind);
 }
 
-/** 获取当前已保存的自定义提示词；未配置时返回 null（用于 admin UI 判断是否为默认） */
+/** 获取当前已保存的自定义提示词；未配置或占位符时返回 null（用于 admin UI 判断是否为默认） */
 export async function getConfiguredPrompt(kind: PromptKind): Promise<string | null> {
   const config = await loadConfig();
   const configured = readConfiguredPromptFromConfig(config, kind);
-  return configured && configured.trim().length > 0 ? configured : null;
+  if (
+    configured &&
+    configured.trim().length > 0 &&
+    !isPlaceholderPrompt(kind, configured)
+  ) {
+    return configured;
+  }
+  return null;
 }
 
 export interface SavePromptOptions {

@@ -45,46 +45,63 @@ describe('prompt config service', () => {
   });
 
   it('savePrompt writes to server-config and registers a version', async () => {
-    await savePrompt('system', 'CUSTOM SYSTEM PROMPT');
+    await savePrompt('system', 'USER CUSTOM SYSTEM PROMPT');
 
     const configured = await getConfiguredPrompt('system');
-    expect(configured).toBe('CUSTOM SYSTEM PROMPT');
+    expect(configured).toBe('USER CUSTOM SYSTEM PROMPT');
 
     const effective = await getEffectivePrompt('system');
-    expect(effective).toBe('CUSTOM SYSTEM PROMPT');
+    expect(effective).toBe('USER CUSTOM SYSTEM PROMPT');
 
     const history = getPromptVersionHistory('system');
     expect(history).toHaveLength(1);
-    expect(history[0].prompt_content).toBe('CUSTOM SYSTEM PROMPT');
+    expect(history[0].prompt_content).toBe('USER CUSTOM SYSTEM PROMPT');
     expect(history[0].is_active).toBe(1);
     expect(history[0].prompt_key).toBe('system');
   });
 
   it('savePrompt preserves other resume sub-keys', async () => {
-    await savePrompt('star', 'CUSTOM STAR');
-    await savePrompt('ats', 'CUSTOM ATS');
+    await savePrompt('star', 'USER CUSTOM STAR PROMPT');
+    await savePrompt('ats', 'USER CUSTOM ATS PROMPT');
 
     const configuredStar = await getConfiguredPrompt('star');
     const configuredAts = await getConfiguredPrompt('ats');
-    expect(configuredStar).toBe('CUSTOM STAR');
-    expect(configuredAts).toBe('CUSTOM ATS');
+    expect(configuredStar).toBe('USER CUSTOM STAR PROMPT');
+    expect(configuredAts).toBe('USER CUSTOM ATS PROMPT');
+  });
+
+  it('getEffectivePrompt returns registry default when server-config contains a placeholder', async () => {
+    await savePrompt('system', 'CUSTOM SYSTEM PROMPT');
+    await savePrompt('star', 'CUSTOM STAR');
+    await savePrompt('ats', 'CUSTOM ATS');
+    await savePrompt('match', 'MATCH-V1');
+
+    expect(await getEffectivePrompt('system')).toBe(getDefaultPrompt('system'));
+    expect(await getEffectivePrompt('star')).toBe(getDefaultPrompt('star'));
+    expect(await getEffectivePrompt('ats')).toBe(getDefaultPrompt('ats'));
+    expect(await getEffectivePrompt('match')).toBe(getDefaultPrompt('match'));
+  });
+
+  it('getConfiguredPrompt returns null for known placeholder values', async () => {
+    await savePrompt('system', 'CUSTOM SYSTEM PROMPT');
+    expect(await getConfiguredPrompt('system')).toBeNull();
   });
 
   it('activatePromptVersion restores a previous version to active', async () => {
-    await savePrompt('match', 'MATCH-V1');
-    await savePrompt('match', 'MATCH-V2');
+    await savePrompt('match', 'USER MATCH V1');
+    await savePrompt('match', 'USER MATCH V2');
 
     const history = getPromptVersionHistory('match');
     expect(history).toHaveLength(2);
 
-    const v1 = history.find((h) => h.prompt_content === 'MATCH-V1');
+    const v1 = history.find((h) => h.prompt_content === 'USER MATCH V1');
     expect(v1).toBeDefined();
 
     const ok = await activatePromptVersion('match', v1!.version);
     expect(ok).toBe(true);
 
-    expect(await getConfiguredPrompt('match')).toBe('MATCH-V1');
-    expect(await getEffectivePrompt('match')).toBe('MATCH-V1');
+    expect(await getConfiguredPrompt('match')).toBe('USER MATCH V1');
+    expect(await getEffectivePrompt('match')).toBe('USER MATCH V1');
   });
 
   it('readConfiguredPromptFromConfig reads the correct slot', () => {

@@ -12,6 +12,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import PromptTab from './prompt-tab';
+import { getDefaultPrompt } from '@/lib/prompts/registry';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn() },
@@ -131,5 +132,27 @@ describe('PromptTab (resume-parse-jd-prompts D1)', () => {
     await waitFor(() => {
       expect(versionGetCalls).toContain('system');
     });
+  });
+
+  it('replaces server placeholder with the registry default prompt', async () => {
+    global.fetch = vi.fn(async (url, init) => {
+      const u = String(url);
+      if (init?.method === 'POST') {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }
+      if (u.includes('/api/admin/config')) {
+        const key = new URL(u, 'http://x').searchParams.get('key');
+        if (key === 'prompt') {
+          return new Response(JSON.stringify({ customPrompt: 'CUSTOM SYSTEM PROMPT' }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ customPrompt: '' }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+
+    render(<PromptTab />);
+    const textarea = await waitFor(() => screen.getByTestId('prompt-textarea-system'));
+    expect((textarea as HTMLTextAreaElement).value).not.toBe('CUSTOM SYSTEM PROMPT');
+    expect((textarea as HTMLTextAreaElement).value).toBe(getDefaultPrompt('system'));
   });
 });

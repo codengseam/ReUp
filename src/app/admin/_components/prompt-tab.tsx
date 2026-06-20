@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Save, RotateCcw, Check, InfoIcon, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getAllPromptSpecs, type PromptSpec } from '@/lib/prompts/registry';
+import { getAllPromptSpecs, type PromptSpec, isPlaceholderPrompt } from '@/lib/prompts/registry';
 import { useDebouncedCallback } from '@/hooks/use-debounce';
 
 const CONFIG_API = '/api/admin/config';
@@ -67,7 +67,7 @@ function PromptEditor({ spec }: { spec: PromptSpec }) {
         if (res.ok) {
           const data = await res.json();
           const trimmed = typeof data.customPrompt === 'string' ? data.customPrompt.trim() : '';
-          if (trimmed) {
+          if (trimmed && !isPlaceholderPrompt(spec.key, trimmed)) {
             setPrompt(trimmed);
             setLocalPrompt(trimmed);
             localPromptRef.current = trimmed;
@@ -160,7 +160,10 @@ function PromptEditor({ spec }: { spec: PromptSpec }) {
       const getRes = await fetch(`${CONFIG_API}?key=${encodeURIComponent(spec.configKey)}`);
       if (getRes.ok) {
         const data = await getRes.json();
-        const restored = typeof data.customPrompt === 'string' ? data.customPrompt : spec.defaultPrompt;
+        const restoredRaw = typeof data.customPrompt === 'string' ? data.customPrompt : spec.defaultPrompt;
+        const restored = isPlaceholderPrompt(spec.key, restoredRaw.trim())
+          ? spec.defaultPrompt
+          : restoredRaw;
         setPrompt(restored);
         setLocalPrompt(restored);
         localPromptRef.current = restored;
