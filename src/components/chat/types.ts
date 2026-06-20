@@ -66,7 +66,7 @@ export const QUICK_ENTRIES = [
   { label: '反问设计', icon: 'HelpCircle', query: '面试最后问什么问题？' },
 ];
 
-// 优秀提问案例库
+// 优秀提问案例库（首页展示 3 个精选，避免与 QUICK_ENTRIES 重复）
 export const EXAMPLE_QUERIES = [
   {
     category: '晋升',
@@ -76,33 +76,15 @@ export const EXAMPLE_QUERIES = [
   },
   {
     category: '晋升',
-    badExample: '我该学什么技术才能晋升？',
-    goodExample: '作为技术负责人，我该学什么方向才能从P7升到P8？',
-    tip: '说明当前职级和目标职级'
-  },
-  {
-    category: '晋升',
     badExample: '业务没亮点怎么办？',
     goodExample: '我做的业务很稳定但不出彩，如何在晋升中体现价值？',
     tip: '描述具体困境而非笼统提问'
   },
   {
     category: '面试',
-    badExample: '面试不会回答怎么办？',
-    goodExample: '面试时被问到不懂的技术栈，怎么优雅地转场？',
-    tip: '聚焦具体场景'
-  },
-  {
-    category: '面试',
     badExample: '简历怎么写？',
     goodExample: '简历上的项目比较平淡，怎么挖掘出亮点？',
     tip: '指出具体问题点'
-  },
-  {
-    category: '面试',
-    badExample: '面试最后问什么？',
-    goodExample: '面试最后反问环节，问什么问题能给面试官留下好印象？',
-    tip: '明确场景和目的'
   },
 ];
 

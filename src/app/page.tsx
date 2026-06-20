@@ -90,7 +90,6 @@ export default function ChatPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [thumbsDownCount, setThumbsDownCount] = useState<number>(0); // 保留字段名（ChatMessage 仍按此读取）；语义现为"反馈总数"
   const [regenerateCount, setRegenerateCount] = useState<number>(0);
-  const [expandedExamples, setExpandedExamples] = useState<Record<string, boolean>>({});
 
   // 客户端水合后从 localStorage 同步模型配置，避免 SSR 水合不匹配
   useEffect(() => {
@@ -1067,11 +1066,7 @@ export default function ChatPage() {
           <div className="max-w-[680px] mx-auto px-6 py-6">
             {/* 欢迎态 */}
             {messages.length === 0 && !isLoading && (
-              <WelcomeScreen
-                onQuickEntry={handleQuickEntry}
-                expandedExamples={expandedExamples}
-                onToggleExample={(key) => setExpandedExamples(prev => ({ ...prev, [key]: !prev[key] }))}
-              />
+              <WelcomeScreen onQuickEntry={handleQuickEntry} />
             )}
 
             {/* 对话消息：跳过空 assistant 消息（loading 态由独立 indicator 渲染，避免重复 AI 头像） */}

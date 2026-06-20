@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Briefcase, ChevronRight, FileText } from 'lucide-react';
+import { Briefcase, FileText, ArrowRight } from 'lucide-react';
 import {
   TrendingUp, Sparkles, Target, HelpCircle
 } from 'lucide-react';
@@ -18,11 +18,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 interface WelcomeScreenProps {
   onQuickEntry: (query: string) => void;
-  expandedExamples: Record<string, boolean>;
-  onToggleExample: (key: string) => void;
 }
 
-export default function WelcomeScreen({ onQuickEntry, expandedExamples, onToggleExample }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onQuickEntry }: WelcomeScreenProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-6">
@@ -53,49 +51,34 @@ export default function WelcomeScreen({ onQuickEntry, expandedExamples, onToggle
           );
         })}
       </div>
-      {/* 优秀提问案例库 */}
-      <div className="w-full max-w-md mt-6">
-        <p className="text-xs text-muted-foreground mb-3 text-center">优秀提问参考</p>
-        {EXAMPLE_QUERIES.map((group, idx) => {
-          const key = `${group.category}-${idx}`;
-          return (
-            <div key={key} className="mb-3">
-              <button
-                onClick={() => onToggleExample(key)}
-                className="w-full flex items-center justify-between text-xs font-medium text-primary bg-primary/10 px-2 py-1.5 rounded mb-1.5 hover:bg-primary/20 transition-colors"
-              >
-                <span>{group.category}类 · {group.goodExample.substring(0, 20)}...</span>
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expandedExamples[key] ? 'rotate-90' : ''}`} />
-              </button>
-              {!expandedExamples[key] && (
-                <button
-                  onClick={() => onQuickEntry(group.goodExample)}
-                  className="block w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-muted px-3 py-2 rounded-lg transition-colors truncate"
-                >
-                  {group.goodExample}
-                </button>
-              )}
-              {expandedExamples[key] && (
-                <div className="space-y-2 px-2 py-2 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="text-[10px] text-red-500 font-medium mb-0.5">差问题</p>
-                    <p className="text-xs text-muted-foreground">{group.badExample}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-green-600 font-medium mb-0.5">好问题</p>
-                    <button
-                      onClick={() => onQuickEntry(group.goodExample)}
-                      className="block w-full text-left text-xs text-foreground hover:text-primary hover:bg-muted px-2 py-1 rounded transition-colors"
-                    >
-                      {group.goodExample}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/70">差异说明：{group.tip}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      {/* 优秀提问案例库：精选 3 个，卡片式网格 */}
+      <div className="w-full max-w-2xl mt-10 px-4">
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <p className="text-xs font-medium text-muted-foreground">试试这样问</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {EXAMPLE_QUERIES.map((group, idx) => (
+            <button
+              key={`${group.category}-${idx}`}
+              onClick={() => onQuickEntry(group.goodExample)}
+              className="group text-left p-4 rounded-xl bg-surface-container border border-border/20 hover:border-primary/30 hover:bg-surface-container-high hover:shadow-sm transition-all"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {group.category}类
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <p className="text-xs text-foreground leading-relaxed line-clamp-3 mb-2">
+                {group.goodExample}
+              </p>
+              <p className="text-[10px] text-muted-foreground/70">
+                {group.tip}
+              </p>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
