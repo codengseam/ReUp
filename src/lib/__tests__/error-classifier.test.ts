@@ -6,14 +6,15 @@ describe('classifyError', () => {
     const err = new TypeError('Failed to fetch');
     const result = classifyError(err);
     expect(result.title).toBe('AI 服务暂不可用');
-    expect(result.hint).toContain('5001');
+    expect(result.message).toContain('无法连接到服务端');
+    expect(result.hint).toContain('后端服务');
   });
 
   it('detects missing credentials (400/Missing)', () => {
     const err = new Error('Missing credentials: OPENAI_API_KEY');
     const result = classifyError(err);
     expect(result.title).toBe('AI 服务未配置');
-    expect(result.hint).toContain('OPENAI_API_KEY');
+    expect(result.hint).toContain('管理后台');
   });
 
   it('detects 401 unauthorized', () => {

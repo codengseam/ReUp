@@ -54,7 +54,7 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions = {}): strin
   }
   parts.push('', DEFAULT_CONSTRAINTS_BLOCK, '', options.format ?? DEFAULT_FORMAT_BLOCK);
   if (options.ragContext) {
-    parts.push('', `## 知识库检索结果\n严格基于以下内容回答：\n\n${options.ragContext}`);
+    parts.push('', `<rag_context>\n严格基于以下内容回答：\n\n${options.ragContext}\n</rag_context>`);
   }
   if (options.sensitiveWarning) {
     parts.push('', `## 注意\n${options.sensitiveWarning}`);

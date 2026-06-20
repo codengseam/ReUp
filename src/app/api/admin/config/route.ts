@@ -24,7 +24,7 @@ export const runtime = 'nodejs';
 // ---------- Key catalogue ----------
 
 const VALID_KEYS = [
-  'prompt', 'model', 'rag',
+  'prompt', 'model', 'rag', 'safety',
 ] as const;
 type ConfigKey = (typeof VALID_KEYS)[number];
 
@@ -73,6 +73,19 @@ const customModelSchema = z.object({
   endpoint: z.string(),
   apiKey: z.string(),
   modelId: z.string(),
+});
+
+const riskPatternSchema = z.object({
+  pattern: z.string(),
+  category: z.string(),
+});
+
+const safetyConfigSchema = z.object({
+  intentClassifierMode: z.enum(['unified', 'legacy']).optional(),
+  highRiskPatterns: z.array(riskPatternSchema).optional(),
+  mediumRiskPatterns: z.array(riskPatternSchema).optional(),
+  blockedMessage: z.string().optional(),
+  offTopicMessage: z.string().optional(),
 });
 
 const postBodySchema = z
@@ -141,6 +154,8 @@ function toViewModel(
       };
     case 'rag':
       return { ragParams: config.ragParams ?? null };
+    case 'safety':
+      return { safetyConfig: config.safetyConfig ?? null };
   }
 }
 
@@ -151,6 +166,7 @@ type ServerPartial =
       defaultModelId?: string;
       customModels?: ServerConfig['customModels'];
       ragParams?: ServerConfig['ragParams'];
+      safetyConfig?: ServerConfig['safetyConfig'];
     };
 
 function toServerPartial(
@@ -195,6 +211,14 @@ function toServerPartial(
       const parsed = ragParamsSchema.safeParse(rp);
       if (!parsed.success) return { error: 'bad_request' };
       return { ragParams: parsed.data };
+    }
+    case 'safety': {
+      const sc = value.safetyConfig;
+      if (sc === undefined) return { error: 'bad_request' };
+      const parsed = safetyConfigSchema.safeParse(sc);
+      if (!parsed.success) return { error: 'bad_request' };
+      // 允许前端只传部分字段，与当前配置合并；zod 已校验字段类型
+      return { safetyConfig: parsed.data as ServerConfig['safetyConfig'] };
     }
   }
 }

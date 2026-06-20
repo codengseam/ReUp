@@ -6,7 +6,7 @@
 // `new Function('m', 'return import(m)')` closure to defeat
 // Turbopack's static import analyser (the package is intentionally
 // not installed). Vitest's `vi.mock` cannot intercept a closure-built
-// import, so the test shim installs `globalThis.__reupXenovaShim` —
+// import, so the test shim installs `globalThis.__xenovaShim` —
 // the production code checks for it before falling through to the
 // Function closure. We delete the shim in `afterEach` so production
 // code paths remain unchanged.
@@ -18,19 +18,19 @@ const { mockPipeline } = vi.hoisted(() => ({
 }));
 
 interface ShimGlobal {
-  __reupXenovaShim?: () => Promise<{
+  __xenovaShim?: () => Promise<{
     pipeline: (task: 'text-classification', model: string) => Promise<unknown>;
   }>;
 }
 
 beforeEach(() => {
-  (globalThis as unknown as ShimGlobal).__reupXenovaShim = async () => ({
+  (globalThis as unknown as ShimGlobal).__xenovaShim = async () => ({
     pipeline: mockPipeline,
   });
 });
 
 afterEach(() => {
-  delete (globalThis as unknown as ShimGlobal).__reupXenovaShim;
+  delete (globalThis as unknown as ShimGlobal).__xenovaShim;
   vi.restoreAllMocks();
 });
 

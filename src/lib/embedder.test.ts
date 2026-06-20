@@ -6,7 +6,7 @@
 // `new Function('m', 'return import(m)')` so Turbopack's static import
 // analyser cannot resolve the optional dependency. Vitest's `vi.mock`
 // cannot intercept a Function-built import, so tests install
-// `globalThis.__reupXenovaShim` and the production code checks for it
+// `globalThis.__xenovaShim` and the production code checks for it
 // before falling through to the closure. We delete the shim in
 // `afterEach` and reset the module cache in `beforeEach` so the
 // pipeline singleton is rebuilt for every test.
@@ -19,19 +19,19 @@ const { mockPipeline, mockReset } = vi.hoisted(() => ({
 }));
 
 interface ShimGlobal {
-  __reupXenovaShim?: () => Promise<{
+  __xenovaShim?: () => Promise<{
     pipeline: (task: 'feature-extraction', model: string) => Promise<unknown>;
   }>;
 }
 
 beforeEach(() => {
-  (globalThis as unknown as ShimGlobal).__reupXenovaShim = async () => ({
+  (globalThis as unknown as ShimGlobal).__xenovaShim = async () => ({
     pipeline: mockPipeline,
   });
 });
 
 afterEach(() => {
-  delete (globalThis as unknown as ShimGlobal).__reupXenovaShim;
+  delete (globalThis as unknown as ShimGlobal).__xenovaShim;
   vi.restoreAllMocks();
   vi.resetModules();
   delete process.env.BGE_M3_DIM;

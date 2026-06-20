@@ -11,14 +11,14 @@ import {
   type Citation,
   type PrecomputedIntent,
 } from '@/lib/rag';
-import { classifyIntent, type IntentCategory, type IntentResult } from '@/lib/intent-classifier';
+import { classifyIntent, type IntentResult } from '@/lib/intent-classifier';
 import {
   recordChatAPICall,
   recordInputGuardBlocked,
   recordOutputGuardBlocked,
 } from '@/lib/admin-stats';
 import { isSafeEndpoint } from '@/lib/url-safety';
-import { getCustomPrompt, getRAGParams, getModelConfig } from '@/lib/server-config';
+import { getCustomPrompt, getRAGParams, getModelConfig, getSafetyConfig } from '@/lib/server-config';
 import { getModelCandidates } from '@/lib/runtime-config';
 import { BUILTIN_MODEL_IDS } from '@/lib/models';
 
@@ -28,7 +28,7 @@ import { BUILTIN_MODEL_IDS } from '@/lib/models';
 type AllowedModelId = (typeof BUILTIN_MODEL_IDS)[number];
 
 const ALLOWED_MODEL_IDS = BUILTIN_MODEL_IDS;
-const DEFAULT_MODEL_ID: AllowedModelId = 'qwen3.6-plus-2026-04-02';
+const DEFAULT_MODEL_ID: AllowedModelId = BUILTIN_MODEL_IDS[0] as AllowedModelId;
 
 function validateModel(modelId: string | undefined): AllowedModelId {
   if (modelId && (ALLOWED_MODEL_IDS as readonly string[]).includes(modelId)) {
@@ -62,10 +62,6 @@ const BASE_SYSTEM_PROMPT = `你是一个基于知识库回答用户问题的 AI 
 
 `;
 
-// Skill 定义 Map：从 data/skills.json 动态加载（见 skills-loader.ts）
-// 框架不硬编码任何领域特定 Skill
-const SKILL_PROMPTS: Map<string, string> = new Map();
-
 // Skill 精简摘要（无 RAG 结果时使用）
 // 框架默认为空，由 data/skills.json 配置驱动
 const SKILL_SUMMARIES = '';
@@ -92,36 +88,16 @@ const SKILL_RULES = `
 
 /**
  * 根据 RAG 检索结果动态构建 Skill 部分的 Prompt
- * 框架通用版：不硬编码 Skill，从 SKILL_PROMPTS Map 动态查询
+ * 框架通用版：不硬编码 Skill
  */
-function buildSkillPrompt(_ragResults: RAGResult[]): string {
+function buildSkillPrompt(): string {
   // 框架通用版：不注入硬编码 Skill
   return BASE_SYSTEM_PROMPT + SKILL_SUMMARIES + SKILL_RULES;
-}
-
-// 默认兜底话术
-const BLOCKED_RESPONSE = '抱歉，您的问题涉及敏感内容，我无法回答。请尝试提出与本应用主题相关的问题。';
-const LOW_CONFIDENCE_RESPONSE = '我对这个问题的把握不够大。建议您咨询专业人士获取更准确的建议。';
-const OFF_TOPIC_RESPONSE = '我是本应用的 AI 助手。请提出与本应用主题相关的问题，我会尽力为您解答。';
-
-/**
- * 把 classifyIntent 的 intent 映射到 retrieve 内部的 categoryFilter。
- * 框架通用版：不硬编码领域分类，统一返回 'all'
- */
-function mapIntentToCategory(_intent: IntentCategory): 'all' {
-  return 'all';
 }
 
 export const maxDuration = 300; // 5 min timeout for SSE streaming routes
 
 export async function POST(request: NextRequest) {
-  const chatStartTime = Date.now();
-  const timer = (label: string, since?: number) => {
-    const t = Date.now() - (since ?? chatStartTime);
-    console.log(`[ChatTimer] ${label}: ${t}ms`);
-    return Date.now();
-  };
-
   let body: { messages?: unknown; model?: string; customProvider?: { providerType?: string; endpoint?: string; apiKey?: string; modelId?: string }; ragParams?: Record<string, unknown>; customPrompt?: string };
   try {
     body = await request.json();
@@ -162,20 +138,20 @@ export async function POST(request: NextRequest) {
     .map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
 
   // ===== 输入门禁（阶段 2：unified classifier 替代 4 个弱 LLM 调用） =====
-  const intentClassifierMode = process.env.INTENT_CLASSIFIER_MODE ?? 'unified';
+  const safetyConfig = await getSafetyConfig();
+  const intentClassifierMode = safetyConfig.intentClassifierMode;
 
-  // 高危/中危正则模式（从旧 inputGuard 拆出，0 LLM 开销；保留是为了不破坏现有红线能力）
-  const HIGH_RISK_PATTERNS: Array<{ pattern: RegExp; category: string }> = [
-    { pattern: /暴力攻击|暴力伤害|威胁杀人|故意伤人|杀人|自杀身亡|自残行为|教唆自杀/gi, category: '暴力' },
-    { pattern: /色情内容|裸体照片|性交易|黄色网站/gi, category: '色情' },
-    { pattern: /种族歧视|仇恨言论|侮辱人格|人身攻击/gi, category: '仇恨' },
-    { pattern: /制造炸弹|恐怖袭击|爆炸袭击|恐怖组织/gi, category: '恐怖' },
-  ];
-  const MEDIUM_RISK_PATTERNS: Array<{ pattern: RegExp; category: string }> = [
-    { pattern: /薪资|工资|薪酬|年终奖|股票|期权|补偿金|赔偿/gi, category: '薪资隐私' },
-    { pattern: /CEO|CTO|CFO|VP|总裁|董事长/gi, category: '高管隐私' },
-    { pattern: /密码|token|key|secret|credential/gi, category: '安全信息' },
-  ];
+  // 高危/中危正则模式：支持从 server-config 覆盖，默认使用框架级红线
+  const highRiskPatterns = safetyConfig.highRiskPatterns ?? [];
+  const mediumRiskPatterns = safetyConfig.mediumRiskPatterns ?? [];
+  const HIGH_RISK_PATTERNS: Array<{ pattern: RegExp; category: string }> = highRiskPatterns.map(p => ({
+    pattern: new RegExp(p.pattern, 'gi'),
+    category: p.category,
+  }));
+  const MEDIUM_RISK_PATTERNS: Array<{ pattern: RegExp; category: string }> = mediumRiskPatterns.map(p => ({
+    pattern: new RegExp(p.pattern, 'gi'),
+    category: p.category,
+  }));
 
   interface InputSafetyShape {
     safe: boolean;
@@ -193,7 +169,7 @@ export async function POST(request: NextRequest) {
     if (!inputSafety.safe) {
       void recordInputGuardBlocked();
       return new Response(
-        JSON.stringify({ error: BLOCKED_RESPONSE }),
+        JSON.stringify({ error: safetyConfig.blockedMessage }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -227,7 +203,7 @@ export async function POST(request: NextRequest) {
     if (intentResult.intent === 'jailbreak') {
       void recordInputGuardBlocked();
       return new Response(
-        JSON.stringify({ error: BLOCKED_RESPONSE }),
+        JSON.stringify({ error: safetyConfig.blockedMessage }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -286,7 +262,7 @@ export async function POST(request: NextRequest) {
                 rewrittenQuery: intentResult.rewrittenQuery,
                 strategy: intentResult.strategy,
                 subQueries: intentResult.subQueries,
-                categoryFilter: mapIntentToCategory(intentResult.intent),
+                categoryFilter: 'all',
               }
             : undefined;
 
@@ -375,7 +351,7 @@ export async function POST(request: NextRequest) {
         const isOffTopic = intentResult?.intent === 'off_topic' || inputSafety.category === '话题越界';
         if (isOffTopic) {
           safeEnqueue(controller, `data: ${JSON.stringify({ status: 'generating' })}\n\n`);
-          safeEnqueue(controller, `data: ${JSON.stringify({ content: OFF_TOPIC_RESPONSE })}\n\n`);
+          safeEnqueue(controller, `data: ${JSON.stringify({ content: safetyConfig.offTopicMessage })}\n\n`);
           safeEnqueue(controller, 'data: [DONE]\n\n');
           controller.close();
           return;
@@ -406,12 +382,12 @@ export async function POST(request: NextRequest) {
             systemPrompt += '\n\n' + SKILL_SUMMARIES + SKILL_RULES;
           }
         } else {
-          systemPrompt = buildSkillPrompt(ragResults as RAGResult[]);
+          systemPrompt = buildSkillPrompt();
         }
 
         if (ragContext) {
-      systemPrompt = `${systemPrompt}\n\n## 知识库检索结果\n\n以下是与你当前问题最相关的参考资料，请严格基于这些内容回答。所有事实性声明必须来自以下参考资料，不得编造：\n\n${ragContext}`;
-    }
+          systemPrompt = `${systemPrompt}\n\n<rag_context>\n以下是与你当前问题最相关的参考资料，请严格基于这些内容回答。所有事实性声明必须来自以下参考资料，不得编造：\n\n${ragContext}\n</rag_context>`;
+        }
 
         // ===== 敏感话题警告 =====
         if (inputSafety.riskLevel === 'medium' && inputSafety.category) {

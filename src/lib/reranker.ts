@@ -60,10 +60,10 @@ async function getPipeline(): Promise<XfPipeline> {
   // dynamic import, so the test environment provides a `globalThis`
   // shim that returns a fake `XfModule` and skips the Function
   // closure entirely. See `src/lib/reranker.test.ts` for the shim.
-  const shimmed = globalThis as { __reupXenovaShim?: () => Promise<XfModule> };
+  const shimmed = globalThis as { __xenovaShim?: () => Promise<XfModule> };
   let mod: XfModule;
-  if (typeof shimmed.__reupXenovaShim === 'function') {
-    mod = await shimmed.__reupXenovaShim();
+  if (typeof shimmed.__xenovaShim === 'function') {
+    mod = await shimmed.__xenovaShim();
   } else {
     const moduleName = '@xenova/' + 'transformers';
     // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func

@@ -2,12 +2,29 @@
 // 1:1 迁移自 rag.ts:484-678
 
 import { LLMClient, type InvokeOptions } from '@/lib/llm-client';
+import { getCached, setCache, type CacheEntry } from './cache';
+
+// ========== LLM route cache ==========
+const routeCache = new Map<string, CacheEntry<{ strategy: 'direct' | 'multiquery' | 'hyde'; rewrittenQuery: string; subQueries?: string[]; confidence: number }>>();
+const ROUTE_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function routeCacheKey(query: string, chatHistory: Array<{ role: string; content: string }>): string {
+  const historySig = chatHistory.slice(-3).map(m => `${m.role.charAt(0)}:${m.content.substring(0, 40)}`).join('|');
+  return `${query}::${historySig}`;
+}
 
 // ========== 8. LLM查询路由 ==========
 async function routeQueryViaLLM(
   query: string,
   chatHistory: Array<{ role: string; content: string }> = []
 ): Promise<{ strategy: 'direct' | 'multiquery' | 'hyde'; rewrittenQuery: string; subQueries?: string[]; confidence: number }> {
+  const cacheKey = routeCacheKey(query, chatHistory);
+  const cached = getCached(routeCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let result: { strategy: 'direct' | 'multiquery' | 'hyde'; rewrittenQuery: string; subQueries?: string[]; confidence: number };
   try {
     const llmClient = new LLMClient();
 
@@ -57,25 +74,38 @@ ${historyStr}
           };
           if (['direct', 'multiquery', 'hyde'].includes(parsed.strategy)) {
             console.log('[RAG] LLM routed query:', parsed.strategy, 'rewritten:', parsed.rewrittenQuery?.substring(0, 30));
-            return {
+            result = {
               strategy: parsed.strategy,
               rewrittenQuery: parsed.rewrittenQuery || query,
               subQueries: parsed.subQueries?.filter(q => q && q.trim().length > 0),
               confidence: parsed.confidence ?? 0.5,
             };
+          } else {
+            throw new Error('invalid strategy');
           }
         } catch (parseErr) {
           console.log('[RAG] LLM returned malformed JSON route, falling back:', parseErr);
           throw parseErr;
         }
+      } else {
+        throw new Error('no json match');
       }
+    } else {
+      throw new Error('empty response');
     }
   } catch (error) {
     console.log('[RAG] LLM查询路由失败，使用本地规则降级:', error instanceof Error ? error.message : String(error));
+    // 降级: 本地规则路由
+    result = routeQueryLocal(query);
   }
 
-  // 降级: 本地规则路由
-  return routeQueryLocal(query);
+  setCache(routeCache, cacheKey, result, ROUTE_CACHE_TTL_MS);
+  return result;
+}
+
+// 测试专用：清空路由缓存，避免跨测试用例污染。
+export function _resetRouteCache(): void {
+  routeCache.clear();
 }
 
 // 本地规则路由降级

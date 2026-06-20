@@ -13,8 +13,8 @@ export function classifyError(error: unknown): MessageError {
   if (error instanceof TypeError && /fetch|network|failed/i.test(error.message)) {
     return {
       title: 'AI 服务暂不可用',
-      message: '无法连接到 ReUp 服务端。',
-      hint: '请检查：① 后端服务是否启动（默认 5001 端口）② 浏览器网络是否正常。',
+      message: '无法连接到服务端。',
+      hint: '请检查：① 后端服务是否已启动 ② 浏览器网络是否正常。',
     };
   }
   if (error instanceof Error) {
@@ -24,14 +24,14 @@ export function classifyError(error: unknown): MessageError {
       return {
         title: 'API 密钥无效',
         message: '服务端配置的密钥被拒绝。',
-        hint: '请检查 .env 中的 OPENAI_API_KEY / ARK_API_KEY 是否过期或被吊销。',
+        hint: '请检查环境变量或管理后台中配置的 API 密钥是否过期或被吊销。',
       };
     }
     if (/Missing credentials|未配置|凭证缺失|api[_\s-]?key.*not.*set/i.test(msg)) {
       return {
         title: 'AI 服务未配置',
         message: '服务端缺少必要的 API 密钥。',
-        hint: '请联系管理员在 .env 中配置 OPENAI_API_KEY / ARK_API_KEY。',
+        hint: '请联系管理员在环境变量或管理后台配置 API 密钥。',
       };
     }
     if (/400[\s-]?Bad Request|400[\s-]?错误请求/i.test(msg)) {

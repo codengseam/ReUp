@@ -1,5 +1,5 @@
 // src/lib/embedder.ts
-// ReUp v2 Phase 1.5: Local BGE-M3 embedder wrapper.
+// Local BGE-M3 embedder wrapper.
 //
 // Replaces the deterministic hash-based pseudo-vector embedder previously
 // used in `src/lib/rag/search.ts` with a real dense embedding via
@@ -19,7 +19,9 @@
 //   `pnpm add @xenova/transformers` (see Phase 1 R3 in the design spec).
 // - The pipeline is cached as a module-level singleton; the model is loaded
 //   lazily on the first non-empty call. Empty / whitespace-only input
-//   short-circuits to a zero vector without loading the model.
+// short-circuits to a zero vector without loading the model.
+
+import { getCached, setCache, type CacheEntry } from '@/lib/rag/cache';
 
 /** Local structural type for the @xenova/transformers feature-extraction
  *  pipeline used by BGE-M3. Kept local to avoid a hard dependency on a
@@ -37,6 +39,15 @@ export const EMBEDDING_DIM = 1024;
 
 /** Default model id served by @xenova/transformers' HF hub proxy. */
 export const MODEL_ID = 'Xenova/bge-m3';
+
+// In-process embedding cache: BGE-M3 inference is deterministic for the same
+// input text, so repeated queries / chunks avoid reloading the model.
+const embedCache = new Map<string, CacheEntry<number[]>>();
+const EMBED_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function embedCacheKey(text: string): string {
+  return text;
+}
 
 /** Thrown when the embedder fails to initialise or the model returns an
  *  unusable tensor. Callers should treat the request as a transient failure
@@ -79,10 +90,10 @@ async function getPipeline(modelId: string): Promise<XfFeaturePipeline> {
   // import, so the test environment provides a `globalThis` shim that
   // returns a fake `XfModule` and skips the Function closure entirely.
   // See `src/lib/embedder.test.ts` for the shim.
-  const shimmed = globalThis as { __reupXenovaShim?: () => Promise<XfModule> };
+  const shimmed = globalThis as { __xenovaShim?: () => Promise<XfModule> };
   let mod: XfModule;
-  if (typeof shimmed.__reupXenovaShim === 'function') {
-    mod = await shimmed.__reupXenovaShim();
+  if (typeof shimmed.__xenovaShim === 'function') {
+    mod = await shimmed.__xenovaShim();
   } else {
     const moduleName = '@xenova/' + 'transformers';
     const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<XfModule>;
@@ -206,6 +217,12 @@ export function createEmbedder(config?: EmbedderConfig): Embedder {
         return new Array<number>(dim).fill(0);
       }
 
+      const key = embedCacheKey(text);
+      const cached = getCached(embedCache, key);
+      if (cached) {
+        return cached;
+      }
+
       let pipe: XfFeaturePipeline;
       try {
         pipe = await getPipeline(modelId);
@@ -231,7 +248,9 @@ export function createEmbedder(config?: EmbedderConfig): Embedder {
       }
       loadedDim = series.length;
       ready = true;
-      return fitDimension(series, dim);
+      const vector = fitDimension(series, dim);
+      setCache(embedCache, key, vector, EMBED_CACHE_TTL_MS);
+      return vector;
     },
 
     isReady(): boolean {
@@ -245,6 +264,7 @@ export function createEmbedder(config?: EmbedderConfig): Embedder {
 export function _resetForTest(): void {
   pipelinePromise = null;
   loadedDim = null;
+  embedCache.clear();
 }
 
 /** Test-only: read the dimension the loaded pipeline actually produced on

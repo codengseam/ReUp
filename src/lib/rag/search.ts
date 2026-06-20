@@ -6,6 +6,7 @@ import { createKnowledgeBase } from '@/lib/knowledge-base';
 import { createEmbedder } from '@/lib/embedder';
 import type { ScoredChunk } from '@/lib/reranker';
 import type { RAGResult } from './types';
+import { getCached, setCache, type CacheEntry } from './cache';
 
 // ========== Embedder (Phase 1.5: BGE-M3 local) ==========
 // Lazy singleton backed by @xenova/transformers' Xenova/bge-m3 model.
@@ -18,6 +19,17 @@ let _llmClient: LLMClient | null = null;
 function getLLMClient(): LLMClient {
   if (!_llmClient) _llmClient = new LLMClient();
   return _llmClient;
+}
+
+// ========== LLM-heavy RAG caches (deterministic for identical inputs) ==========
+const keywordCache = new Map<string, CacheEntry<string[]>>();
+const hydeCache = new Map<string, CacheEntry<string | null>>();
+const rerankCache = new Map<string, CacheEntry<RAGResult[]>>();
+const LLM_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function rerankCacheKey(query: string, results: RAGResult[]): string {
+  const sig = results.map(r => `${(r.content || '').substring(0, 80)}:${r.score.toFixed(4)}`).join('|');
+  return `${query}::${sig}`;
 }
 
 // ========== 1. 语义检索（local knowledge-base） ==========
@@ -96,6 +108,13 @@ async function keywordAugmentedSearch(
 async function extractKeywordsViaLLM(
   text: string
 ): Promise<string[]> {
+  const cacheKey = text;
+  const cached = getCached(keywordCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let keywords: string[];
   try {
     const llmClient = getLLMClient();
 
@@ -113,19 +132,22 @@ async function extractKeywordsViaLLM(
     );
 
     if (response && response.content) {
-      const keywords = response.content
+      keywords = response.content
         .split(/[,，、\s]+/)
         .map(k => k.trim())
         .filter(k => k.length > 0 && k.length <= 10);
       console.log('[RAG] LLM extracted keywords:', keywords);
-      return keywords;
+    } else {
+      keywords = [];
     }
-    return [];
   } catch (error) {
     console.log('[RAG] LLM关键词提取失败，使用本地分词降级:', error instanceof Error ? error.message : String(error));
     // 降级: 本地简单分词
-    return extractKeywordsLocal(text);
+    keywords = extractKeywordsLocal(text);
   }
+
+  setCache(keywordCache, cacheKey, keywords, LLM_CACHE_TTL_MS);
+  return keywords;
 }
 
 // 本地分词降级方案（仅在LLM调用失败时使用）
@@ -234,13 +256,21 @@ async function rerankResults(
   results: RAGResult[],
   query: string
 ): Promise<RAGResult[]> {
-  if (results.length <= 2) return results.sort((a, b) => b.score - a.score);
+  const sortedInput = [...results].sort((a, b) => b.score - a.score);
+  if (sortedInput.length <= 2) return sortedInput;
 
+  const cacheKey = rerankCacheKey(query, sortedInput);
+  const cached = getCached(rerankCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let reranked: RAGResult[];
   try {
     const llmClient = getLLMClient();
 
     // 构建文档摘要列表
-    const docList = results.map((r, i) =>
+    const docList = sortedInput.map((r, i) =>
       `[${i + 1}] ${(r.content || '').substring(0, 150).replace(/\n/g, ' ')}`
     ).join('\n');
 
@@ -266,37 +296,42 @@ ${docList}
     if (response && response.content) {
       const orderMatch = response.content.match(/[\d,]+/);
       if (orderMatch) {
-        const order = orderMatch[0].split(',').map(n => parseInt(n.trim(), 10) - 1).filter(n => n >= 0 && n < results.length);
-        const reranked: RAGResult[] = [];
+        const order = orderMatch[0].split(',').map(n => parseInt(n.trim(), 10) - 1).filter(n => n >= 0 && n < sortedInput.length);
+        const ordered: RAGResult[] = [];
         const usedIndices = new Set<number>();
 
         // 按LLM排序顺序添加
         for (const idx of order) {
           if (!usedIndices.has(idx)) {
-            reranked.push(results[idx]);
+            ordered.push(sortedInput[idx]);
             usedIndices.add(idx);
           }
         }
         // 添加LLM未提及的文档（按原始score降序填充）
         const remaining = [];
-        for (let i = 0; i < results.length; i++) {
+        for (let i = 0; i < sortedInput.length; i++) {
           if (!usedIndices.has(i)) {
-            remaining.push(results[i]);
+            remaining.push(sortedInput[i]);
           }
         }
         remaining.sort((a, b) => b.score - a.score);
-        reranked.push(...remaining);
+        ordered.push(...remaining);
 
         console.log('[RAG] LLM Rerank order:', order.map(n => n + 1));
-        return reranked;
+        reranked = ordered;
+      } else {
+        reranked = sortedInput;
       }
+    } else {
+      reranked = sortedInput;
     }
   } catch (error) {
     console.log('[RAG] LLM Rerank失败，使用原始排序降级:', error instanceof Error ? error.message : String(error));
+    reranked = sortedInput;
   }
 
-  // 降级: 按原始score排序
-  return results.sort((a, b) => b.score - a.score);
+  setCache(rerankCache, cacheKey, reranked, LLM_CACHE_TTL_MS);
+  return reranked;
 }
 
 // ========== 6. 上下文压缩 ==========
@@ -337,6 +372,13 @@ function compressContext(results: RAGResult[], maxChars: number = 3000): RAGResu
 async function generateHydeAnswer(
   query: string
 ): Promise<string | null> {
+  const cacheKey = query;
+  const cached = getCached(hydeCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let answer: string | null = null;
   try {
     const llmClient = getLLMClient();
 
@@ -360,14 +402,22 @@ async function generateHydeAnswer(
     );
 
     if (response && response.content && response.content.trim().length > 0) {
-      console.log('[RAG] HyDE generated hypothetical answer, length:', response.content.length);
-      return response.content.trim();
+      answer = response.content.trim();
+      console.log('[RAG] HyDE generated hypothetical answer, length:', answer.length);
     }
-    return null;
   } catch (error) {
     console.error('[RAG] HyDE generation failed, falling back to direct search:', error);
-    return null;
   }
+
+  setCache(hydeCache, cacheKey, answer, LLM_CACHE_TTL_MS);
+  return answer;
+}
+
+// 测试专用：清空 LLM 级缓存，避免跨测试用例污染。
+export function _resetLLMCaches(): void {
+  keywordCache.clear();
+  hydeCache.clear();
+  rerankCache.clear();
 }
 
 // 注意：search.ts 内部所有函数仅在 rag 内部使用，不直接对外导出
