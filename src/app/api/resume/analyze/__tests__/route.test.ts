@@ -51,13 +51,13 @@ describe('POST /api/resume/analyze', () => {
     process.env.DASHSCOPE_API_KEY = 'test-key';
   });
 
-  it('returns 400 when no resumeFile is provided', async () => {
+  it('returns 400 when neither resume nor JD is provided', async () => {
     const fd = new FormData();
     const res = await POST(makeRequest(fd) as unknown as Parameters<typeof POST>[0]);
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.ok).toBe(false);
-    expect(body.error).toBe('missing_resume_file');
+    expect(body.error).toBe('missing_resume_and_jd');
   });
 
   it('analyzes a text resume without JD and returns diagnostics', async () => {
@@ -164,11 +164,12 @@ describe('POST /api/resume/analyze', () => {
     expect(body.error).toBe('file_too_large');
   });
 
-  it('returns 422 when parse fails', async () => {
+  it('returns 422 when PDF parse fails', async () => {
     const fd = new FormData();
+    // Invalid PDF bytes should cause the PDF parser to throw.
     fd.append(
       'resumeFile',
-      new File([], 'empty.txt', { type: 'text/plain' }),
+      new File([new Uint8Array(100)], 'corrupt.pdf', { type: 'application/pdf' }),
     );
     const res = await POST(makeRequest(fd) as unknown as Parameters<typeof POST>[0]);
     expect(res.status).toBe(422);

@@ -15,6 +15,7 @@ import { ResumeRawCompare } from './ResumeRawCompare';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { MatchGauge } from './MatchGauge';
 import { JdCard } from '../jd/JdCard';
+import { JdAnalysisCard } from '../jd/JdAnalysisCard';
 import type { ResumeDocument, ATSResult, MatchReport } from '@/features/resume/types';
 import type { JDDocument } from '@/features/jd/types';
 import type { DiagnosticResult } from '@/features/resume/diagnostics';
@@ -28,6 +29,14 @@ interface AnalyzeResponse {
   diagnostics?: DiagnosticResult;
   ats?: ATSResult;
   match?: MatchReport;
+  jdAnalysis?: {
+    summary: string;
+    keyCompetencies: string[];
+    interviewQuestions: Array<{ question: string; weight: 'high' | 'medium' | 'low'; purpose: string }>;
+    hiddenRisks: string[];
+    cultureFit: string[];
+    growthPath: string[];
+  };
   error?: string;
 }
 
@@ -45,8 +54,16 @@ export function ResumeAnalyzer() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult | null>(null);
   const [atsResult, setAtsResult] = useState<ATSResult | null>(null);
   const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
+  const [jdAnalysis, setJdAnalysis] = useState<AnalyzeResponse['jdAnalysis'] | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const hasInput = (file !== null || rawText.trim().length > 0) && jdText.trim().length > 0;
+  const hasResumeInput = file !== null || rawText.trim().length > 0;
+  const hasJdInput = jdText.trim().length > 0;
+  const hasInput = hasResumeInput || hasJdInput;
+  const analysisMode: 'resume-only' | 'jd-only' | 'both' = hasResumeInput && hasJdInput
+    ? 'both'
+    : hasResumeInput
+      ? 'resume-only'
+      : 'jd-only';
 
   useEffect(() => {
     safeTrack({ type: 'page_view', page: '/resume/analyzer' });
@@ -55,7 +72,7 @@ export function ResumeAnalyzer() {
   const reset = useCallback(() => {
     setState('idle'); setError(''); setProgress(0);
     setResume(null); setJd(null); setDiagnostics(null);
-    setAtsResult(null); setMatchReport(null);
+    setAtsResult(null); setMatchReport(null); setJdAnalysis(null);
   }, []);
 
   const handleFile = useCallback(async (uploaded: File) => {
@@ -66,8 +83,7 @@ export function ResumeAnalyzer() {
       uploaded.type === 'application/pdf' ||
       uploaded.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     setRawText(isBinary ? `[已上传 ${uploaded.name}]` : await uploaded.text());
-    if (!jdText.trim()) setState('idle');
-  }, [jdText]);
+  }, []);
 
   const onDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault(); setIsDragging(false);
@@ -102,9 +118,13 @@ export function ResumeAnalyzer() {
 
     try {
       const formData = new FormData();
-      const resumeFile = file ?? new File([rawText], 'pasted-resume.txt', { type: 'text/plain' });
-      formData.append('resumeFile', resumeFile);
-      if (jdText.trim()) formData.append('jdText', jdText.trim());
+      if (hasResumeInput) {
+        const resumeFile = file ?? new File([rawText], 'pasted-resume.txt', { type: 'text/plain' });
+        formData.append('resumeFile', resumeFile);
+      }
+      if (hasJdInput) {
+        formData.append('jdText', jdText.trim());
+      }
 
       const res = await fetch('/api/resume/analyze', {
         method: 'POST',
@@ -117,12 +137,13 @@ export function ResumeAnalyzer() {
       setJd(json.jd ?? null);
       setDiagnostics(json.diagnostics ?? null);
       setAtsResult(json.ats ?? null);
-      if (json.resume && json.ats) {
-        setMatchReport(json.match ?? { strengths: [], gaps: [], priorities: [] });
+      setJdAnalysis(json.jdAnalysis ?? null);
+      if (json.match) {
+        setMatchReport(json.match);
       }
       setState('done');
 
-      // Track match_analysis: score comes from ATS coverage.
+      // Track match_analysis: score comes from ATS coverage when both resume and JD are present.
       const score = json.ats?.coverage?.percentage ?? 0;
       safeTrack({ type: 'match_analysis', data: { score: Math.round(score) } });
     } catch (err) {
@@ -138,7 +159,7 @@ export function ResumeAnalyzer() {
         },
       });
     }
-  }, [hasInput, file, rawText, jdText, fileName, fileSize]);
+  }, [hasInput, hasResumeInput, hasJdInput, file, rawText, jdText, fileName, fileSize]);
 
   const dragClass = isDragging
     ? 'border-primary bg-primary/5'
@@ -207,9 +228,15 @@ export function ResumeAnalyzer() {
             <Button onClick={() => { void onAnalyze(); }} disabled={!hasInput || state === 'analyzing'}
               className="w-full h-11 rounded-lg text-[13px] font-semibold" size="lg">
               {state === 'analyzing' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileSearch className="w-4 h-4 mr-1.5" />}
-              {state === 'analyzing' ? '分析中…' : '开始分析'}
+              {state === 'analyzing'
+                ? '分析中…'
+                : analysisMode === 'resume-only'
+                  ? '分析简历'
+                  : analysisMode === 'jd-only'
+                    ? '分析 JD'
+                    : '开始匹配分析'}
             </Button>
-            {!hasInput && <p className="text-[10px] text-muted-foreground text-center -mt-2">请填写简历和 JD 内容后开始分析</p>}
+            {!hasInput && <p className="text-[10px] text-muted-foreground text-center -mt-2">请填写简历或 JD 内容后开始分析</p>}
           </div>
         </aside>
 
@@ -228,33 +255,52 @@ export function ResumeAnalyzer() {
             <Button variant="outline" onClick={reset}>重试</Button>
           </div>}
 
-          {state === 'done' && resume && (
-            <Tabs defaultValue="compare" className="h-full flex flex-col">
+          {state === 'done' && (
+            <Tabs defaultValue={resume ? 'compare' : 'jd'} className="h-full flex flex-col">
               <div className="px-4 pt-4 border-b border-border shrink-0">
                 <TabsList className="h-8">
-                  <TabsTrigger value="compare" className="text-[11px] gap-1 px-2.5"><Eye className="w-3 h-3" />对比视图</TabsTrigger>
-                  <TabsTrigger value="diagnostics" className="text-[11px] gap-1 px-2.5">
-                    <ClipboardCheck className="w-3 h-3" />诊断
-                    {diagnostics && diagnostics.summary.total > 0 && (
-                      <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-medium rounded-full bg-red-100 text-red-700">{diagnostics.summary.total}</span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="jd" className="text-[11px] gap-1 px-2.5" disabled={!jd}><Target className="w-3 h-3" />JD</TabsTrigger>
-                  <TabsTrigger value="match" className="text-[11px] gap-1 px-2.5" disabled={!matchReport || !atsResult}><BarChart3 className="w-3 h-3" />匹配度</TabsTrigger>
+                  {resume && (
+                    <TabsTrigger value="compare" className="text-[11px] gap-1 px-2.5"><Eye className="w-3 h-3" />对比视图</TabsTrigger>
+                  )}
+                  {resume && diagnostics && (
+                    <TabsTrigger value="diagnostics" className="text-[11px] gap-1 px-2.5">
+                      <ClipboardCheck className="w-3 h-3" />诊断
+                      {diagnostics.summary.total > 0 && (
+                        <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-medium rounded-full bg-red-100 text-red-700">{diagnostics.summary.total}</span>
+                      )}
+                    </TabsTrigger>
+                  )}
+                  {jd && (
+                    <TabsTrigger value="jd" className="text-[11px] gap-1 px-2.5"><Target className="w-3 h-3" />JD</TabsTrigger>
+                  )}
+                  {resume && matchReport && atsResult && (
+                    <TabsTrigger value="match" className="text-[11px] gap-1 px-2.5"><BarChart3 className="w-3 h-3" />匹配度</TabsTrigger>
+                  )}
                 </TabsList>
               </div>
-              <TabsContent value="compare" className="flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden">
-                <ResumeRawCompare rawText={rawText} resume={resume} />
-              </TabsContent>
-              <TabsContent value="diagnostics" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
-                {diagnostics ? <DiagnosticsPanel diagnostics={diagnostics} /> : <p className="text-[12px] text-muted-foreground">诊断数据不可用</p>}
-              </TabsContent>
-              <TabsContent value="jd" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
-                {jd ? <JdCard jd={jd} /> : <p className="text-[12px] text-muted-foreground">JD 数据不可用</p>}
-              </TabsContent>
-              <TabsContent value="match" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
-                {matchReport && atsResult ? <MatchGauge matchReport={matchReport} atsResult={atsResult} /> : <p className="text-[12px] text-muted-foreground">匹配度数据不可用</p>}
-              </TabsContent>
+              {resume && (
+                <TabsContent value="compare" className="flex-1 min-h-0 overflow-hidden data-[state=inactive]:hidden">
+                  <ResumeRawCompare rawText={rawText} resume={resume} />
+                </TabsContent>
+              )}
+              {resume && diagnostics && (
+                <TabsContent value="diagnostics" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
+                  <DiagnosticsPanel diagnostics={diagnostics} />
+                </TabsContent>
+              )}
+              {jd && (
+                <TabsContent value="jd" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
+                  <div className="flex flex-col gap-5">
+                    <JdCard jd={jd} />
+                    {jdAnalysis && <JdAnalysisCard analysis={jdAnalysis} />}
+                  </div>
+                </TabsContent>
+              )}
+              {resume && matchReport && atsResult && (
+                <TabsContent value="match" className="flex-1 overflow-auto p-5 data-[state=inactive]:hidden">
+                  <MatchGauge matchReport={matchReport} atsResult={atsResult} />
+                </TabsContent>
+              )}
             </Tabs>
           )}
         </main>

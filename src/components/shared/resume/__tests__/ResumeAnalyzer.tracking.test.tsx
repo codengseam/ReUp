@@ -38,7 +38,9 @@ function mockAnalyzeSuccess(): ReturnType<typeof vi.fn> {
 }
 
 function clickStart() {
-  const btn = screen.getByRole('button', { name: /开始分析/ });
+  const btn = screen.getByRole('button', {
+    name: /^(分析简历|分析 JD|开始匹配分析)$/,
+  });
   fireEvent.click(btn);
 }
 

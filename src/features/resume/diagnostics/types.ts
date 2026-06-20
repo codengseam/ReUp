@@ -1,7 +1,7 @@
 // ─── Shared types for diagnostics modules ───────────────────────────────
 
 export interface DiagnosticIssue {
-  type: 'typo' | 'timeline' | 'format' | 'contradiction';
+  type: 'typo' | 'timeline' | 'format' | 'contradiction' | 'impact' | 'readability' | 'career';
   severity: 'error' | 'warning' | 'info';
   message: string;
   location: string; // e.g. "experience[0].bullets[2]"
