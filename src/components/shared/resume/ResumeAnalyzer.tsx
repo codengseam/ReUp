@@ -142,9 +142,7 @@ export function ResumeAnalyzer() {
       setDiagnostics(json.diagnostics ?? null);
       setAtsResult(json.ats ?? null);
       setJdAnalysis(json.jdAnalysis ?? null);
-      if (json.match) {
-        setMatchReport(json.match);
-      }
+      setMatchReport(json.match ?? null);
       setState('done');
 
       // Track match_analysis: score comes from ATS coverage when both resume and JD are present.

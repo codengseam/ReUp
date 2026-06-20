@@ -300,7 +300,8 @@ function deriveJDDimensions(jd: JDDocument): JDMatchDimension[] {
   }
   for (const skill of jd.skills) {
     const weight = skill.required ? 2 : 1;
-    dims.push({ id: `skill-${dims.length}`, label: `${skill.name}（${skill.level}）`, weight, source: 'skill' });
+    // Use only skill.name as label — level (精通/熟悉) is self-assessment, not a match keyword.
+    dims.push({ id: `skill-${dims.length}`, label: skill.name, weight, source: 'skill' });
   }
   for (const resp of jd.responsibilities.slice(0, 10)) {
     dims.push({ id: `resp-${dims.length}`, label: resp, weight: 1, source: 'responsibility' });
@@ -328,26 +329,50 @@ function resumeText(resume: ResumeDocument): string {
 }
 
 function evidenceForDimension(resume: ResumeDocument, label: string): string {
-  const tokens = tokenizePhrases(label);
+  const tokens = tokenizePhrases(label).filter((t) => t.length >= 2);
   const text = resumeText(resume);
+
+  // Matching strategy:
+  // - English tokens (length >= 2, e.g. "Java"): 1 hit suffices.
+  // - Short CJK labels (<= 5 chars): 1 hit suffices (e.g. "本科及以上" → "本科").
+  // - Long CJK labels (> 5 chars): require 2 hits or 1 long token (>= 3 chars).
+  //   This prevents false positives from generic bigrams like "工作" / "经验".
+  const cjkChars = (label.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const hasEnglishToken = tokens.some((t) => /^[a-z0-9+#.]+$/.test(t));
+  const minHits = hasEnglishToken || cjkChars <= 5 ? 1 : 2;
+
+  function countHits(haystack: string): { hits: number; longHit: boolean } {
+    let hits = 0;
+    let longHit = false;
+    for (const t of tokens) {
+      if (haystack.includes(t)) {
+        hits++;
+        if (t.length >= 3) longHit = true;
+      }
+    }
+    return { hits, longHit };
+  }
+
+  function isMatch(haystack: string): boolean {
+    const { hits, longHit } = countHits(haystack);
+    if (hits >= minHits) return true;
+    return hits >= 1 && longHit;
+  }
 
   for (const e of resume.experience) {
     for (const b of e.bullets) {
-      const lower = b.toLowerCase();
-      if (tokens.some((t) => t.length >= 2 && lower.includes(t))) return b;
+      if (isMatch(b.toLowerCase())) return b;
     }
   }
   for (const p of resume.projects) {
     for (const b of p.bullets) {
-      const lower = b.toLowerCase();
-      if (tokens.some((t) => t.length >= 2 && lower.includes(t))) return b;
+      if (isMatch(b.toLowerCase())) return b;
     }
   }
   for (const s of resume.skills) {
-    const lower = s.toLowerCase();
-    if (tokens.some((t) => t.length >= 2 && lower.includes(t))) return s;
+    if (isMatch(s.toLowerCase())) return s;
   }
-  if (tokens.some((t) => t.length >= 2 && text.includes(t))) {
+  if (isMatch(text)) {
     return '（简历原文中提及相关关键词）';
   }
   return '';
@@ -391,6 +416,7 @@ export function computeOverallMatchScore(
   const dims = deriveJDDimensions(jd);
   if (dims.length === 0) return 0;
   const totalWeight = dims.reduce((sum, d) => sum + d.weight, 0);
+  if (totalWeight === 0) return 0;
   const hitLabels = new Set(partial.strengths.map((s) => s.dimension));
   const hitWeight = dims.filter((d) => hitLabels.has(d.label)).reduce((sum, d) => sum + d.weight, 0);
   return Math.round((hitWeight / totalWeight) * 100);

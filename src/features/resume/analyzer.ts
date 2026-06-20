@@ -75,10 +75,17 @@ export async function analyzeResume(
       // ── Match pipeline (JD-driven) ──
       (async (): Promise<MatchReport> => {
         const partialMatch = buildMatchReportFromJD(resume, jd);
+        // generatePriorities is the only LLM-dependent step; if it fails,
+        // we still want strengths/gaps + overallScore to survive.
+        let priorities: MatchReport['priorities'] = [];
+        try {
+          priorities = await generatePriorities(resume, partialMatch, {
+            llmClient: options?.llmClient,
+          });
+        } catch {
+          // priorities stays [], MatchReport.priorities defaults to []
+        }
         const overallScore = computeOverallMatchScore(partialMatch, jd);
-        const priorities = await generatePriorities(resume, partialMatch, {
-          llmClient: options?.llmClient,
-        });
         return { ...partialMatch, priorities, overallScore };
       })(),
       // ── JD expert analysis ──
