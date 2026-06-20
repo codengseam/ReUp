@@ -46,7 +46,7 @@ open http://localhost:5000
 |--------|------|--------|------|
 | `DASHSCOPE_API_KEY` | ✅ | — | 阿里云 DashScope API Key，从 [控制台](https://dashscope.console.aliyun.com/apiKey) 获取 |
 | `DASHSCOPE_BASE_URL` | ❌ | `https://dashscope.aliyuncs.com/compatible-mode` | OpenAI 兼容模式端点 |
-| `DASHSCOPE_CHAT_MODEL` | ❌ | `gui-plus-2026-02-26` | 对话模型名 |
+| `DASHSCOPE_CHAT_MODEL` | ❌ | `qwen3.6-plus-2026-04-02` | 对话模型名 |
 | `DASHSCOPE_EMBEDDING_MODEL` | ❌ | `text-embedding-v3` | 向量嵌入模型名 |
 | `LLM_PROVIDER` | ❌ | `dashscope` | LLM 提供商标识 |
 | `REUP_PORT` | ❌ | `5000` | 宿主机映射端口（容器内固定 5000） |

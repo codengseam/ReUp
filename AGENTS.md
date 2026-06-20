@@ -20,7 +20,7 @@ Career advisor with "senior HR + CEO" perspective: promotion coaching, interview
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router) + React 19 + TypeScript 5 strict + Tailwind 4 + shadcn/ui (Radix)
-- **LLM**: DashScope OpenAI-compatible (Qwen / `gui-plus-2026-02-26`), `DASHSCOPE_API_KEY` in `.env.local`
+- **LLM**: DashScope OpenAI-compatible (Qwen / `qwen3.6-plus-2026-04-02`), `DASHSCOPE_API_KEY` in `.env.local`
 - **Embedding**: BGE-M3 local (1024-dim, pre-bundled 608 vectors in `data/skill-vectors.json`)
 - **Rerank**: BGE-reranker-v2-m3 local (lazy load)
 - **RAG**: `src/lib/rag/` (semantic + sparse + HyDE → weighted fusion → doc_id dedup, Top-K=5)
@@ -99,4 +99,4 @@ Primary `#10b981` (emerald) · Background `#FFFFFF` · minimal & professional. F
 
 ---
 
-Current `AGENTS.md` ≈ 1661 tokens (measured 2026-06-17, ±1). Rerun `pnpm tokens AGENTS.md` to update.
+Current `AGENTS.md` ≈ 1665 tokens (measured 2026-06-20, ±1). Rerun `pnpm tokens AGENTS.md` to update.
