@@ -14,9 +14,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LLMClient, type LLMResponse } from '@/server/llm/llm-client';
-import { classifyDimensions, generatePriorities } from './matcher';
+import { classifyDimensions, generatePriorities, buildMatchReportFromJD, computeOverallMatchScore } from './matcher';
 import { loadSkillsSync } from '@/server/rag/skills-loader';
 import type { MatchReport, ResumeDocument } from './types';
+import type { JDDocument } from '@/features/jd/types';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -241,5 +242,127 @@ describe('integration: classifyDimensions + generatePriorities on real fixture',
     // At least one priority mentions something actionable (metric / quantify / reorder / summary)
     const joined = out.map((p) => p.action.toLowerCase()).join(' | ');
     expect(joined).toMatch(/metric|quantif|reorder|summary|skill|jd/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — JD-driven match: buildMatchReportFromJD + computeOverallMatchScore
+// ---------------------------------------------------------------------------
+
+const jdMatchResume: ResumeDocument = {
+  meta: { version: 'reup.v2.phase3', source: 'text', createdAt: '2026-01-15T00:00:00.000Z' },
+  basic: { name: '测试', title: '后端工程师', yearsOfExperience: 5 },
+  experience: [
+    {
+      company: 'A公司',
+      role: '后端开发',
+      period: '2020-2025',
+      bullets: ['使用 Java 开发高并发微服务，QPS 提升至 5000', '使用 MySQL 存储核心业务数据'],
+    },
+  ],
+  projects: [],
+  skills: ['Java', 'MySQL', 'Redis'],
+  education: [],
+  raw: '后端工程师 / 5年经验 / Java MySQL Redis',
+};
+
+const jdMatchJD: JDDocument = {
+  meta: { source: 'text', parsedAt: '2026-01-15T00:00:00.000Z' },
+  title: '后端工程师',
+  hardRequirements: [
+    { category: '经验', description: '5年以上后端开发经验', priority: 'must' },
+    { category: '学历', description: '本科及以上', priority: 'preferred' },
+  ],
+  responsibilities: ['负责微服务架构设计与开发', '负责数据库性能优化'],
+  skills: [
+    { name: 'Java', level: '精通', required: true },
+    { name: 'MySQL', level: '熟悉', required: true },
+    { name: 'Kubernetes', level: '熟悉', required: false },
+  ],
+  raw: '后端工程师 5年经验 Java MySQL Kubernetes',
+};
+
+describe('buildMatchReportFromJD', () => {
+  it('matches skills that appear in resume and reports gaps for missing ones', () => {
+    const report = buildMatchReportFromJD(jdMatchResume, jdMatchJD);
+    // Java and MySQL should be matched (appear in resume skills + bullets)
+    const matchedLabels = report.strengths.map((s) => s.dimension);
+    expect(matchedLabels).toContain('Java');
+    expect(matchedLabels).toContain('MySQL');
+    // Kubernetes should be a gap (not in resume)
+    const gapLabels = report.gaps.map((g) => g.dimension);
+    expect(gapLabels).toContain('Kubernetes');
+  });
+
+  it('does not produce false positives from generic bigrams like "工作" or "经验"', () => {
+    // A resume with zero relevant content should have mostly gaps, not strengths.
+    const emptyishResume: ResumeDocument = {
+      ...jdMatchResume,
+      skills: [],
+      experience: [{ company: 'B', role: '实习生', period: '2024', bullets: ['整理文档'] }],
+      raw: '实习生',
+    };
+    const report = buildMatchReportFromJD(emptyishResume, jdMatchJD);
+    // "5年以上后端开发经验" should NOT match "整理文档" via generic bigram "经验"
+    const matchedLabels = report.strengths.map((s) => s.dimension);
+    expect(matchedLabels).not.toContain('5年以上后端开发经验');
+  });
+
+  it('returns empty strengths and all gaps for empty resume', () => {
+    const report = buildMatchReportFromJD(emptyResume, jdMatchJD);
+    expect(report.strengths).toHaveLength(0);
+    expect(report.gaps.length).toBeGreaterThan(0);
+  });
+});
+
+describe('computeOverallMatchScore', () => {
+  it('returns 0 for empty JD (no dimensions)', () => {
+    const emptyJD: JDDocument = {
+      meta: { source: 'text', parsedAt: '2026-01-15T00:00:00.000Z' },
+      title: '',
+      hardRequirements: [],
+      responsibilities: [],
+      skills: [],
+      raw: '',
+    };
+    const partial = buildMatchReportFromJD(jdMatchResume, emptyJD);
+    const score = computeOverallMatchScore(partial, emptyJD);
+    expect(score).toBe(0);
+  });
+
+  it('returns 0 when nothing matches', () => {
+    const noMatchResume: ResumeDocument = {
+      ...emptyResume,
+      skills: ['Cooking'],
+      raw: '厨师',
+    };
+    const partial = buildMatchReportFromJD(noMatchResume, jdMatchJD);
+    const score = computeOverallMatchScore(partial, jdMatchJD);
+    expect(score).toBe(0);
+  });
+
+  it('returns a value in [0, 100] and higher when more dimensions match', () => {
+    const partial = buildMatchReportFromJD(jdMatchResume, jdMatchJD);
+    const score = computeOverallMatchScore(partial, jdMatchJD);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+    // Java (weight 2) + MySQL (weight 2) are required skills, should match.
+    expect(score).toBeGreaterThan(0);
+  });
+
+  it('returns 100 when all dimensions are matched', () => {
+    const fullMatchResume: ResumeDocument = {
+      ...jdMatchResume,
+      experience: [
+        ...jdMatchResume.experience,
+        { company: 'C', role: '运维', period: '2023', bullets: ['使用 Kubernetes 部署服务'] },
+      ],
+      skills: [...jdMatchResume.skills, 'Kubernetes'],
+      education: [{ school: '大学', degree: '本科', period: '2015-2019' }],
+      raw: '后端工程师 本科 5年 Java MySQL Kubernetes 微服务 数据库优化',
+    };
+    const partial = buildMatchReportFromJD(fullMatchResume, jdMatchJD);
+    const score = computeOverallMatchScore(partial, jdMatchJD);
+    expect(score).toBe(100);
   });
 });

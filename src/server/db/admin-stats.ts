@@ -19,20 +19,28 @@ const STATS_FILE = path.join(process.cwd(), 'admin-stats.json');
 let statsBuffer: AdminStatsData | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 
+/** Reset in-memory state for tests. Does not delete the persisted file. */
+export function _resetForTest(): void {
+  statsBuffer = null;
+  writeQueue = Promise.resolve();
+}
+
 async function ensureStats(): Promise<AdminStatsData> {
   if (statsBuffer) return statsBuffer;
 
   try {
     const raw = await readFile(STATS_FILE, 'utf-8');
     const parsed = JSON.parse(raw) as Partial<AdminStatsData>;
+    // serviceStartTime should reflect the current process start, not the first-ever start.
     statsBuffer = {
       ragRetrieveCount: parsed.ragRetrieveCount ?? 0,
       chatApiCallCount: parsed.chatApiCallCount ?? 0,
       totalResponseTimeMs: parsed.totalResponseTimeMs ?? 0,
       inputGuardBlockedCount: parsed.inputGuardBlockedCount ?? 0,
       outputGuardBlockedCount: parsed.outputGuardBlockedCount ?? 0,
-      serviceStartTime: parsed.serviceStartTime ?? Date.now(),
+      serviceStartTime: Date.now(),
     };
+    await flushStats();
   } catch {
     statsBuffer = {
       ragRetrieveCount: 0,

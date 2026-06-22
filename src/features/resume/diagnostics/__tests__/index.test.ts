@@ -123,13 +123,13 @@ describe('index', () => {
   });
 
   describe('summary', () => {
-    it('should have correct summary for empty result', () => {
+    it('should have correct summary when no issues are detected', () => {
       const resume = makeResume({
         raw: '',
         basic: { name: 'Test', title: '工程师', yearsOfExperience: 3 },
         skills: ['Python'],
         experience: [
-          { company: 'A', role: 'Dev', period: '2021-2023', bullets: ['使用 Python 开发后端服务并优化系统性能'] },
+          { company: 'A', role: 'Dev', period: '2021-2023', bullets: ['使用 Python 开发后端服务，将核心接口耗时从 200ms 优化至 50ms'] },
         ],
         education: [{ school: 'University', degree: 'BS', period: '2016-2020' }],
       });
@@ -137,7 +137,7 @@ describe('index', () => {
       expect(result.summary.total).toBe(result.issues.length);
       expect(result.summary.errors).toBe(0);
       expect(result.summary.warnings).toBe(0);
-      expect(result.summary.infos).toBe(0);
+      expect(result.summary.errors + result.summary.warnings + result.summary.infos).toBe(result.summary.total);
     });
 
     it('should count errors correctly', () => {

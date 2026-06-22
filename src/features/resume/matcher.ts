@@ -14,6 +14,7 @@
 
 import { LLMClient, type Message } from '@/server/llm/llm-client';
 import { loadSkillsSync } from '@/server/rag/skills-loader';
+import type { JDDocument } from '@/features/jd/types';
 import type { MatchReport, ResumeDocument } from './types';
 
 // ---------------------------------------------------------------------------
@@ -277,4 +278,146 @@ function clampRank(n: number): 1 | 2 | 3 {
   if (i <= 1) return 1;
   if (i >= 3) return 3;
   return i as 1 | 2 | 3;
+}
+
+// ---------------------------------------------------------------------------
+// JD-driven match report (replaces skill-based matching for resume+JD flow)
+// ---------------------------------------------------------------------------
+
+/** A matchable dimension derived from the JD. */
+interface JDMatchDimension {
+  id: string;
+  label: string;
+  weight: number;
+  source: 'hardRequirement' | 'skill' | 'responsibility' | 'focusPoint';
+}
+
+function deriveJDDimensions(jd: JDDocument): JDMatchDimension[] {
+  const dims: JDMatchDimension[] = [];
+  for (const req of jd.hardRequirements) {
+    const weight = req.priority === 'must' ? 3 : 1;
+    dims.push({ id: `req-${dims.length}`, label: req.description, weight, source: 'hardRequirement' });
+  }
+  for (const skill of jd.skills) {
+    const weight = skill.required ? 2 : 1;
+    // Use only skill.name as label — level (精通/熟悉) is self-assessment, not a match keyword.
+    dims.push({ id: `skill-${dims.length}`, label: skill.name, weight, source: 'skill' });
+  }
+  for (const resp of jd.responsibilities.slice(0, 10)) {
+    dims.push({ id: `resp-${dims.length}`, label: resp, weight: 1, source: 'responsibility' });
+  }
+  for (const fp of jd.focusPoints?.slice(0, 5) ?? []) {
+    const weight = fp.weight === 'high' ? 2 : fp.weight === 'medium' ? 1 : 0.5;
+    dims.push({ id: `fp-${dims.length}`, label: fp.description, weight, source: 'focusPoint' });
+  }
+  return dims;
+}
+
+function resumeText(resume: ResumeDocument): string {
+  const parts: string[] = [];
+  parts.push(resume.basic.title ?? '', resume.raw);
+  for (const s of resume.skills) parts.push(s);
+  for (const e of resume.experience) {
+    parts.push(e.company, e.role);
+    for (const b of e.bullets) parts.push(b);
+  }
+  for (const p of resume.projects) {
+    parts.push(p.name);
+    for (const b of p.bullets) parts.push(b);
+  }
+  return parts.join('\n').toLowerCase();
+}
+
+function evidenceForDimension(resume: ResumeDocument, label: string): string {
+  const tokens = tokenizePhrases(label).filter((t) => t.length >= 2);
+  const text = resumeText(resume);
+
+  // Matching strategy:
+  // - English tokens (length >= 2, e.g. "Java"): 1 hit suffices.
+  // - Short CJK labels (<= 5 chars): 1 hit suffices (e.g. "本科及以上" → "本科").
+  // - Long CJK labels (> 5 chars): require 2 hits or 1 long token (>= 3 chars).
+  //   This prevents false positives from generic bigrams like "工作" / "经验".
+  const cjkChars = (label.match(/[\u4e00-\u9fff]/g) ?? []).length;
+  const hasEnglishToken = tokens.some((t) => /^[a-z0-9+#.]+$/.test(t));
+  const minHits = hasEnglishToken || cjkChars <= 5 ? 1 : 2;
+
+  function countHits(haystack: string): { hits: number; longHit: boolean } {
+    let hits = 0;
+    let longHit = false;
+    for (const t of tokens) {
+      if (haystack.includes(t)) {
+        hits++;
+        if (t.length >= 3) longHit = true;
+      }
+    }
+    return { hits, longHit };
+  }
+
+  function isMatch(haystack: string): boolean {
+    const { hits, longHit } = countHits(haystack);
+    if (hits >= minHits) return true;
+    return hits >= 1 && longHit;
+  }
+
+  for (const e of resume.experience) {
+    for (const b of e.bullets) {
+      if (isMatch(b.toLowerCase())) return b;
+    }
+  }
+  for (const p of resume.projects) {
+    for (const b of p.bullets) {
+      if (isMatch(b.toLowerCase())) return b;
+    }
+  }
+  for (const s of resume.skills) {
+    if (isMatch(s.toLowerCase())) return s;
+  }
+  if (isMatch(text)) {
+    return '（简历原文中提及相关关键词）';
+  }
+  return '';
+}
+
+function severityFromWeight(weight: number): 'high' | 'medium' | 'low' {
+  if (weight >= 2.5) return 'high';
+  if (weight >= 1.5) return 'medium';
+  return 'low';
+}
+
+/**
+ * Build a JD-driven match report.
+ * Overall score = weighted hits / weighted total, clamped to [0,1].
+ */
+export function buildMatchReportFromJD(
+  resume: ResumeDocument,
+  jd: JDDocument,
+): Omit<MatchReport, 'priorities'> {
+  const dims = deriveJDDimensions(jd);
+  const strengths: MatchReport['strengths'] = [];
+  const gaps: MatchReport['gaps'] = [];
+
+  for (const dim of dims) {
+    const evidence = evidenceForDimension(resume, dim.label);
+    if (evidence.length > 0) {
+      strengths.push({ dimension: dim.label, evidence });
+    } else {
+      gaps.push({ dimension: dim.label, severity: severityFromWeight(dim.weight) });
+    }
+  }
+
+  return { strengths, gaps };
+}
+
+/** Compute overall match percentage (0-100) from a JD-driven partial match. */
+export function computeOverallMatchScore(
+  partial: Omit<MatchReport, 'priorities'>,
+  jd: JDDocument,
+): number {
+  const dims = deriveJDDimensions(jd);
+  if (dims.length === 0) return 0;
+  const totalWeight = dims.reduce((sum, d) => sum + d.weight, 0);
+  if (totalWeight === 0) return 0;
+  const hitLabels = new Set(partial.strengths.map((s) => s.dimension));
+  const hitWeight = dims.filter((d) => hitLabels.has(d.label)).reduce((sum, d) => sum + d.weight, 0);
+  return Math.round((hitWeight / totalWeight) * 100);
 }

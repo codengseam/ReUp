@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Bug, Calendar, FileText, Info, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Bug, Calendar, FileText, Info, ChevronDown, Target, BookOpen, Briefcase } from 'lucide-react';
 import type { DiagnosticResult, DiagnosticIssue } from '@/features/resume/diagnostics';
 
 interface Props {
@@ -13,6 +13,9 @@ const TYPE_LABELS: Record<DiagnosticIssue['type'], string> = {
   timeline: '时间线',
   format: '格式',
   contradiction: '矛盾',
+  impact: '量化成果',
+  readability: '可读性',
+  career: '职业叙事',
 };
 
 const TYPE_ICONS: Record<DiagnosticIssue['type'], React.ReactNode> = {
@@ -20,6 +23,9 @@ const TYPE_ICONS: Record<DiagnosticIssue['type'], React.ReactNode> = {
   timeline: <Calendar className="w-3 h-3" />,
   format: <FileText className="w-3 h-3" />,
   contradiction: <AlertTriangle className="w-3 h-3" />,
+  impact: <Target className="w-3 h-3" />,
+  readability: <BookOpen className="w-3 h-3" />,
+  career: <Briefcase className="w-3 h-3" />,
 };
 
 const SEVERITY_COLORS: Record<DiagnosticIssue['severity'], { bg: string; text: string; border: string; dot: string }> = {
@@ -43,7 +49,7 @@ export function DiagnosticsPanel({ diagnostics }: Props) {
       acc[issue.type].push(issue);
       return acc;
     },
-    { typo: [], timeline: [], format: [], contradiction: [] },
+    { typo: [], timeline: [], format: [], contradiction: [], impact: [], readability: [], career: [] },
   );
 
   const groupKeys = (Object.keys(grouped) as DiagnosticIssue['type'][]).filter(
@@ -83,7 +89,7 @@ export function DiagnosticsPanel({ diagnostics }: Props) {
             key={type}
             type={type}
             issues={grouped[type]}
-            defaultOpen={type === 'contradiction' || type === 'timeline'}
+            defaultOpen={type === 'contradiction' || type === 'timeline' || type === 'impact' || type === 'career'}
           />
         ))}
       </div>
