@@ -33,7 +33,12 @@ jobs:
           # 这会完全覆盖魔搭空间 main 分支上的原有文件
           git push modelscope main:main --force
 
-          # 删除魔搭空间上的 master 和 coze 分支
-          # || true 表示即使分支不存在也不会导致 workflow 失败
+          # 同步把 main 覆盖到 master 分支
+          # 原因：魔搭空间创空间可能默认部署 master 分支，而 master 上残留了旧代码
+          #（如引用 skills-index.md 的旧 Dockerfile）。即便 master 删不掉，也保证它和 main 内容一致。
+          git push modelscope main:master --force || true
+
+          # 尝试删除魔搭空间上的 master 和 coze 分支
+          # || true 表示即使分支不存在或因为是默认分支删不掉，也不会导致 workflow 失败
           git push modelscope --delete master || true
           git push modelscope --delete coze || true
