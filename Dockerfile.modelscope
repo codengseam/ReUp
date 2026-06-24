@@ -1,0 +1,126 @@
+# ReUp on ModelScope 创空间
+# 魔搭空间 Docker 部署专用 Dockerfile
+# 关键适配点:
+#   - 暴露端口必须是 7860
+#   - 持久化目录必须是 /mnt/workspace (仅该目录重启后保留)
+#   - 使用 root 运行 (魔搭空间容器默认 root)
+
+ARG NODE_VERSION=20
+ARG PNPM_VERSION=9
+
+# ============================================================================
+# Stage 1: deps — 安装所有依赖 (含 devDependencies, 用于构建)
+# ============================================================================
+FROM node:${NODE_VERSION}-slim AS deps
+ARG PNPM_VERSION
+
+WORKDIR /app
+
+# 原生模块编译工具链 (better-sqlite3, sharp)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+# 只复制 manifest, 利用 docker 层缓存
+COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+RUN pnpm install --frozen-lockfile
+
+# ============================================================================
+# Stage 2: builder — Next.js build + tsup 打包 server + prisma generate
+# ============================================================================
+FROM node:${NODE_VERSION}-slim AS builder
+ARG PNPM_VERSION
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# 1) 生成 Prisma client
+RUN pnpm prisma generate
+
+# 2) Next.js 生产构建
+RUN pnpm next build
+
+# 3) tsup 打包自定义 server 入口
+RUN pnpm tsup src/server.ts \
+    --format cjs \
+    --platform node \
+    --target node20 \
+    --outDir dist \
+    --no-splitting \
+    --no-minify
+
+# ============================================================================
+# Stage 3: runner — 最小运行时镜像
+# ============================================================================
+FROM node:${NODE_VERSION}-slim AS runner
+ARG PNPM_VERSION
+
+WORKDIR /app
+
+# 运行时系统依赖: curl 用于 HEALTHCHECK, sqlite3 用于调试
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+# 复制生产依赖 (从 deps 阶段)
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-lock.yaml ./
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder /app/prisma/generated ./prisma/generated
+
+# 数据: skill-vectors.json (27MB, 已在仓库) + skills.json + book-sources
+# 这些文件只读, 不需要持久化, 放在镜像内即可
+COPY --from=builder /app/data ./data
+
+# 入口脚本
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# 魔搭空间关键环境变量
+# 仅 /mnt/workspace 目录在容器重启后保留
+ENV NODE_ENV=production
+ENV PORT=7860
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV LOOP_ENGINEERING_DB=/mnt/workspace/loop-engineering.sqlite
+ENV REUP_VECTORS_PATH=/app/data/skill-vectors.json
+ENV HF_HOME=/mnt/workspace/.cache/hub
+ENV TRANSFORMERS_CACHE=/mnt/workspace/.cache/hub
+ENV TMPDIR=/mnt/workspace/.cache/tmp
+
+EXPOSE 7860
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -fsS http://localhost:7860/api/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["node", "dist/server.js"]

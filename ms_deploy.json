@@ -1,0 +1,21 @@
+{
+  "$schema": "https://modelscope.cn/api/v1/studios/deploy_schema.json",
+  "sdk_type": "docker",
+  "resource_configuration": "platform/2v-cpu-16g-mem",
+  "port": 7860,
+  "environment_variables": [
+    {"name": "DASHSCOPE_BASE_URL", "value": "https://dashscope.aliyuncs.com/compatible-mode"},
+    {"name": "DASHSCOPE_CHAT_MODEL", "value": "qwen3.6-plus-2026-04-02"},
+    {"name": "DASHSCOPE_EMBEDDING_MODEL", "value": "text-embedding-v3"},
+    {"name": "LLM_PROVIDER", "value": "dashscope"},
+    {"name": "NODE_ENV", "value": "production"},
+    {"name": "PORT", "value": "7860"},
+    {"name": "HOSTNAME", "value": "0.0.0.0"},
+    {"name": "LOOP_ENGINEERING_DB", "value": "/mnt/workspace/loop-engineering.sqlite"},
+    {"name": "REUP_VECTORS_PATH", "value": "/app/data/skill-vectors.json"},
+    {"name": "HF_HOME", "value": "/mnt/workspace/.cache/hub"},
+    {"name": "TRANSFORMERS_CACHE", "value": "/mnt/workspace/.cache/hub"},
+    {"name": "TMPDIR", "value": "/mnt/workspace/.cache/tmp"},
+    {"name": "RESUME_PDF_LLM_FALLBACK", "value": "false"}
+  ]
+}
