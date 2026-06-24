@@ -1,0 +1,34 @@
+name: Sync to ModelScope
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Push to ModelScope
+        env:
+          MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
+        run: |
+          # 添加魔搭空间远程仓库
+          git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/bossagent.git
+
+          # 获取魔搭空间当前分支（通常是 master 或 main）
+          git fetch modelscope
+
+          # 推送当前 main 分支到魔搭空间的 main 分支
+          # 如果魔搭空间默认分支是 master，把 :main 改成 :master
+          git push modelscope main:main --force
