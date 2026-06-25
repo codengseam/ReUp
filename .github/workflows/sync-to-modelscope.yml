@@ -2,7 +2,7 @@ name: Sync to ModelScope
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -20,9 +20,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       # 部署约定（写死在 workflow 里，防止遗忘）：
-      # - GitHub 主分支：main
+      # - GitHub 主分支未来会改为 master；目前同时支持 main 和 master
       # - 魔搭空间默认部署分支：master（无法修改，且受保护禁止 force push）
-      # - 因此每次用普通 push 把 GitHub main 同步到魔搭 master（fast-forward）
+      # - 当前触发 push 的分支（GITHUB_REF_NAME）被同步到魔搭 master
+      # - 历史分叉时，用 --allow-unrelated-histories 合并魔搭 master 后再 push
+      # - 项目从 gitee → github → modelscope 演化，两边历史独立，必须允许无关历史合并
       # - 不预先 fetch 整个魔搭仓库（27MB skill-vectors.json + 全历史会触发 curl 18 RPC 中断）
       # - push 失败时只 shallow fetch master（--depth=1），merge 后再 push
       # - 魔搭上的 main 分支是历史残留，尝试删除
@@ -36,14 +38,16 @@ jobs:
           # 添加魔搭空间远程仓库
           git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/reup.git
 
-          # 普通 push 同步 GitHub main 到魔搭 master（不用 --force，master 受保护）
-          # 魔搭 master 之前同步过我们的代码，fast-forward 即可，无需预先 fetch
-          if ! git push modelscope main:master; then
-            echo "Fast-forward failed, shallow-fetching modelscope/master..."
+          # 普通 push 同步 GitHub 当前分支到魔搭 master（不用 --force，master 受保护）
+          # GITHUB_REF_NAME 是当前触发 workflow 的分支名（main 或 master）
+          if ! git push modelscope "${GITHUB_REF_NAME}:master"; then
+            echo "Push rejected, shallow-fetching modelscope/master and merging with unrelated histories..."
             # 只 shallow fetch master 一个分支，避免拉取整个魔搭仓库历史
             git fetch modelscope master --depth=1
-            git merge --no-edit modelscope/master
-            git push modelscope main:master
+            # 项目从 gitee → github → modelscope 演化，两边历史独立
+            # 必须用 --allow-unrelated-histories 才能合并
+            git merge --no-edit --allow-unrelated-histories modelscope/master
+            git push modelscope "${GITHUB_REF_NAME}:master"
           fi
 
           # 删除魔搭空间上的 main 分支（如果存在）

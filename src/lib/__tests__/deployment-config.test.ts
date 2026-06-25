@@ -182,13 +182,19 @@ describe('deployment config consistency', () => {
       );
     });
 
-    it('pushes GitHub main to ModelScope master (the deploy branch)', () => {
-      expect(workflow).toMatch(/git push modelscope main:master/);
+    it('triggers on both main and master (for default branch migration)', () => {
+      // 用户计划把 GitHub 默认分支改为 master，workflow 两边都监听
+      expect(workflow).toMatch(/branches:\s*\[main,\s*master\]/);
+    });
+
+    it('pushes current GitHub branch to ModelScope master (the deploy branch)', () => {
+      // GITHUB_REF_NAME 是当前触发 push 的分支名（main 或 master）
+      expect(workflow).toMatch(/git push modelscope "\$\{GITHUB_REF_NAME\}:master"/);
     });
 
     it('does NOT force push to master (protected branch, force push denied)', () => {
       // 魔搭空间 master 是受保护分支，--force 会被 pre-receive hook 拒绝
-      expect(workflow).not.toMatch(/main:master\s+--force/);
+      expect(workflow).not.toMatch(/:master\s+--force/);
     });
 
     it('does NOT push GitHub main to ModelScope main (avoid stale branch)', () => {
@@ -198,6 +204,12 @@ describe('deployment config consistency', () => {
     it('has merge fallback for non-fast-forward case', () => {
       // 历史分叉时，merge modelscope/master 后再 push（标准 GitLab 协作流）
       expect(workflow).toMatch(/git merge.*modelscope\/master/);
+    });
+
+    it('merges unrelated histories when needed', () => {
+      // GitHub main 与魔搭 master 有独立历史（项目从 gitee → github → modelscope 演化）
+      // 必须用 --allow-unrelated-histories 才能合并
+      expect(workflow).toMatch(/--allow-unrelated-histories/);
     });
 
     it('does NOT fetch all modelscope branches upfront (RPC failure on large repo)', () => {
