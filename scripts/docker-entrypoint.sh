@@ -19,9 +19,10 @@ echo "================================================"
 
 cd /app
 
-# 1) 确保数据目录存在 (volume 挂载点)
+# 1) 确保数据目录存在 (volume 挂载点 / ModelScope /mnt/workspace)
 mkdir -p "$(dirname "${LOOP_ENGINEERING_DB:-/app/data/loop-engineering.sqlite}")"
 mkdir -p "${HF_HOME:-/app/.cache/hub}"
+mkdir -p "${TMPDIR:-/app/.cache/tmp}"
 
 # 2) Prisma migrate deploy (生产环境推荐)
 #    如果 prisma/migrations 不存在, 跳过 (项目当前用 schema-first, 无迁移文件)

@@ -11,8 +11,8 @@
 
 ARG NODE_VERSION=20
 ARG PNPM_VERSION=9
-# 统一端口来源 (runner 阶段 ENV PORT / EXPOSE / HEALTHCHECK 共用)
-ARG APP_PORT=5000
+# ModelScope Spaces 要求端口 7860 (健康检查探测此端口)
+# fly.io / docker-compose 通过运行时 env PORT=5000 覆盖
 # 非 root 用户 UID/GID (需与 volume 挂载宿主目录权限对齐)
 ARG APP_UID=1001
 ARG APP_GID=1001
@@ -83,10 +83,6 @@ RUN pnpm tsup src/server.ts \
 # ============================================================================
 FROM node:${NODE_VERSION}-slim AS runner
 ARG PNPM_VERSION
-# ARG 跨阶段不继承, 在 runner 阶段重新声明 (默认值保持现有行为不变)
-ARG APP_PORT=5000
-ARG APP_UID=1001
-ARG APP_GID=1001
 
 WORKDIR /app
 
@@ -122,25 +118,27 @@ COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # 运行时目录: 数据库 + 模型缓存挂载点
+# /mnt/workspace 是 ModelScope 唯一持久化目录; /app/data 供 fly.io/compose volume 挂载
 RUN mkdir -p /app/data /app/.cache/hub /app/.cache/tmp \
+    /mnt/workspace/.cache/hub /mnt/workspace/.cache/tmp \
     && chown -R reup:reup /app
 
 ENV NODE_ENV=production
-ENV PORT=$APP_PORT
+ENV PORT=7860
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
-# better-sqlite3 数据库路径 (挂载 volume 持久化)
-ENV LOOP_ENGINEERING_DB=/app/data/loop-engineering.sqlite
-# @xenova/transformers 模型缓存目录 (挂载 volume 避免冷启动重下)
-ENV HF_HOME=/app/.cache/hub
-ENV TRANSFORMERS_CACHE=/app/.cache/hub
-ENV TMPDIR=/app/.cache/tmp
+# better-sqlite3 数据库路径 (/mnt/workspace 是 ModelScope 唯一持久化目录)
+ENV LOOP_ENGINEERING_DB=/mnt/workspace/loop-engineering.sqlite
+# 向量索引 (镜像内已 bake, 只读)
+ENV REUP_VECTORS_PATH=/app/data/skill-vectors.json
+# @xenova/transformers 模型缓存目录 (/mnt/workspace 持久化避免冷启动重下)
+ENV HF_HOME=/mnt/workspace/.cache/hub
+ENV TRANSFORMERS_CACHE=/mnt/workspace/.cache/hub
+ENV TMPDIR=/mnt/workspace/.cache/tmp
 
-USER reup
+EXPOSE 7860
 
-EXPOSE ${APP_PORT}
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://localhost:${PORT}/api/health || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
