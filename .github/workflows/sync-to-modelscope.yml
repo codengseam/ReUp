@@ -19,6 +19,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # 部署约定（写死在 workflow 里，防止遗忘）：
+      # - GitHub 主分支：main
+      # - 魔搭空间默认部署分支：master（无法修改）
+      # - 因此每次只把 GitHub main 强制推送到魔搭 master
+      # - 魔搭上的 main 分支是历史残留，尝试删除
       - name: Sync to ModelScope
         env:
           MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
@@ -29,16 +34,13 @@ jobs:
           # 获取魔搭空间所有分支
           git fetch modelscope
 
-          # 强制推送 GitHub 的 main 到魔搭空间的 main
-          # 这会完全覆盖魔搭空间 main 分支上的原有文件
-          git push modelscope main:main --force
+          # 强制推送 GitHub 的 main 到魔搭空间的 master
+          # 魔搭空间默认部署 master 分支，这是唯一需要同步的目标分支
+          git push modelscope main:master --force
 
-          # 同步把 main 覆盖到 master 分支
-          # 原因：魔搭空间创空间可能默认部署 master 分支，而 master 上残留了旧代码
-          #（如引用 skills-index.md 的旧 Dockerfile）。即便 master 删不掉，也保证它和 main 内容一致。
-          git push modelscope main:master --force || true
+          # 删除魔搭空间上的 main 分支（如果存在）
+          # 该分支是旧配置残留，魔搭空间实际使用 master 作为默认分支
+          git push modelscope --delete main || true
 
-          # 尝试删除魔搭空间上的 master 和 coze 分支
-          # || true 表示即使分支不存在或因为是默认分支删不掉，也不会导致 workflow 失败
-          git push modelscope --delete master || true
+          # 删除其他可能存在的废弃分支
           git push modelscope --delete coze || true

@@ -15,6 +15,8 @@
 //   4. ms_deploy.json declares port 7860
 //   5. No separate Dockerfile.modelscope exists (single Dockerfile)
 //   6. All health checks use /api/health
+//   7. sync-to-modelscope.yml pushes GitHub main to ModelScope master (not main)
+//      and targets codengseam/reup.git
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
@@ -168,6 +170,33 @@ describe('deployment config consistency', () => {
       // is never used and causes confusion. The single Dockerfile must handle
       // all deployment targets via runtime env var overrides.
       expect(existsSync(resolve(ROOT, 'Dockerfile.modelscope'))).toBe(false);
+    });
+  });
+
+  describe('sync-to-modelscope.yml — branch mapping', () => {
+    const workflow = readFile('.github/workflows/sync-to-modelscope.yml');
+
+    it('targets codengseam/reup.git (current ModelScope space)', () => {
+      expect(workflow).toMatch(
+        /https:\/\/oauth2:\$\{MODELSCOPE_TOKEN\}@www\.modelscope\.cn\/studios\/codengseam\/reup\.git/
+      );
+    });
+
+    it('pushes GitHub main to ModelScope master (the deploy branch)', () => {
+      expect(workflow).toMatch(/git push modelscope main:master --force/);
+    });
+
+    it('does NOT push GitHub main to ModelScope main (avoid stale branch)', () => {
+      expect(workflow).not.toMatch(/git push modelscope main:main/);
+    });
+
+    it('deletes ModelScope main branch if it exists', () => {
+      expect(workflow).toMatch(/git push modelscope --delete main/);
+    });
+
+    it('does NOT try to delete ModelScope master branch', () => {
+      // master 是魔搭空间默认分支，删不掉；workflow 不应尝试
+      expect(workflow).not.toMatch(/git push modelscope --delete master/);
     });
   });
 });
