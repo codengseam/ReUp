@@ -38,9 +38,25 @@ jobs:
           # 添加魔搭空间远程仓库
           git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/re_up.git
 
+          # 带重试的 push 函数：魔搭 Git 服务器偶发 502 / RPC 断连
+          push_with_retry() {
+            local max=5 delay=10
+            for i in $(seq 1 $max); do
+              if git push modelscope "${GITHUB_REF_NAME}:master"; then
+                echo "Push succeeded on attempt $i"
+                return 0
+              fi
+              echo "Push attempt $i/$max failed, retrying in ${delay}s..."
+              [ "$i" -lt "$max" ] && sleep "$delay"
+              delay=$((delay * 2))
+            done
+            echo "All $max push attempts failed"
+            return 1
+          }
+
           # 普通 push 同步 GitHub 当前分支到魔搭 master（不用 --force，master 受保护）
           # GITHUB_REF_NAME 是当前触发 workflow 的分支名（main 或 master）
-          if ! git push modelscope "${GITHUB_REF_NAME}:master"; then
+          if ! push_with_retry; then
             echo "Push rejected, shallow-fetching modelscope/master and merging with unrelated histories..."
             # 只 shallow fetch master 一个分支，避免拉取整个魔搭仓库历史
             git fetch modelscope master --depth=1
@@ -48,7 +64,7 @@ jobs:
             # 必须用 --allow-unrelated-histories 才能合并
             # -X ours：冲突时保留 GitHub 版本（魔搭自动初始化的 README.md 等会被覆盖）
             git merge --no-edit --allow-unrelated-histories -X ours modelscope/master
-            git push modelscope "${GITHUB_REF_NAME}:master"
+            push_with_retry
           fi
 
           # 删除魔搭空间上的 main 分支（如果存在）
