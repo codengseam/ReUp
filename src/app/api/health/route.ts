@@ -53,6 +53,11 @@ export async function GET(request: Request) {
     detail: dbPath,
   };
 
+  checks.apiKey = {
+    ok: Boolean(process.env.DASHSCOPE_API_KEY?.trim() || process.env.ZHIPU_API_KEY?.trim()),
+    detail: `dashscope=${process.env.DASHSCOPE_API_KEY ? 'set' : 'unset'}; zhipu=${process.env.ZHIPU_API_KEY ? 'set' : 'unset'}`,
+  };
+
   const allOk = Object.values(checks).every((c) => c.ok);
   return NextResponse.json(
     { ...base, checks },

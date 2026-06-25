@@ -1030,6 +1030,13 @@ export default function ChatPage() {
               >
                 清空对话
               </button>
+              <a
+                href="/admin"
+                target="_top"
+                className="block w-full px-4 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm text-muted-foreground text-center"
+              >
+                管理后台
+              </a>
             </div>
           </div>
         </div>

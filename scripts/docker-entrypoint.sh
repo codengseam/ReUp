@@ -15,6 +15,16 @@ echo "  PORT          = ${PORT:-5000}"
 echo "  LOOP_ENG_DB   = ${LOOP_ENGINEERING_DB:-<unset, will use default>}"
 echo "  VECTORS_PATH  = ${REUP_VECTORS_PATH:-<default data/skill-vectors.json>}"
 echo "  HF_HOME       = ${HF_HOME:-<unset>}"
+if [ -n "${DASHSCOPE_API_KEY:-}" ]; then
+  echo "  DASHSCOPE_API_KEY = <set, length ${#DASHSCOPE_API_KEY}>"
+else
+  echo "  DASHSCOPE_API_KEY = <unset>"
+fi
+if [ -n "${ZHIPU_API_KEY:-}" ]; then
+  echo "  ZHIPU_API_KEY     = <set, length ${#ZHIPU_API_KEY}>"
+else
+  echo "  ZHIPU_API_KEY     = <unset>"
+fi
 echo "================================================"
 
 cd /app
