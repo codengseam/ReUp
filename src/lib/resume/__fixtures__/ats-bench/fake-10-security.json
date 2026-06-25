@@ -1,0 +1,8 @@
+{
+  "id": "fake-10-security",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：孙鹏\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级安全工程师\n**工作经验**：5年安全工程经验\n\n## 核心能力\n\n- Web 安全：OWASP Top 10、SQL 注入、XSS、CSRF\n- 渗透测试：Burp Suite、Metasploit、Nmap\n- 代码审计：Java、Python、JavaScript\n- 云安全：AWS 安全、容器安全\n\n## 工作经历\n\n### 示例公司 T\n\n高级安全工程师（2021年09月 - 至今）\n\n- 主导 SDL 体系建设\n- 全年高危漏洞 0 起\n- 推进安全左移\n\n### 示例公司 U\n\n安全工程师（2019年07月 - 2021年08月）\n\n- 负责内部安全测试\n- 渗透测试 50+ 系统\n- 推动漏洞修复 SLA 提升\n\n## 专业技能\n\n- 工具：Burp Suite、Metasploit、Nmap、Sqlmap、Wireshark\n- 编程：Python、Java、JavaScript、Go\n- 平台：AWS、Azure、GCP\n- 框架：OWASP、CWE、CVE、ATT&CK",
+  "jd": "高级安全工程师招聘。负责 Web 安全、渗透测试、代码审计、SDL 体系建设、云安全、应急响应。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nOWASP OWASP OWASP OWASP OWASP — web security framework.\nBurp Suite Burp Suite Burp Suite Burp Suite Burp Suite — penetration tool.\nPython Python Python Python Python — scripting.\nPenetration Testing Penetration Testing Penetration Testing Penetration Testing Penetration Testing — offensive security.\nCode Audit Code Audit Code Audit Code Audit Code Audit — secure code review.\nCloud Security Cloud Security Cloud Security Cloud Security Cloud Security — cloud.\n\n需要熟悉 OWASP Top 10、Burp Suite、Metasploit、Python、Java、代码审计、SDL、渗透测试、应急响应、云安全、合规。3+ years security experience required.",
+  "expectedTopKeywords": ["owasp", "burp suite", "python", "penetration testing", "code audit", "cloud security"],
+  "expectedMinCoverage": 65
+}

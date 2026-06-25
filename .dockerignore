@@ -1,0 +1,83 @@
+# .dockerignore — 排除不需要进镜像的文件, 加快构建 + 避免缓存失效
+# 与 .gitignore 思路一致, 但更严格 (构建上下文越小越好)
+
+# VCS
+.git
+.gitignore
+.gitattributes
+.github
+
+# 依赖与构建产物 (镜像内重新生成)
+node_modules
+.next
+dist
+.turbo
+.vercel
+.cache
+coverage
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# 环境变量 (敏感, 通过 docker-compose / -e 注入)
+.env
+.env.*
+!.env.local.example
+
+# 本地数据库 (通过 volume 挂载, 不进镜像)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+dev.db
+prisma/dev.db
+data/loop-engineering.sqlite
+data/loop-engineering.sqlite-*
+
+# 运行时配置 (含明文 key, 通过 volume 挂载)
+data/.runtime-config.json
+
+# 日志
+*.log
+*.log.*
+logs/
+output.log
+
+# 测试与文档 (运行时不需要)
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/
+**/__fixtures__/
+.vitest-cache
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# IDE / OS
+.vscode
+.idea
+*.iml
+.DS_Store
+Thumbs.db
+
+# 容器自身 (避免递归)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Trae / Coze 工具产物
+.trae
+.cozeproj
+.qoder
+.superpowers
+
+# 大文件: 视频与归档 (仓库里若有, 不进镜像)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.zip
+*.gz
+*.iso
+*.dmg

@@ -1,0 +1,8 @@
+{
+  "id": "fake-09-product",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：吴婷\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级产品经理\n**工作经验**：5年产品经理经验\n\n## 核心能力\n\n- 业务规划：行业分析、竞品分析、商业模式\n- 产品设计：用户调研、PRD、原型、AB 测试\n- 数据驱动：北极星指标、漏斗分析、留存\n- 跨部门协作：研发、设计、运营、市场\n\n## 工作经历\n\n### 示例公司 R\n\n高级产品经理（2022年01月 - 至今）\n\n- 负责示例业务线产品规划\n- 主导从 0 到 1 新业务孵化\n- 推动用户增长 200%\n\n### 示例公司 S\n\n产品经理（2020年06月 - 2021年12月）\n\n- 负责示例中后台系统\n- 沉淀 30+ 通用组件\n- 推动跨部门数据打通\n\n## 专业技能\n\n- 工具：Axure、Figma、墨刀、Jira、Confluence\n- 数据：SQL、Tableau、神策、GrowingIO\n- 方法：AARRR、HEART、北极星、OKR、用户故事地图",
+  "jd": "高级产品经理招聘。负责业务规划、产品设计、跨部门协作、数据驱动决策、AB 测试、用户增长。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPRD PRD PRD PRD PRD — product requirements.\nAxure Axure Axure Axure Axure — prototyping.\nFigma Figma Figma Figma Figma — design tool.\nSQL SQL SQL SQL SQL — data analysis.\nA/B Testing A/B Testing A/B Testing A/B Testing A/B Testing — experimentation.\nUser Research User Research User Research User Research User Research — discovery.\n\n需要熟悉 PRD、Axure、Figma、SQL、A/B 测试、用户研究、数据分析、北极星指标、OKR、增长黑客、跨部门协作。4+ years PM experience required.",
+  "expectedTopKeywords": ["prd", "axure", "figma", "sql", "a/b testing", "user research"],
+  "expectedMinCoverage": 60
+}

@@ -1,0 +1,62 @@
+# ReUp on Fly.io
+# 用法:
+#   1. fly launch --no-deploy --name <你的应用名>
+#   2. fly volumes create reup_data --size 3 --region <你的region>
+#   3. fly volumes create reup_models --size 5 --region <你的region>
+#   4. fly secrets set DASHSCOPE_API_KEY=sk-xxxx
+#   5. fly deploy
+#
+# 注意:
+#   - 免费 tier 默认 256MB 内存可能不够跑 BGE-M3, 如冷启动 OOM 请升级到 512MB/1GB
+#   - 首次启动会下载 ~2.3GB 模型到 reup_models volume, 耗时取决于网络
+#   - SQLite 数据保存在 reup_data volume, 应用重建不会丢失
+
+app = '<your-app-name>'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '5000'
+  HOSTNAME = '0.0.0.0'
+  LOOP_ENGINEERING_DB = '/app/data/loop-engineering.sqlite'
+  REUP_VECTORS_PATH = '/app/data/skill-vectors.json'
+  HF_HOME = '/app/.cache/hub'
+  TRANSFORMERS_CACHE = '/app/.cache/hub'
+  TMPDIR = '/app/.cache/tmp'
+  DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode'
+  DASHSCOPE_CHAT_MODEL = 'qwen3.6-plus-2026-04-02'
+  DASHSCOPE_EMBEDDING_MODEL = 'text-embedding-v3'
+  LLM_PROVIDER = 'dashscope'
+  RESUME_PDF_LLM_FALLBACK = 'false'
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '60s'
+    method = 'GET'
+    path = '/api/health'
+    protocol = 'http'
+    tls_skip_verify = false
+
+[[mounts]]
+  source = 'reup_data'
+  destination = '/app/data'
+
+[[mounts]]
+  source = 'reup_models'
+  destination = '/app/.cache'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

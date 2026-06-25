@@ -1,0 +1,8 @@
+{
+  "id": "fake-07-data",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：黄静\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级数据工程师\n**工作经验**：5年数据工程经验\n\n## 核心能力\n\n- 大数据：Hadoop、Spark、Flink\n- 数据仓库：Hive、ClickHouse、Iceberg\n- 调度：Airflow、DolphinScheduler\n- 流处理：Kafka、Flink CDC\n\n## 工作经历\n\n### 示例公司 N\n\n高级数据工程师（2021年08月 - 至今）\n\n- 主导实时数仓从 0 到 1 建设\n- 日处理数据量 100 亿+\n- 推动 Iceberg 湖仓一体落地\n\n### 示例公司 O\n\n数据工程师（2019年07月 - 2021年07月）\n\n- 负责离线数仓 ETL 优化\n- 调度任务 5000+\n- 推动元数据管理建设\n\n## 专业技能\n\n- 大数据：Hadoop、Spark、Flink\n- 存储：Hive、ClickHouse、Iceberg、Hudi\n- 调度：Airflow、DolphinScheduler\n- 流处理：Kafka、Flink CDC、Pulsar\n- 查询：Trino、Presto、Impala",
+  "jd": "高级数据工程师招聘。负责实时/离线数仓建设、湖仓一体、ETL 优化、元数据管理、数据治理。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nSpark Spark Spark Spark Spark — distributed compute.\nFlink Flink Flink Flink Flink — stream processing.\nKafka Kafka Kafka Kafka Kafka — messaging.\nHive Hive Hive Hive Hive — data warehouse.\nAirflow Airflow Airflow Airflow Airflow — workflow orchestration.\nClickHouse ClickHouse ClickHouse ClickHouse ClickHouse — OLAP.\nIceberg Iceberg Iceberg Iceberg Iceberg — table format.\n\n需要熟悉 Spark、Flink、Kafka、Hive、Airflow、ClickHouse、Iceberg、Hudi、数据建模、数据治理、元数据管理、性能优化。4+ years data engineering experience required.",
+  "expectedTopKeywords": ["spark", "flink", "kafka", "hive", "airflow", "clickhouse", "iceberg"],
+  "expectedMinCoverage": 70
+}

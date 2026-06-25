@@ -1,0 +1,8 @@
+{
+  "id": "fake-01-sdet",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：张辰\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级测试开发工程师\n**工作经验**：5年+ 测试开发经验\n\n## 核心能力\n\n- 自动化测试：基于Python+Pytest+Requests搭建接口自动化体系\n- 性能优化：接口耗时从 850ms 优化至 583ms\n- 工具开发：全链路数据构造工具\n\n## 工作经历\n\n### 示例公司 A\n\n业务负责人（2022年10月 - 至今）\n\n- 端到端负责示例业务线质量保障\n- 接口自动化覆盖率达 90.5%\n- 缺陷逃逸率从 9.76% 降至 1.42%\n\n### 示例公司 B\n\n团队负责人（2021年04月 - 2022年10月）\n\n- 紧急业务交接：3天完成核心模块交接\n- 建设 PyTest 自动化，场景覆盖率从45%提升至91%\n- 设计MQ消息对账机制\n\n### 示例公司 C\n\n测试工程师（2019年07月 - 2021年04月）\n\n- 独立负责示例平台质量体系从0到1建设\n- 沉淀700+核心用例和90+接口自动化\n\n## 专业技能\n\n- 数据库：MySQL、SQL优化\n- 编程语言：Python（熟悉）\n- 工具：Linux、Git、JIRA\n- 性能测试：JMeter、压测、链路追踪",
+  "jd": "高级测试开发工程师招聘。负责核心业务系统的自动化测试、质量保障、接口测试、白盒测试、回归测试、性能测试、缺陷跟踪、CI/CD、测试体系建设。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nPython Python Python Python Python — scripting, frameworks, tools.\nPytest Pytest Pytest Pytest Pytest — fixture, parameterization, plugins.\nMySQL MySQL MySQL MySQL MySQL — schema, indexing, transactions.\nLinux Linux Linux Linux Linux — shell, performance tools, deployment.\nGit Git Git Git Git — branching, code review, CI.\nJIRA JIRA JIRA JIRA JIRA — ticket tracking, agile boards.\n\n需要熟悉自动化测试、接口测试、白盒测试、Web测试、APP测试、敏捷测试、回归测试、测试体系、测试用例、测试计划、缺陷跟踪、报告输出、CI/CD、Jenkins、Git、JIRA 等工具。5+ years QA experience required.",
+  "expectedTopKeywords": ["python", "pytest", "mysql", "linux", "git", "jira"],
+  "expectedMinCoverage": 60
+}

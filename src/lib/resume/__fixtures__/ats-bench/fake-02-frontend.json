@@ -1,0 +1,8 @@
+{
+  "id": "fake-02-frontend",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：王林\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：高级前端工程师\n**工作经验**：5年前端开发经验\n\n## 核心能力\n\n- 前端架构：React、Vue、Next.js 体系\n- 性能优化：首屏加载、代码分割、懒加载\n- 工具链：Webpack、Vite、TypeScript\n\n## 工作经历\n\n### 示例公司 D\n\n高级前端工程师（2022年06月 - 至今）\n\n- 主导微前端架构升级，统一 5 个子应用\n- 首屏加载时间从 3.2s 优化至 1.1s\n- 沉淀 12 个公共组件\n\n### 示例公司 E\n\n前端工程师（2020年07月 - 2022年05月）\n\n- 负责中后台系统开发\n- 推进 TypeScript 全量迁移\n- 单元测试覆盖率从 30% 提升至 80%\n\n## 专业技能\n\n- 框架：React、Vue、Next.js\n- 工具：Webpack、Vite、TypeScript\n- 状态管理：Redux、Pinia、Zustand\n- 样式：Tailwind CSS、CSS Modules\n- 测试：Jest、Vitest、Testing Library",
+  "jd": "高级前端工程师招聘。负责大型 Web 应用的前端架构、性能优化、组件库建设、CI/CD、代码质量。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nReact React React React React — primary frontend framework.\nTypeScript TypeScript TypeScript TypeScript TypeScript — typed JS.\nNext.js Next.js Next.js Next.js Next.js — SSR/ISR framework.\nWebpack Webpack Webpack Webpack Webpack — bundler.\nVitest Vitest Vitest Vitest Vitest — unit test framework.\nJest Jest Jest Jest Jest — test framework.\nCSS CSS CSS CSS CSS — styling.\n\n需要熟悉前端工程化、性能优化、可访问性、单元测试、Storybook、Monorepo、Lerna、Turborepo 等。4+ years frontend experience required.",
+  "expectedTopKeywords": ["react", "typescript", "next", "webpack", "vitest", "jest"],
+  "expectedMinCoverage": 65
+}

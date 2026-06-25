@@ -1,0 +1,8 @@
+{
+  "id": "fake-04-fullstack",
+  "source": "fully synthetic — public fixture, no real personal data",
+  "resume": "## 个人信息\n\n**姓名**：赵敏\n**电话**：000-0000-0000\n**邮箱**：example@example.com\n**求职意向**：全栈工程师\n**工作经验**：4年全栈开发经验\n\n## 核心能力\n\n- 全栈开发：React + Node.js + PostgreSQL\n- DevOps：Docker、CI/CD、监控告警\n- 架构设计：单体到微服务的演进\n\n## 工作经历\n\n### 示例公司 H\n\n全栈工程师（2022年01月 - 至今）\n\n- 独立负责 SaaS 产品从 0 到 1\n- 前端 React + 后端 Node.js + PostgreSQL\n- 集成 Stripe 支付、Twilio 短信\n\n### 示例公司 I\n\nWeb 工程师（2020年06月 - 2021年12月）\n\n- 负责内部工具开发\n- 推进前端组件化\n- 推动 TypeScript 迁移\n\n## 专业技能\n\n- 前端：React、TypeScript、Tailwind\n- 后端：Node.js、Express、NestJS\n- 数据库：PostgreSQL、MongoDB、Redis\n- DevOps：Docker、GitHub Actions、AWS\n- 测试：Jest、Supertest、Cypress",
+  "jd": "全栈工程师招聘。负责 SaaS 产品的全栈开发、前后端架构、数据库设计、API 设计与实现、CI/CD、监控告警。\n\nRequired skills (each repeated 5 times for TF top-K ranking):\nReact React React React React — frontend.\nTypeScript TypeScript TypeScript TypeScript TypeScript — typed JS.\nNode.js Node.js Node.js Node.js Node.js — backend runtime.\nPostgreSQL PostgreSQL PostgreSQL PostgreSQL PostgreSQL — relational DB.\nDocker Docker Docker Docker Docker — containerization.\nAWS AWS AWS AWS AWS — cloud platform.\nGraphQL GraphQL GraphQL GraphQL GraphQL — API query language.\nRedis Redis Redis Redis Redis — cache.\n\n需要熟悉全栈开发、RESTful API、GraphQL、CI/CD、Docker、Kubernetes、AWS、PostgreSQL、MongoDB、Redis、单元测试、集成测试、E2E 测试。3+ years full-stack experience required.",
+  "expectedTopKeywords": ["react", "typescript", "node", "postgresql", "docker", "aws", "graphql", "redis"],
+  "expectedMinCoverage": 70
+}

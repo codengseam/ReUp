@@ -1,0 +1,105 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "id": "jinsheng-dicing-luoji",
+      "name": "晋升底层逻辑",
+      "category": "promotion",
+      "trigger": "我绩效很好，为什么没晋升？",
+      "framework": "先精通当前级别，再做下一级别的事",
+      "steps": ["确认晋升通道", "评估当前级别", "对标下一级", "寻找越级机会"]
+    },
+    {
+      "id": "jinsheng-san-yuanze",
+      "name": "晋升三大原则",
+      "category": "promotion",
+      "trigger": "我该学什么技术？",
+      "framework": "主动/成长/价值三原则过滤任务",
+      "steps": ["确认目标", "价值过滤", "成长诊断", "主动出击"]
+    },
+    {
+      "id": "nengli-sanzhong-jingjie",
+      "name": "能力三重境界",
+      "category": "promotion",
+      "trigger": "这个业务做了两年还能怎么提升？",
+      "framework": "基础(会做)/熟练(做好)/精通(优化)三层定位",
+      "steps": ["确认评估对象", "识别当前状态", "暴露熟练假象", "制定精通方案"]
+    },
+    {
+      "id": "p8-lingyu-zhuanjia",
+      "name": "领域专家演进",
+      "category": "promotion",
+      "trigger": "升了总监天天开会怎么办？",
+      "framework": "532精力分配+梯队+领域破局",
+      "steps": ["校验P8题面", "诊断精力分配", "盘点梯队", "制定领域破局点"]
+    },
+    {
+      "id": "competency-model-alignment",
+      "name": "素质模型对齐",
+      "category": "interview",
+      "trigger": "怎么自我介绍？",
+      "framework": "经验-技能-潜力-动机四层冰山模型",
+      "steps": ["诊断回答层次", "挖掘潜力层", "深究动机层", "重组回答结构"]
+    },
+    {
+      "id": "highlight-extractor",
+      "name": "亮点挖掘",
+      "category": "interview",
+      "trigger": "简历没亮点怎么办？",
+      "framework": "价值/结果/创新/动机四维挖掘",
+      "steps": ["输入平淡经历", "价值与结果榨取", "创新与动机榨取", "生成亮点句"]
+    },
+    {
+      "id": "blind-spot-navigation",
+      "name": "盲区导航",
+      "category": "interview",
+      "trigger": "面试被问住怎么圆？",
+      "framework": "坦诚+平移/降维到主场",
+      "steps": ["定位盲区属性", "建立坦诚防线", "设计降维/平移话术", "总结输出"]
+    },
+    {
+      "id": "reverse-questioning-framework",
+      "name": "反问框架",
+      "category": "interview",
+      "trigger": "面试最后问什么？",
+      "framework": "三元交集模型（应聘者+面试官+职位）",
+      "steps": ["收集真实诉求", "定位三元交集", "设计反问话术", "提供避坑指南"]
+    }
+  ],
+  "hotQueries": [
+    { "id": 1, "text": "我绩效很好，为什么没晋升？", "category": "promotion" },
+    { "id": 2, "text": "我的经历没有亮点怎么办？", "category": "interview" },
+    { "id": 3, "text": "面试被问住不会回答怎么圆？", "category": "interview" },
+    { "id": 4, "text": "升了总监天天开会怎么办？", "category": "promotion" },
+    { "id": 5, "text": "怎么自我介绍最加分？", "category": "interview" },
+    { "id": 6, "text": "面试最后问什么问题？", "category": "interview" },
+    { "id": 7, "text": "如何在现有业务中继续提升？", "category": "promotion" },
+    { "id": 8, "text": "该学什么技术才能晋升？", "category": "promotion" },
+    { "id": 9, "text": "我P6做了2年核心业务，绩效连续2次A，但晋升答辩没过，可能是什么原因？", "category": "promotion" },
+    { "id": 10, "text": "作为技术负责人，我该学什么方向才能从P7升到P8？", "category": "promotion" },
+    { "id": 11, "text": "我做的业务很稳定但不出彩，如何在晋升中体现价值？", "category": "promotion" },
+    { "id": 12, "text": "面试时被问到不懂的技术栈，怎么优雅地转场？", "category": "interview" },
+    { "id": 13, "text": "简历上的项目比较平淡，怎么挖掘出亮点？", "category": "interview" },
+    { "id": 14, "text": "面试最后反问环节，问什么问题能给面试官留下好印象？", "category": "interview" }
+  ],
+  "quickEntries": [
+    { "label": "晋升困惑", "icon": "TrendingUp", "query": "我绩效很好，为什么没晋升？" },
+    { "label": "简历优化", "icon": "Sparkles", "query": "我的经历没有亮点怎么办？" },
+    { "label": "面试准备", "icon": "Target", "query": "怎么自我介绍最加分？" },
+    { "label": "反问设计", "icon": "HelpCircle", "query": "面试最后问什么问题？" }
+  ],
+  "suggestions": [
+    { "keywords": ["晋升", "升职"], "suggestion": "我绩效很好，为什么没晋升？" },
+    { "keywords": ["简历", "亮点"], "suggestion": "我的经历没有亮点怎么办？" },
+    { "keywords": ["面试", "准备"], "suggestion": "面试前应该如何准备自我介绍？" },
+    { "keywords": ["反问", "问什么"], "suggestion": "面试最后应该问什么问题？" },
+    { "keywords": ["绩效", "考核"], "suggestion": "绩效很好但晋升不了怎么办？" },
+    { "keywords": ["能力", "提升"], "suggestion": "如何在现有业务中提升能力境界？" },
+    { "keywords": ["自我介绍"], "suggestion": "面试时怎么做高质量的自我介绍？" },
+    { "keywords": ["不会", "问住"], "suggestion": "面试被问住不会回答怎么圆？" },
+    { "keywords": ["总监", "管理"], "suggestion": "升了总监天天开会怎么办？" },
+    { "keywords": ["技术", "学什么"], "suggestion": "我应该学什么技术才能晋升？" },
+    { "keywords": ["P7", "P8"], "suggestion": "从P7到P8需要做哪些关键转变？" },
+    { "keywords": ["跳槽", "换工作"], "suggestion": "跳槽面试需要特别注意什么？" }
+  ]
+}

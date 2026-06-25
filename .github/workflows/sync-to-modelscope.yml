@@ -1,0 +1,44 @@
+name: Sync to ModelScope
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync to ModelScope
+        env:
+          MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
+        run: |
+          # 添加魔搭空间远程仓库
+          git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/reup.git
+
+          # 获取魔搭空间所有分支
+          git fetch modelscope
+
+          # 强制推送 GitHub 的 main 到魔搭空间的 main
+          # 这会完全覆盖魔搭空间 main 分支上的原有文件
+          git push modelscope main:main --force
+
+          # 同步把 main 覆盖到 master 分支
+          # 原因：魔搭空间创空间可能默认部署 master 分支，而 master 上残留了旧代码
+          #（如引用 skills-index.md 的旧 Dockerfile）。即便 master 删不掉，也保证它和 main 内容一致。
+          git push modelscope main:master --force || true
+
+          # 尝试删除魔搭空间上的 master 和 coze 分支
+          # || true 表示即使分支不存在或因为是默认分支删不掉，也不会导致 workflow 失败
+          git push modelscope --delete master || true
+          git push modelscope --delete coze || true
