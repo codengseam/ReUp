@@ -21,7 +21,7 @@ jobs:
 
       # 部署约定（写死在 workflow 里，防止遗忘）：
       # - GitHub 主分支未来会改为 master；目前同时支持 main 和 master
-      # - 魔搭空间默认部署分支：master（无法修改，且受保护禁止 force push）
+      # - 魔搭空间 re_up 默认部署分支：master（无法修改，且受保护禁止 force push）
       # - 当前触发 push 的分支（GITHUB_REF_NAME）被同步到魔搭 master
       # - 历史分叉时，用 --allow-unrelated-histories 合并魔搭 master 后再 push
       # - 项目从 gitee → github → modelscope 演化，两边历史独立，必须允许无关历史合并
@@ -36,7 +36,7 @@ jobs:
           git config http.postBuffer 524288000
 
           # 添加魔搭空间远程仓库
-          git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/reup.git
+          git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/re_up.git
 
           # 普通 push 同步 GitHub 当前分支到魔搭 master（不用 --force，master 受保护）
           # GITHUB_REF_NAME 是当前触发 workflow 的分支名（main 或 master）

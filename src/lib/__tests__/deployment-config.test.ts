@@ -176,9 +176,9 @@ describe('deployment config consistency', () => {
   describe('sync-to-modelscope.yml — branch mapping', () => {
     const workflow = readFile('.github/workflows/sync-to-modelscope.yml');
 
-    it('targets codengseam/reup.git (current ModelScope space)', () => {
+    it('targets codengseam/re_up.git (current ModelScope space)', () => {
       expect(workflow).toMatch(
-        /https:\/\/oauth2:\$\{MODELSCOPE_TOKEN\}@www\.modelscope\.cn\/studios\/codengseam\/reup\.git/
+        /https:\/\/oauth2:\$\{MODELSCOPE_TOKEN\}@www\.modelscope\.cn\/studios\/codengseam\/re_up\.git/
       );
     });
 
