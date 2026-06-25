@@ -46,7 +46,8 @@ jobs:
             git fetch modelscope master --depth=1
             # 项目从 gitee → github → modelscope 演化，两边历史独立
             # 必须用 --allow-unrelated-histories 才能合并
-            git merge --no-edit --allow-unrelated-histories modelscope/master
+            # -X ours：冲突时保留 GitHub 版本（魔搭自动初始化的 README.md 等会被覆盖）
+            git merge --no-edit --allow-unrelated-histories -X ours modelscope/master
             git push modelscope "${GITHUB_REF_NAME}:master"
           fi
 

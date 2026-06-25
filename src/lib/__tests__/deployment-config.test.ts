@@ -212,6 +212,12 @@ describe('deployment config consistency', () => {
       expect(workflow).toMatch(/--allow-unrelated-histories/);
     });
 
+    it('prefers GitHub version on merge conflicts (-X ours)', () => {
+      // 魔搭空间会自动初始化 README.md 等文件，与 GitHub 版本冲突
+      // 必须以 GitHub 版本为准（ours），避免自动合并失败
+      expect(workflow).toMatch(/git merge.*-X ours/);
+    });
+
     it('does NOT fetch all modelscope branches upfront (RPC failure on large repo)', () => {
       // 裸 `git fetch modelscope` 会拉取整个魔搭仓库历史，
       // 27MB skill-vectors.json + 全历史导致 curl 18 RPC 中断
