@@ -200,6 +200,22 @@ describe('deployment config consistency', () => {
       expect(workflow).toMatch(/git merge.*modelscope\/master/);
     });
 
+    it('does NOT fetch all modelscope branches upfront (RPC failure on large repo)', () => {
+      // 裸 `git fetch modelscope` 会拉取整个魔搭仓库历史，
+      // 27MB skill-vectors.json + 全历史导致 curl 18 RPC 中断
+      expect(workflow).not.toMatch(/^\s*git fetch modelscope\s*$/m);
+    });
+
+    it('fetches master shallowly only on push failure', () => {
+      // push 失败时才 shallow fetch master（--depth=1 减少传输量）
+      expect(workflow).toMatch(/git fetch modelscope master.*--depth=1/);
+    });
+
+    it('configures large http.postBuffer to avoid RPC transfer cutoff', () => {
+      // 大仓库 push/fetch 需要 buffer ≥ 500MB 避免 curl 18
+      expect(workflow).toMatch(/http\.postBuffer\s+\d+/);
+    });
+
     it('deletes ModelScope main branch if it exists', () => {
       expect(workflow).toMatch(/git push modelscope --delete main/);
     });
