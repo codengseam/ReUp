@@ -83,6 +83,9 @@ RUN pnpm tsup src/server.ts \
 # ============================================================================
 FROM node:${NODE_VERSION}-slim AS runner
 ARG PNPM_VERSION
+# 必须在 runner stage 重新声明，否则 groupadd/useradd 收不到全局 ARG 的值
+ARG APP_UID
+ARG APP_GID
 
 WORKDIR /app
 

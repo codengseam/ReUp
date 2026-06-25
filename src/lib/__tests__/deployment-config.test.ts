@@ -36,6 +36,17 @@ function argDefault(dockerfile: string, name: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Extract the body of a specific Dockerfile stage (multi-stage build). */
+function stageBody(dockerfile: string, stageName: string): string {
+  const startRe = new RegExp(`^FROM\\s+\\S+\\s+AS\\s+${stageName}\\s*$`, 'm');
+  const startMatch = dockerfile.match(startRe);
+  if (!startMatch) return '';
+  const startIdx = startMatch.index! + startMatch[0].length;
+  const endMatch = dockerfile.slice(startIdx).match(/^FROM\s/m);
+  const endIdx = endMatch ? startIdx + endMatch.index! : dockerfile.length;
+  return dockerfile.slice(startIdx, endIdx);
+}
+
 /** Extract all `ENV KEY=value` lines (last write wins, like Docker). */
 function envValue(dockerfile: string, key: string): string | null {
   const re = new RegExp(`^ENV\\s+${key}=(\\S+)`, 'gm');
@@ -86,6 +97,15 @@ describe('deployment config consistency', () => {
       // ModelScope mounts /mnt/workspace as root-owned; a non-root USER
       // cannot mkdir inside it, causing entrypoint failure.
       expect(dockerfile).not.toMatch(/^USER\s+reup\s*$/m);
+    });
+
+    it('re-declares APP_UID/APP_GID ARG in runner stage', () => {
+      // 全局 ARG 不会自动继承到后续 stage；runner 阶段必须重新声明，
+      // 否则 groupadd/useradd 会拿到空值，ModelScope 构建报错：
+      // "invalid group ID 'reup'"
+      const runner = stageBody(dockerfile, 'runner');
+      expect(runner).toMatch(/^ARG\s+APP_UID\s*$/m);
+      expect(runner).toMatch(/^ARG\s+APP_GID\s*$/m);
     });
   });
 
@@ -182,9 +202,9 @@ describe('deployment config consistency', () => {
       );
     });
 
-    it('triggers on both main and master (for default branch migration)', () => {
-      // 用户计划把 GitHub 默认分支改为 master，workflow 两边都监听
-      expect(workflow).toMatch(/branches:\s*\[main,\s*master\]/);
+    it('triggers on master only (default branch)', () => {
+      // GitHub 默认分支已改为 master，workflow 只监听 master
+      expect(workflow).toMatch(/branches:\s*\[master\]/);
     });
 
     it('pushes current GitHub branch to ModelScope master (the deploy branch)', () => {
