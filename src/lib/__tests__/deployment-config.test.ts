@@ -183,11 +183,21 @@ describe('deployment config consistency', () => {
     });
 
     it('pushes GitHub main to ModelScope master (the deploy branch)', () => {
-      expect(workflow).toMatch(/git push modelscope main:master --force/);
+      expect(workflow).toMatch(/git push modelscope main:master/);
+    });
+
+    it('does NOT force push to master (protected branch, force push denied)', () => {
+      // 魔搭空间 master 是受保护分支，--force 会被 pre-receive hook 拒绝
+      expect(workflow).not.toMatch(/main:master\s+--force/);
     });
 
     it('does NOT push GitHub main to ModelScope main (avoid stale branch)', () => {
       expect(workflow).not.toMatch(/git push modelscope main:main/);
+    });
+
+    it('has merge fallback for non-fast-forward case', () => {
+      // 历史分叉时，merge modelscope/master 后再 push（标准 GitLab 协作流）
+      expect(workflow).toMatch(/git merge.*modelscope\/master/);
     });
 
     it('deletes ModelScope main branch if it exists', () => {

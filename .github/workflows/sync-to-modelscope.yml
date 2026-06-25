@@ -21,8 +21,9 @@ jobs:
 
       # 部署约定（写死在 workflow 里，防止遗忘）：
       # - GitHub 主分支：main
-      # - 魔搭空间默认部署分支：master（无法修改）
-      # - 因此每次只把 GitHub main 强制推送到魔搭 master
+      # - 魔搭空间默认部署分支：master（无法修改，且受保护禁止 force push）
+      # - 因此每次用普通 push 把 GitHub main 同步到魔搭 master（fast-forward）
+      # - 历史分叉时 merge modelscope/master 后再 push（标准 GitLab 协作流）
       # - 魔搭上的 main 分支是历史残留，尝试删除
       - name: Sync to ModelScope
         env:
@@ -34,9 +35,13 @@ jobs:
           # 获取魔搭空间所有分支
           git fetch modelscope
 
-          # 强制推送 GitHub 的 main 到魔搭空间的 master
-          # 魔搭空间默认部署 master 分支，这是唯一需要同步的目标分支
-          git push modelscope main:master --force
+          # 普通 push 同步 GitHub main 到魔搭 master（不用 --force，master 受保护）
+          # 魔搭 master 之前同步过我们的代码，fast-forward 即可
+          if ! git push modelscope main:master; then
+            echo "Fast-forward failed, merging modelscope/master..."
+            git merge --no-edit modelscope/master
+            git push modelscope main:master
+          fi
 
           # 删除魔搭空间上的 main 分支（如果存在）
           # 该分支是旧配置残留，魔搭空间实际使用 master 作为默认分支
