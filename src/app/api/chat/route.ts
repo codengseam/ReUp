@@ -668,16 +668,32 @@ export async function POST(request: NextRequest) {
         }
 
         // ===== 幻觉校验 =====
+        // fail-closed：faithful===false 涵盖"检出幻觉"与"检查工具故障(check-error)"两种情况。
+        // 不阻断已生成的答案流，仅在末尾追加 hallucination_warning 并标记低置信。
         if (ragContext) {
           const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
           if (!hallucinationResult.faithful) {
-            console.warn('[Chat] Hallucination detected:', hallucinationResult.ungroundedParts);
-            safeEnqueue(controller, `data: ${JSON.stringify({ hallucinationDetected: true, hallucinationDetails: hallucinationResult.ungroundedParts })}\n\n`);
+            // check-error / unparseable 均为"校验工具未能完成"，区别于"确认幻觉"
+            const isCheckError = hallucinationResult.reason === 'check-error' || hallucinationResult.reason === 'unparseable';
+            console.warn('[Chat] Hallucination check not faithful:', {
+              reason: hallucinationResult.reason,
+              ungrounded: hallucinationResult.ungroundedParts,
+            });
+            safeEnqueue(controller, `data: ${JSON.stringify({
+              type: 'hallucination_warning',
+              message: isCheckError
+                ? '⚠️ 本次回答的准确性校验未能完成，建议核实关键信息'
+                : '⚠️ 本次回答可能存在不准确之处，建议核实',
+              hallucinationDetails: hallucinationResult.ungroundedParts,
+              lowConfidence: true,
+              // 向后兼容：仅确认的幻觉才触发前端 hallucinationDetected 标记
+              hallucinationDetected: !isCheckError,
+            })}\n\n`);
           }
         }
 
         // ===== 置信度评估 & 转人工 =====
-        // 传入 latestUserMessage 让热门问题（已收录在 HOT_QUERIES 中的问题及其变体）直接拿高置信度
+        // 传入 latestUserMessage：热门问题作为加权因子（×1.1）参与置信度计算，置信度仍以召回质量为基础
         const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage);
         const shouldTransferToHuman = confidence.level === 'low';
         safeEnqueue(controller, `data: ${JSON.stringify({

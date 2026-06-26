@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { Inspector } from 'react-dev-inspector';
+import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
+
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: {
@@ -56,9 +60,10 @@ export default function RootLayout({
 
   return (
     <html lang="zh-CN">
-      <body className={`antialiased`}>
+      <body className={`${inter.variable} antialiased`}>
         {isDev && <Inspector />}
         {children}
+        <Toaster richColors />
       </body>
     </html>
   );

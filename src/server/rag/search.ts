@@ -32,7 +32,7 @@ async function semanticSearch(
     if (categoryFilter === 'promotion' || categoryFilter === 'interview') {
       opts.category = categoryFilter;
     }
-    const chunks = await knowledgeBase.semanticSearch(query, topK, { ...opts, skipRerank: true });
+    const chunks = await knowledgeBase.semanticSearch(query, topK, opts);
 
     if (chunks.length === 0) {
       console.log('[RAG] No results from semantic search');
@@ -189,19 +189,19 @@ async function hybridSearch(
     const scores = results.map(r => r.score);
     const min = Math.min(...scores);
     const max = Math.max(...scores);
-    if (max === min) return results.map(() => 0);
+    if (max === min) return scores;  // 等分时保持原分，避免归零拉低融合与置信度
     return scores.map(score => (score - min) / (max - min));
   }
 
   const semanticNormalized = minMaxNormalize(semanticResults);
   const keywordNormalized = minMaxNormalize(keywordResults);
 
-  // 2. 构建统一的文档映射（key 为 content.trim().substring(0, 100)）
+  // 2. 构建统一的文档映射（key 为 docId，缺失时回退 content 前 100 字符）
   const docMap = new Map<string, { result: RAGResult; semanticScore: number; keywordScore: number }>();
 
   for (let i = 0; i < semanticResults.length; i++) {
     const r = semanticResults[i];
-    const key = r.content.trim().substring(0, 100);
+    const key = r.docId || r.content.trim().substring(0, 100);
     const existing = docMap.get(key);
     if (existing) {
       existing.semanticScore = Math.max(existing.semanticScore, semanticNormalized[i]);
@@ -212,7 +212,7 @@ async function hybridSearch(
 
   for (let i = 0; i < keywordResults.length; i++) {
     const r = keywordResults[i];
-    const key = r.content.trim().substring(0, 100);
+    const key = r.docId || r.content.trim().substring(0, 100);
     const existing = docMap.get(key);
     if (existing) {
       existing.keywordScore = Math.max(existing.keywordScore, keywordNormalized[i]);

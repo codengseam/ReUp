@@ -126,6 +126,13 @@ describe('deployment config consistency', () => {
       );
     });
 
+    it("overrides REUP_CONFIG_DIR to /app/data (config persistence on volume)", () => {
+      // Dockerfile defaults REUP_CONFIG_DIR to /mnt/workspace/config (ModelScope).
+      // fly.io must override back to /app/data (reup_data volume mount) or admin
+      // config (server-config.json) is lost on every machine restart.
+      expect(fly).toMatch(/REUP_CONFIG_DIR\s*=\s*['"]\/app\/data['"]/);
+    });
+
     it("overrides HF_HOME to /app/.cache", () => {
       expect(fly).toMatch(/HF_HOME\s*=\s*['"]\/app\/\.cache\/hub['"]/);
     });
@@ -150,6 +157,13 @@ describe('deployment config consistency', () => {
       expect(compose).toMatch(
         /LOOP_ENGINEERING_DB:\s*\/app\/data\/loop-engineering\.sqlite/
       );
+    });
+
+    it('sets REUP_CONFIG_DIR to /app/data (config persistence on volume)', () => {
+      // Dockerfile defaults REUP_CONFIG_DIR to /mnt/workspace/config (ModelScope).
+      // compose must override back to /app/data (reup-db volume mount) or admin
+      // config (server-config.json) is lost on every container restart.
+      expect(compose).toMatch(/REUP_CONFIG_DIR:\s*\/app\/data/);
     });
 
     it('sets HF_HOME to /app/.cache', () => {

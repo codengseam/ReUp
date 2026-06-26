@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Search, BookOpen, Lightbulb, MessageCircle,
   RotateCcw, Volume2, Copy, Share2, Quote, AlertTriangle, Check,
   ThumbsDown, UserRound, Brain, ChevronDown, ChevronRight, AlertCircle, RefreshCw
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import type { Message, CitationData, ThinkingStep } from './types';
 
 // ========== ThinkingPanel 组件 ==========
@@ -166,7 +167,11 @@ export function formatMarkdown(
       ALLOWED_ATTR: ['class', 'data-msg-id', 'data-cite-id', 'data-citation', 'data-citation-id', 'data-message-id'],
     });
   }
-  return html;
+  // purify 未就绪（SSR 无 window）：转义为纯文本占位，绝不返回未消毒 HTML（关闭 XSS 窗口）
+  return html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // ========== 渲染AI回复的4板块 ==========
@@ -326,7 +331,7 @@ interface ChatMessageProps {
   onThumbsDown: () => void;
 }
 
-export default function ChatMessage({
+function ChatMessage({
   message,
   isLoading,
   isLastMessage,
@@ -343,17 +348,6 @@ export default function ChatMessage({
   onThumbsDown,
 }: ChatMessageProps) {
   const [expandedAnalysis, setExpandedAnalysis] = useState<Set<string>>(new Set());
-  const purifyRef = useRef<{ sanitize: (dirty: string, config?: Record<string, unknown>) => string } | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('dompurify')
-        .then(m => {
-          purifyRef.current = m.default;
-        })
-        .catch(() => {});
-    }
-  }, []);
 
   return (
     <div
@@ -406,7 +400,7 @@ export default function ChatMessage({
                 streamStatus={status}
               />
             )}
-            {renderAIContent(message.content, message.id, message.citations, expandedAnalysis, setExpandedAnalysis, purifyRef.current)}
+            {renderAIContent(message.content, message.id, message.citations, expandedAnalysis, setExpandedAnalysis, typeof window !== 'undefined' ? DOMPurify : null)}
             {/* 加载中光标 */}
             {isLoading && isLastMessage && message.role === 'assistant' && (
               <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
@@ -539,3 +533,25 @@ export default function ChatMessage({
     </div>
   );
 }
+
+function areEqual(prev: ChatMessageProps, next: ChatMessageProps): boolean {
+  return (
+    prev.message.id === next.message.id &&
+    prev.message.content === next.message.content &&
+    prev.message.citations === next.message.citations &&
+    prev.message.confidence === next.message.confidence &&
+    prev.message.safetyWarning === next.message.safetyWarning &&
+    prev.message.hallucinationDetected === next.message.hallucinationDetected &&
+    prev.message.transferToHuman === next.message.transferToHuman &&
+    prev.message.thinkingSteps === next.message.thinkingSteps &&
+    prev.message.error === next.message.error &&
+    prev.isLoading === next.isLoading &&
+    prev.isLastMessage === next.isLastMessage &&
+    prev.status === next.status &&
+    prev.copiedId === next.copiedId &&
+    prev.thumbsDownCount === next.thumbsDownCount &&
+    prev.regenerateCount === next.regenerateCount
+  );
+}
+
+export default React.memo(ChatMessage, areEqual);

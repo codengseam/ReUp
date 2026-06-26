@@ -23,6 +23,9 @@ primary_region = 'sin'
   HOSTNAME = '0.0.0.0'
   LOOP_ENGINEERING_DB = '/app/data/loop-engineering.sqlite'
   REUP_VECTORS_PATH = '/app/data/skill-vectors.json'
+  # Override Dockerfile's /mnt/workspace/config back to the reup_data volume mount (/app/data)
+  # so admin config (server-config.json) persists on fly.io (not a ModelScope deployment).
+  REUP_CONFIG_DIR = '/app/data'
   HF_HOME = '/app/.cache/hub'
   TRANSFORMERS_CACHE = '/app/.cache/hub'
   TMPDIR = '/app/.cache/tmp'

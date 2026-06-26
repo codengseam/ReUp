@@ -7,7 +7,11 @@ import path from 'path';
 
 // 配置路径在运行时根据 process.cwd() 计算，避免模块加载时缓存 cwd。
 // 测试可通过 process.chdir() 切换工作目录以使用隔离的临时目录。
+// ModelScope 容器通过 REUP_CONFIG_DIR 指向 /mnt/workspace/config 实现持久化;
+// 本地/dev 未设置该 env 时回落到 process.cwd()/data, 行为不变。
 function getConfigDir(): string {
+  const override = process.env.REUP_CONFIG_DIR;
+  if (override) return override;
   return path.join(process.cwd(), 'data');
 }
 

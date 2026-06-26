@@ -2,19 +2,24 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Briefcase, FileText, ArrowRight } from 'lucide-react';
-import {
-  TrendingUp, Sparkles, Target, HelpCircle
-} from 'lucide-react';
-import { QUICK_ENTRIES, EXAMPLE_QUERIES } from './types';
+import { Briefcase, FileText, ArrowRight, TrendingUp, Sparkles, Target } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { EXAMPLE_QUERIES } from './types';
 
-// 图标名称到组件的映射
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  TrendingUp,
-  Sparkles,
-  Target,
-  HelpCircle,
-};
+interface SceneEntry {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  prompt?: string;
+  href?: string;
+}
+
+const SCENES: SceneEntry[] = [
+  { icon: TrendingUp, title: '晋升答辩', description: '梳理核心贡献与答辩逻辑', prompt: '我准备晋升答辩，如何突出核心贡献？' },
+  { icon: Briefcase, title: '面试准备', description: '自我介绍与高频问题演练', prompt: '面试如何自我介绍最加分？' },
+  { icon: Target, title: '能力盘点', description: '定位当前能力与晋升差距', prompt: '帮我盘点当前能力与晋升的差距' },
+  { icon: FileText, title: '简历优化', description: '上传简历挖掘亮点', href: '/resume' },
+];
 
 interface WelcomeScreenProps {
   onQuickEntry: (query: string) => void;
@@ -27,30 +32,38 @@ export default function WelcomeScreen({ onQuickEntry }: WelcomeScreenProps) {
         <Briefcase className="w-8 h-8 text-primary-foreground" />
       </div>
       <h2 className="text-xl font-semibold text-foreground mb-2">你好，我是你的职场顾问</h2>
-      <p className="text-sm text-muted-foreground mb-6 text-center">以资深 HR + 总裁视角，帮你解决晋升和面试问题</p>
-      {/* 简历优化：主操作胶囊按钮，跳转上传页 */}
-      <Link
-        href="/resume"
-        className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 active:scale-[0.97] transition-all mb-8 shadow-sm"
-      >
-        <FileText className="w-4 h-4 shrink-0" />
-        <span>简历优化</span>
-      </Link>
-      <div className="flex flex-wrap items-center justify-center gap-3 max-w-md">
-        {QUICK_ENTRIES.map(entry => {
-          const IconComponent = ICON_MAP[entry.icon];
-          return (
+      <p className="text-sm text-muted-foreground mb-8 text-center">以资深 HR + 总裁视角，帮你解决晋升和面试问题</p>
+
+      {/* 场景卡片：2x2 移动端 / 4x1 桌面端 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl px-4">
+        {SCENES.map(scene => {
+          const Icon = scene.icon;
+          const card = (
+            <Card className="shadow-none border-border/40 hover:border-primary transition-colors p-4 gap-2 h-full rounded-xl">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Icon className="w-4 h-4 text-primary" />
+              </div>
+              <div className="font-medium text-sm text-foreground mt-2">{scene.title}</div>
+              <p className="text-xs text-muted-foreground leading-snug">{scene.description}</p>
+            </Card>
+          );
+          return scene.href ? (
+            <Link key={scene.title} href={scene.href} className="block text-left">
+              {card}
+            </Link>
+          ) : (
             <button
-              key={entry.label}
-              onClick={() => onQuickEntry(entry.query)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-surface-container text-sm font-medium text-foreground hover:bg-surface-container-high active:scale-[0.97] transition-all border border-border/20"
+              key={scene.title}
+              type="button"
+              onClick={() => scene.prompt && onQuickEntry(scene.prompt)}
+              className="block w-full text-left"
             >
-              {IconComponent && <IconComponent className="w-4 h-4 text-primary shrink-0" />}
-              <span>{entry.label}</span>
+              {card}
             </button>
           );
         })}
       </div>
+
       {/* 优秀提问案例库：精选 3 个，卡片式网格 */}
       <div className="w-full max-w-2xl mt-10 px-4">
         <div className="flex items-center justify-center gap-2 mb-4">

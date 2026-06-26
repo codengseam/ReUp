@@ -1,4 +1,4 @@
-// src/lib/resume/ats.benchmark.test.ts
+// src/features/resume/ats.benchmark.test.ts
 // ReUp v2 Phase 4 P1 (I2): ATS accuracy benchmark.
 //
 // Loads all fixtures from `data/resume-eval/*.json`, runs the TF-mode
@@ -11,7 +11,7 @@
 // All engines in this benchmark use the TF (no-LLM) path for determinism.
 // No LLM is invoked, no network is used.
 //
-// Run with: `pnpm benchmark:ats` (or `pnpm test src/lib/resume/ats.benchmark.test.ts`).
+// Run with: `pnpm benchmark:ats` (or `pnpm test src/features/resume/ats.benchmark.test.ts`).
 
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { computeAtsCoverage, extractJdKeywords } from './ats';
 import { parseResume } from './parser';
+import type { ResumeDocument } from './types';
 
 // ---------------------------------------------------------------------------
 // Fixture schema
@@ -104,11 +105,11 @@ function formatTable(rows: Row[]): string {
 // Benchmark
 // ---------------------------------------------------------------------------
 
-// NOTE (2026-06-17): Benchmark is skipped until the eval fixture set is
-// expanded to >= 10 samples under data/resume-eval/. Current fixtures are
-// insufficient to produce a meaningful aggregate score.
-describe.skip('ats-benchmark', () => {
-  it('achieves average coverage >= 85% across the eval set', async () => {
+// Aggregate fixture benchmark. Skipped until the eval fixture set under
+// data/resume-eval/ reaches >= 10 samples (currently 2). The concrete
+// regression cases below are the actionable baseline in the meantime.
+describe('ats-benchmark', () => {
+  it.skip('achieves average coverage >= 85% across the eval set (needs >= 10 fixtures in data/resume-eval/; currently 2)', async () => {
     const fixtures = loadFixtures();
     const rows: Row[] = [];
     for (const f of fixtures) rows.push(await runFixture(f));
@@ -126,5 +127,67 @@ describe.skip('ats-benchmark', () => {
     expect(rows.length).toBeGreaterThanOrEqual(10);
     expect(avg).toBeGreaterThanOrEqual(AVG_THRESHOLD);
     expect(allPass).toBe(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // Concrete regression baseline (TF path, no LLM, fully deterministic).
+  // Pins the ATS scoring behaviour so refactors can't silently drift the
+  // coverage maths or the TF keyword extraction.
+  //
+  // Shared JD: 8 distinct English terms, each appearing once → TF gives every
+  // keyword weight 1.0 (max freq === 1), so coverage = hits / 8 * 100.
+  // -----------------------------------------------------------------------
+
+  const REGRESSION_JD = 'Python Pytest MySQL Linux Git Docker Kubernetes Jenkins';
+  const REGRESSION_TOPK = 20;
+
+  function makeResume(skills: string[]): ResumeDocument {
+    return {
+      meta: { version: 'reup.v2.phase3', source: 'text', createdAt: '2026-01-01T00:00:00.000Z' },
+      basic: { name: '张辰', title: '工程师' },
+      experience: [],
+      projects: [],
+      skills,
+      education: [],
+      raw: '张辰 / 工程师',
+    };
+  }
+
+  it('resume listing JD-relevant skills outscores a sparse resume without them', async () => {
+    const kws = await extractJdKeywords(REGRESSION_JD, { topK: REGRESSION_TOPK });
+    expect(kws.length).toBe(8);
+
+    const structured = makeResume(['Python', 'Pytest', 'MySQL', 'Linux', 'Git']);
+    const sparse = makeResume([]);
+
+    const covStructured = computeAtsCoverage(structured, kws);
+    const covSparse = computeAtsCoverage(sparse, kws);
+
+    // 5 of 8 keywords hit → 62.5%; sparse hits none → 0%
+    expect(covStructured.percentage).toBeCloseTo(62.5, 1);
+    expect(covSparse.percentage).toBe(0);
+    expect(covStructured.percentage).toBeGreaterThan(covSparse.percentage);
+  });
+
+  it('keyword match ratio falls within the expected band for a partial-overlap resume', async () => {
+    const kws = await extractJdKeywords(REGRESSION_JD, { topK: REGRESSION_TOPK });
+    const partial = makeResume(['Python', 'Pytest', 'MySQL']); // 3 of 8 → 37.5%
+
+    const cov = computeAtsCoverage(partial, kws);
+    expect(cov.percentage).toBeGreaterThanOrEqual(25);
+    expect(cov.percentage).toBeLessThanOrEqual(50);
+    expect(cov.percentage).toBeCloseTo(37.5, 1);
+  });
+
+  it('adding a previously-missing JD keyword to the skills section raises coverage', async () => {
+    const kws = await extractJdKeywords(REGRESSION_JD, { topK: REGRESSION_TOPK });
+    const before = makeResume(['Python', 'Pytest', 'MySQL']);         // 3 of 8 → 37.5%
+    const after = makeResume(['Python', 'Pytest', 'MySQL', 'Linux']); // 4 of 8 → 50%
+
+    const covBefore = computeAtsCoverage(before, kws);
+    const covAfter = computeAtsCoverage(after, kws);
+
+    expect(covAfter.percentage).toBeGreaterThan(covBefore.percentage);
+    expect(covAfter.percentage).toBeCloseTo(50, 1);
   });
 });

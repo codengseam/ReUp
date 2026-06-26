@@ -133,10 +133,10 @@ export async function retrieve(
     }
   }
 
-  // 6. 去重合并(按content前100字符去重，保留最高分)
+  // 6. 去重合并(按 docId 去重，缺失时回退 content 前 100 字符，保留最高分)
   const mergedMap = new Map<string, RAGResult>();
   for (const result of allResults) {
-    const key = result.content.trim().substring(0, 100);
+    const key = result.docId || result.content.trim().substring(0, 100);
     const existing = mergedMap.get(key);
     if (!existing || result.score > existing.score) {
       mergedMap.set(key, result);
