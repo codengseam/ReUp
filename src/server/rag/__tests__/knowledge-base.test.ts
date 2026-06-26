@@ -393,3 +393,78 @@ describe('knowledge-base: hybridSearch()', () => {
     expect(spy).toHaveBeenCalledWith('q', 5, opts);
   });
 });
+
+// ===================================================================
+// reranker timeout / reject fallback (3s timeout → cosine order)
+// ===================================================================
+
+describe('knowledge-base: reranker timeout/reject fallback', () => {
+  beforeEach(() => {
+    setupStore();
+    setupRerank();
+    mockSearch.mockReset();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('falls back to cosine order when reranker times out (3s) and clears the timer', async () => {
+    const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
+    const candidates: SearchResult[] = Array.from({ length: 15 }, (_, i) =>
+      makeResult(`cand-${i}`, 0.9 - i * 0.05, `text-${i}`)
+    );
+    mockSearch.mockReturnValue(candidates);
+    // rerank resolves only after 4s — well past the 3s timeout
+    mockRerank.mockReturnValueOnce(new Promise((r) => setTimeout(r, 4000)));
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+
+    const kb = createKnowledgeBase({ embed });
+    const promise = kb.semanticSearch('q', 5);
+    // advance past the 3s reranker timeout so the timeout branch rejects
+    await vi.advanceTimersByTimeAsync(3001);
+    const result = await promise;
+
+    // cosine order: first 5 candidates by descending composite score
+    expect(result).toHaveLength(5);
+    expect(result.map((r) => r.id)).toEqual(['cand-0', 'cand-1', 'cand-2', 'cand-3', 'cand-4']);
+    expect(result[0]).toEqual({ id: 'cand-0', text: 'text-0', score: 0.9 });
+
+    // fallback log emitted
+    const fallbackMessages = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(fallbackMessages.some((m) => m.includes('Reranker fallback'))).toBe(true);
+
+    // timeout timer was cleared in the finally block
+    expect(clearSpy).toHaveBeenCalled();
+
+    logSpy.mockRestore();
+    clearSpy.mockRestore();
+  });
+
+  it('falls back to cosine order when reranker rejects (immediate)', async () => {
+    const embed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
+    const candidates: SearchResult[] = Array.from({ length: 15 }, (_, i) =>
+      makeResult(`cand-${i}`, 0.9 - i * 0.05, `text-${i}`)
+    );
+    mockSearch.mockReturnValue(candidates);
+    mockRerank.mockRejectedValueOnce(new Error('boom'));
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const kb = createKnowledgeBase({ embed });
+    const result = await kb.semanticSearch('q', 5);
+
+    // cosine order
+    expect(result).toHaveLength(5);
+    expect(result.map((r) => r.id)).toEqual(['cand-0', 'cand-1', 'cand-2', 'cand-3', 'cand-4']);
+
+    // fallback log emitted
+    const fallbackMessages = logSpy.mock.calls.map((c) => String(c[0]));
+    expect(fallbackMessages.some((m) => m.includes('Reranker fallback'))).toBe(true);
+
+    logSpy.mockRestore();
+  });
+});

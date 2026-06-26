@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'http';
 import { parse } from 'url';
 import next from 'next';
+import { preheatRAG } from './server/rag/preheat';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || '0.0.0.0';
@@ -73,6 +74,9 @@ app.prepare().then(() => {
         dev ? 'development' : 'production'
       }`
     );
+    // 冷启动预热: 并行加载 BGE-M3 + reranker (fire-and-forget)。
+    // 生产环境默认开启 (REUP_PREHEAT=0 可禁用); dev/test 自动跳过, 不影响本地开发。
+    void preheatRAG();
   });
 }).catch((err) => {
   console.error('> Failed to prepare Next.js app:', err);

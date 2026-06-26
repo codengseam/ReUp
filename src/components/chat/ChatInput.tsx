@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, Search } from 'lucide-react';
+import { Send, Mic, MicOff, Search, Square } from 'lucide-react';
 
 interface ChatInputProps {
   input: string;
@@ -12,6 +12,7 @@ interface ChatInputProps {
   modelName: string;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
   onToggleVoice: () => void;
   onSuggestionClick: (suggestion: string) => void;
 }
@@ -25,6 +26,7 @@ export default function ChatInput({
   modelName,
   onInputChange,
   onSend,
+  onStop,
   onToggleVoice,
   onSuggestionClick,
 }: ChatInputProps) {
@@ -87,17 +89,19 @@ export default function ChatInput({
             {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
 
-          {/* 发送按钮 */}
+          {/* 发送 / 停止按钮：流式生成时变形为停止按钮（同位置，避免布局抖动） */}
           <button
-            onClick={onSend}
-            disabled={!input.trim() || isLoading}
+            onClick={isLoading ? onStop : onSend}
+            disabled={!isLoading && !input.trim()}
+            aria-label={isLoading ? '停止生成' : '发送'}
+            title={isLoading ? '停止生成' : '发送'}
             className={`p-2.5 rounded-xl transition-all ${
-              input.trim() && !isLoading
+              isLoading || input.trim()
                 ? 'bg-primary text-primary-foreground hover:opacity-90'
                 : 'bg-muted-foreground/10 text-muted-foreground/40'
             }`}
           >
-            <Send className="w-4 h-4" />
+            {isLoading ? <Square className="w-4 h-4" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
 

@@ -11,6 +11,9 @@
 
 ARG NODE_VERSION=20
 ARG PNPM_VERSION=9
+# 镜像版本 (来自 package.json version, 通过 --build-arg APP_VERSION=$(node -p "require('./package.json').version") 注入)
+# 默认 dev; runner stage 重新声明后供 LABEL 引用。
+ARG APP_VERSION=dev
 # ModelScope Spaces 要求端口 7860 (健康检查探测此端口)
 # fly.io / docker-compose 通过运行时 env PORT=5000 覆盖
 # 非 root 用户 UID/GID (需与 volume 挂载宿主目录权限对齐)
@@ -86,6 +89,13 @@ ARG PNPM_VERSION
 # 必须在 runner stage 重新声明，否则 groupadd/useradd 收不到全局 ARG 的值
 ARG APP_UID
 ARG APP_GID
+# 重新声明 APP_VERSION (全局 ARG 不会自动继承到 stage), 供 OCI LABEL 引用
+ARG APP_VERSION
+
+# OCI 标准镜像元数据 (https://github.com/opencontainers/image-spec/blob/main/annotations.md)
+LABEL org.opencontainers.image.title="ReUp"
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.description="Career promotion & resume advisor"
 
 WORKDIR /app
 
@@ -138,6 +148,10 @@ ENV REUP_VECTORS_PATH=/app/data/skill-vectors.json
 ENV HF_HOME=/mnt/workspace/.cache/hub
 ENV TRANSFORMERS_CACHE=/mnt/workspace/.cache/hub
 ENV TMPDIR=/mnt/workspace/.cache/tmp
+# 管理员配置 (server-config.json: prompts / RAG 参数 / 自定义模型)
+# ModelScope 上指向 /mnt/workspace/config 持久化, 避免每次重启丢失管理员配置;
+# fly.io / docker-compose 通过运行时 env 覆盖回 /app/data (volume 挂载)。
+ENV REUP_CONFIG_DIR=/mnt/workspace/config
 
 EXPOSE 7860
 

@@ -227,10 +227,11 @@ export async function outputGuard(
 }
 
 // 幻觉校验（LLM调用）
+// fail-closed：检查工具自身故障（异常）时返回 faithful:false + reason:'check-error'，由调用方决定是否告警/阻断。
 export async function hallucinationCheck(
   answer: string,
   context: string
-): Promise<{ hasHallucination: boolean; faithful: boolean; details?: string; ungroundedParts?: string[] }> {
+): Promise<{ hasHallucination: boolean; faithful: boolean; details?: string; ungroundedParts?: string[]; reason?: string; error?: string }> {
   try {
     const llmClient = new LLMClient();
     const response = await llmClient.invoke(
@@ -239,7 +240,14 @@ export async function hallucinationCheck(
     const text = response.content.trim();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]) as { hasHallucination: boolean; details: string; ungroundedParts?: string[] };
+      let parsed: { hasHallucination: boolean; details: string; ungroundedParts?: string[] };
+      try {
+        parsed = JSON.parse(jsonMatch[0]) as { hasHallucination: boolean; details: string; ungroundedParts?: string[] };
+      } catch (parseErr) {
+        const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        console.log('[hallucinationCheck] LLM返回非JSON，fail-closed:', errMsg);
+        return { hasHallucination: false, faithful: false, reason: 'unparseable', error: errMsg, ungroundedParts: [] };
+      }
       const faithful = !parsed.hasHallucination;
       return {
         hasHallucination: parsed.hasHallucination,
@@ -248,10 +256,14 @@ export async function hallucinationCheck(
         ungroundedParts: faithful ? [] : (parsed.ungroundedParts || (parsed.details ? [parsed.details] : [])),
       };
     }
+    // LLM 返回内容但无 JSON 结构 → fail-closed
+    console.log('[hallucinationCheck] LLM返回无可解析JSON，fail-closed:', text.substring(0, 100));
+    return { hasHallucination: false, faithful: false, reason: 'unparseable', error: 'LLM returned non-JSON content', ungroundedParts: [] };
   } catch (err) {
-    console.log('[hallucinationCheck] LLM幻觉检测失败，跳过:', err instanceof Error ? err.message : String(err));
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.log('[hallucinationCheck] LLM幻觉检测失败，fail-closed:', errMsg);
+    return { hasHallucination: false, faithful: false, reason: 'check-error', error: errMsg, ungroundedParts: [] };
   }
-  return { hasHallucination: false, faithful: true, ungroundedParts: [] };
 }
 
 // ========== 兼容旧接口 ==========

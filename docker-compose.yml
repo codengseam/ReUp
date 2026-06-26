@@ -5,6 +5,15 @@
 #   3. 访问 http://localhost:5000
 #   4. 健康检查: curl http://localhost:5000/api/health
 #
+# 端口说明 (Dockerfile 与 compose 的端口拆分是有意为之):
+#   - Dockerfile 默认 PORT=7860 + EXPOSE 7860: ModelScope Spaces 健康检查强制探测
+#     7860 端口, 且 ms_deploy.json 的 environment_variables 在 ModelScope Docker
+#     Studio beta 下不会下发到运行时, 故 7860 必须在镜像 ENV 里硬编码。
+#   - docker-compose.yml (本文件) 面向本地 / fly.io: 通过运行时 env PORT=5000
+#     覆盖镜像默认值, 容器内监听 5000, 宿主端口由 ${REUP_PORT:-5000} 映射。
+#   - src/server.ts 只读 process.env.PORT (回落 '5000'), 不硬编码 7860/5000;
+#     同一镜像因此可在 ModelScope (7860) 与本地 (5000) 两种端口下运行。
+#
 # Volume 说明:
 #   - reup-db       : SQLite 数据库文件 (loop-engineering.sqlite)
 #   - reup-models   : @xenova/transformers 模型缓存 (BGE-M3 ~2GB + reranker ~250MB)
@@ -15,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: reup:latest
+    image: reup:${REUP_VERSION:-latest}
     container_name: reup
     restart: unless-stopped
 
@@ -41,6 +50,9 @@ services:
 
       # ---- 数据库 (挂载 volume 持久化) ----
       LOOP_ENGINEERING_DB: /app/data/loop-engineering.sqlite
+      # 覆盖 Dockerfile 的 /mnt/workspace/config 回到 reup-db volume 挂载点 (/app/data),
+      # 使 admin 配置 (server-config.json) 在 compose 部署中持久化 (非 ModelScope 场景)。
+      REUP_CONFIG_DIR: /app/data
 
       # ---- 向量索引 (镜像内已 bake, 也可挂载覆盖) ----
       REUP_VECTORS_PATH: /app/data/skill-vectors.json

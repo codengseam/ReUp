@@ -79,6 +79,10 @@ function buildSearchOptions(opts?: SemanticSearchOptions): SearchOptions {
   return out;
 }
 
+// Cross-encoder rerank 超时阈值。首次调用需懒加载 250MB BGE-reranker-v2-m3 模型，
+// 超时则降级到 cosine 排序；singleton promise 在后台继续加载，后续请求命中后即走 cross-encoder。
+const RERANK_TIMEOUT_MS = 3000;
+
 export function createKnowledgeBase(config: KnowledgeBaseConfig): KnowledgeBase {
   if (!config || typeof config.embed !== 'function') {
     throw new Error('knowledge-base: config.embed is required and must be a function');
@@ -113,7 +117,37 @@ export function createKnowledgeBase(config: KnowledgeBaseConfig): KnowledgeBase 
       return candidates.slice(0, topK).map(toScoredChunk);
     }
 
-    return doRerank(query, candidates.map(toChunk), topK);
+    // 默认走 BGE cross-encoder 重排；3s 超时或加载失败时降级到 cosine 排序
+    // （candidates 已按 vector-store composite 分数降序，slice 即 cosine 序）。
+    // 首次调用触发 250MB 模型懒加载；singleton promise 在后台继续，后续请求命中后即走 cross-encoder。
+    const start = Date.now();
+    const rerankPromise = doRerank(query, candidates.map(toChunk), topK);
+    // 吞掉超时后迟到的 rejection，避免 unhandledRejection；记录日志以便线上排查
+    rerankPromise.catch((err) => {
+      console.log('[RAG] Reranker late rejection (post-timeout):', err?.message ?? err);
+    });
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`reranker timeout ${RERANK_TIMEOUT_MS}ms`)),
+        RERANK_TIMEOUT_MS
+      );
+    });
+    try {
+      const reranked = await Promise.race([rerankPromise, timeout]);
+      console.log(
+        `[RAG] Reranker hit (cross-encoder): ${Date.now() - start}ms, in=${candidates.length} out=${reranked.length}`
+      );
+      return reranked;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.log(
+        `[RAG] Reranker fallback after ${Date.now() - start}ms (${reason}); using cosine order`
+      );
+      return candidates.slice(0, topK).map(toScoredChunk);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   // Self-referential object: `hybridSearch` looks up `semanticSearch` on `kb`

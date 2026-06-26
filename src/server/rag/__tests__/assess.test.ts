@@ -1,5 +1,5 @@
 // 阶段 4 Task 4.2：assessConfidence 单元测试
-// 覆盖：HOT_QUERY 命中 0.9 / 无结果 0.1 / 线性打分（结果数 + 最高分加权）
+// 覆盖：HOT_QUERY 加权（×1.1，不再直接定 0.9）/ 无结果 0.1 / 线性打分（结果数 + 最高分加权）
 
 import { describe, it, expect } from 'vitest';
 import { assessConfidence, isHotQuery } from '@/server/rag/assess';
@@ -9,16 +9,29 @@ const mk = (score: number, n = 1): RAGResult[] =>
   Array.from({ length: n }, (_, i) => ({ content: `c${i}`, score, docId: `d${i}` }));
 
 describe('assessConfidence - 阶段 4 线性打分', () => {
-  it('HOT_QUERY 命中 → high + score 0.9', () => {
+  it('HOT_QUERY 不再直接定 0.9，改为基于召回质量加权（×1.1）', () => {
+    // 2 条结果 + top 0.5：baseScore=(2/5)*0.5+0.5*0.5=0.45；×1.1=0.495 → medium
     const r = assessConfidence(mk(0.5, 2), '我绩效很好，为什么没晋升？');
-    expect(r.level).toBe('high');
-    expect(r.score).toBe(0.9);
+    expect(r.level).toBe('medium');
+    expect(r.score).toBeCloseTo(0.495, 2);
   });
 
-  it('HOT_QUERY 命中（无 RAG 结果也高）', () => {
+  it('HOT_QUERY 命中但无 RAG 结果 → 不再高置信，按召回质量判为 low', () => {
+    // 无召回：0.1 × 1.1 = 0.11 → low
     const r = assessConfidence([], '面试被问住不会回答怎么圆？');
+    expect(r.level).toBe('low');
+    expect(r.score).toBeCloseTo(0.11, 2);
+    expect(r.reason).toBe('no_results');
+  });
+
+  it('HOT_QUERY 加权可将 medium 提升到 high（baseScore×1.1 跨阈值）', () => {
+    // 4 条 + top 0.55：baseScore=(4/5)*0.5+0.55*0.5=0.675；×1.1=0.7425 → high
+    const r = assessConfidence(mk(0.55, 4), '我绩效很好，为什么没晋升？');
     expect(r.level).toBe('high');
-    expect(r.score).toBe(0.9);
+    expect(r.score).toBeCloseTo(0.7425, 3);
+    // 同结果非热门应为 medium（验证加权是唯一差异）
+    const r2 = assessConfidence(mk(0.55, 4), '冷门');
+    expect(r2.level).toBe('medium');
   });
 
   it('无 RAG 结果且非热门 → low + score 0.1 + reason no_results', () => {

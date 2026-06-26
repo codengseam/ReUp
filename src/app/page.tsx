@@ -5,12 +5,14 @@ import {
   Briefcase, Menu, X, Settings, ChevronRight,
   Search, Lightbulb, Trash2, Mic
 } from 'lucide-react';
-import type { Message, CitationData, ModelConfig, CustomProvider } from '@/components/chat/types';
+import type { Message, CitationData, ModelConfig, CustomProvider, ThinkingStep } from '@/components/chat/types';
 import {
   AVAILABLE_MODELS, PROVIDER_TEMPLATES, SKILLS,
   INPUT_SUGGESTIONS_DB
 } from '@/components/chat/types';
 import { correctTypos } from '@/shared/utils/typo-correction';
+import { consumeSSE } from '@/shared/utils/sse-client';
+import { toast } from 'sonner';
 import ChatMessage from '@/components/chat/ChatMessage';
 import ChatInput from '@/components/chat/ChatInput';
 import WelcomeScreen from '@/components/chat/WelcomeScreen';
@@ -150,6 +152,13 @@ export default function ChatPage() {
   const voiceBaseInputRef = useRef<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const requestDurations = useRef<number[]>([]);
+  // 流式期间 localStorage 写入节流：pending 缓存 + 500ms 防抖，流结束/卸载时 flush
+  const pendingMessagesRef = useRef<Message[] | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // pending 等待起始时间：流式高频更新会持续重置 500ms 防抖导致永不触发，pending 等待超 2s 时强制 flush
+  const pendingSinceRef = useRef<number>(0);
+  // beforeunload 需要稳定引用最新 flush 函数（flushPendingMessages 依赖 currentConversationId 会变）
+  const flushRef = useRef<() => void>(() => {});
   const [estimatedSeconds, setEstimatedSeconds] = useState<number | null>(null);
   const [pendingRegenerate, setPendingRegenerate] = useState<{ content: string; isRegenerating: boolean } | null>(null);
 
@@ -339,16 +348,63 @@ export default function ChatPage() {
 
   // ===== 发送消息 =====
   // 同步 messages 到 conversation-store 的包装器（既支持函数也支持数组）
-  // 注意：从 store 读最新值，避免连续调用时拿到陈旧的 messages
+  // 流式期间防抖：React 状态即时更新（UI 不卡），localStorage 写入最多 500ms 一次
+  const flushPendingMessages = useCallback(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    const pending = pendingMessagesRef.current;
+    if (pending !== null) {
+      pendingMessagesRef.current = null;
+      pendingSinceRef.current = 0;
+      if (currentConversationId) {
+        try {
+          updateConversationMessages(currentConversationId, pending);
+        } catch { /* 对话可能已被删除 */ }
+      }
+    }
+  }, [currentConversationId]);
+
   const setMessages = useCallback((updater: Message[] | ((prev: Message[]) => Message[])) => {
     if (!currentConversationId) return;
-    const convs = getConversations();
-    const conv = convs.find(c => c.id === currentConversationId);
-    const prev = conv?.messages ?? [];
+    // 优先用 pending 缓存（比 store 更新），避免连续调用拿到陈旧 messages
+    const prev = pendingMessagesRef.current ?? getConversations().find(c => c.id === currentConversationId)?.messages ?? [];
     const next = typeof updater === 'function' ? updater(prev) : updater;
-    updateConversationMessages(currentConversationId, next);
-    setConversations(getConversations());
-  }, [currentConversationId]);
+    // pending 刚从空转为非空：记录等待起始时间（用于流式期间 2s 兜底）
+    if (pendingMessagesRef.current === null) {
+      pendingSinceRef.current = Date.now();
+    }
+    pendingMessagesRef.current = next;
+    // React 状态即时更新，保持 UI 响应
+    setConversations(prevConvs =>
+      prevConvs.map(c => c.id === currentConversationId ? { ...c, messages: next, updatedAt: Date.now() } : c)
+    );
+    // 防抖写入 localStorage；流式高频更新会持续重置 500ms 防抖，pending 等待超 2s 时强制 flush
+    if (pendingSinceRef.current !== 0 && Date.now() - pendingSinceRef.current > 2000) {
+      flushPendingMessages();
+    } else {
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = setTimeout(() => { flushPendingMessages(); }, 500);
+    }
+  }, [currentConversationId, flushPendingMessages]);
+
+  // 卸载或切换对话时 flush 残留 pending，避免丢失最后一段流式内容
+  useEffect(() => {
+    return () => { flushPendingMessages(); };
+  }, [flushPendingMessages]);
+
+  // 始终保持 flushRef 指向最新 flush 函数（flushPendingMessages 随 currentConversationId 变化）
+  useEffect(() => {
+    flushRef.current = flushPendingMessages;
+  }, [flushPendingMessages]);
+
+  // 关闭标签页 / 导航离开时强制 flush，避免流式途中丢失未落盘的 assistant 回复
+  useEffect(() => {
+    const handleBeforeUnload = () => { flushRef.current?.(); };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   const sendMessage = useCallback(async (messageText?: string, isRegenerating = false) => {
     const rawText = (messageText || input).trim();
@@ -403,11 +459,19 @@ export default function ChatPage() {
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
-      const response = await fetch('/api/chat', {
+      let citationsData: CitationData[] = [];
+      let strategyData: string | undefined;
+      let confidenceData: 'high' | 'medium' | 'low' = 'high';
+      let confidenceReasonData: string | undefined;
+      let safetyWarningData: string | undefined;
+
+      await consumeSSE({
+        url: '/api/chat',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
+        maxRetries: 0,
+        body: {
           messages: chatHistory,
           model: modelConfig.id,
           ...(modelConfig.providerType ? {
@@ -428,145 +492,116 @@ export default function ChatPage() {
               };
             } catch { return {}; }
           })(),
-        }),
+        },
+        onEvent: (parsed) => {
+          if (parsed.status) {
+            setStatus(parsed.status as string);
+          }
+
+          if (parsed.meta) {
+            const meta = parsed.meta as { citations?: CitationData[]; strategy?: string };
+            citationsData = meta.citations || [];
+            strategyData = meta.strategy;
+          }
+
+          if (parsed.content) {
+            const chunk = parsed.content as string;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + chunk }
+                  : m
+              )
+            );
+          }
+
+          if (parsed.confidence) {
+            confidenceData = parsed.confidence as 'high' | 'medium' | 'low';
+            confidenceReasonData = parsed.confidenceReason as string | undefined;
+          }
+
+          if (parsed.safetyWarning) {
+            safetyWarningData = parsed.safetyWarning as string;
+          }
+
+          if (parsed.transferToHuman) {
+            const reason = (parsed.transferReason as string) || '系统评估当前问题需要人工顾问介入';
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, transferToHuman: true, transferReason: reason }
+                  : m
+              )
+            );
+          }
+          if (parsed.hallucinationDetected) {
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, hallucinationDetected: true }
+                  : m
+              )
+            );
+          }
+
+          if (parsed.thinkingStep) {
+            const step = parsed.thinkingStep as ThinkingStep;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      thinkingSteps: [...(m.thinkingSteps || []).filter(s => s.step !== step.step), step],
+                    }
+                  : m
+              )
+            );
+          }
+
+          if (parsed.error) {
+            const errorMsg = parsed.error as string;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + `\n\n⚠️ ${errorMsg}` }
+                  : m
+              )
+            );
+          }
+        },
+        onDone: () => {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    citations: citationsData,
+                    strategy: strategyData,
+                    confidence: confidenceData,
+                    confidenceReason: confidenceReasonData,
+                    safetyWarning: safetyWarningData,
+                  }
+                : m
+            )
+          );
+        },
+        onError: (err) => {
+          const classified = classifyError(err);
+          toast.error(classified.title);
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: '', error: classified }
+                : m
+            )
+          );
+        },
       });
 
-      if (!response.ok) {
-        // 尝试从响应体里提取更具体的错误信息
-        let detail = `HTTP ${response.status}`;
-        try {
-          const text = await response.text();
-          if (text) {
-            // 优先尝试 JSON
-            try {
-              const json = JSON.parse(text);
-              if (json?.error) detail = String(json.error);
-              else if (json?.message) detail = String(json.message);
-            } catch {
-              // 非 JSON，直接用 text（限制长度）
-              detail = text.substring(0, 200);
-            }
-          }
-        } catch { /* ignore */ }
-        throw new Error(detail);
+      // 用户主动中止：consumeSSE 在 abort 时静默返回，需手动清掉空 assistant 消息
+      if (controller.signal.aborted) {
+        setMessages(prev => prev.filter(m => m.id !== assistantId));
       }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('无法读取响应');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let citationsData: CitationData[] = [];
-      let strategyData: string | undefined;
-      let confidenceData: 'high' | 'medium' | 'low' = 'high';
-      let confidenceReasonData: string | undefined;
-      let safetyWarningData: string | undefined;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-
-          try {
-            const parsed = JSON.parse(data);
-
-            if (parsed.status) {
-              setStatus(parsed.status);
-            }
-
-            if (parsed.meta) {
-              citationsData = parsed.meta.citations || [];
-              strategyData = parsed.meta.strategy;
-            }
-
-            if (parsed.content) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, content: m.content + parsed.content }
-                    : m
-                )
-              );
-            }
-
-            if (parsed.confidence) {
-              confidenceData = parsed.confidence;
-              confidenceReasonData = parsed.confidenceReason;
-            }
-
-            if (parsed.safetyWarning) {
-              safetyWarningData = parsed.safetyWarning;
-            }
-
-            if (parsed.transferToHuman) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, transferToHuman: true, transferReason: parsed.transferReason || '系统评估当前问题需要人工顾问介入' }
-                    : m
-                )
-              );
-            }
-            if (parsed.hallucinationDetected) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, hallucinationDetected: true }
-                    : m
-                )
-              );
-            }
-
-            if (parsed.thinkingStep) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        thinkingSteps: [...(m.thinkingSteps || []).filter(s => s.step !== parsed.thinkingStep.step), parsed.thinkingStep],
-                      }
-                    : m
-                )
-              );
-            }
-
-            if (parsed.error) {
-              setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, content: m.content + `\n\n⚠️ ${parsed.error}` }
-                    : m
-                )
-              );
-            }
-          } catch {
-            // 忽略解析错误
-          }
-        }
-      }
-
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === assistantId
-            ? {
-                ...m,
-                citations: citationsData,
-                strategy: strategyData,
-                confidence: confidenceData,
-                confidenceReason: confidenceReasonData,
-                safetyWarning: safetyWarningData,
-              }
-            : m
-        )
-      );
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         // 用户主动中止：把刚插入的空 assistant 消息清掉
@@ -575,6 +610,7 @@ export default function ChatPage() {
       }
       // 区分错误类型，给出对应提示
       const err = classifyError(error);
+      toast.error(err.title);
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantId
@@ -583,6 +619,7 @@ export default function ChatPage() {
         )
       );
     } finally {
+      flushPendingMessages();
       setIsLoading(false);
       setStatus('');
       const elapsed = (Date.now() - startTime) / 1000;
@@ -594,6 +631,11 @@ export default function ChatPage() {
       setEstimatedSeconds(Math.round(avg));
     }
   }, [input, isLoading, messages, modelConfig]);
+
+  // 用户主动停止生成：触发 abort，consumeSSE 在 abort 时静默返回，由 sendMessage 的 abort 分支清理空 assistant 消息
+  const stopGeneration = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
 
   // 重新生成
   const regenerate = useCallback(() => {
@@ -709,12 +751,13 @@ export default function ChatPage() {
   // 清空对话
   const clearMessages = useCallback(() => {
     if (!currentConversationId) return;
+    flushPendingMessages();
     clearConversationMessages(currentConversationId);
     setConversations(getConversations());
     setActiveCitation(null);
     setThumbsDownCount(0);
     setRegenerateCount(0);
-  }, [currentConversationId]);
+  }, [currentConversationId, flushPendingMessages]);
 
   // 处理快捷按钮
   const handleQuickEntry = useCallback((query: string) => {
@@ -765,6 +808,7 @@ export default function ChatPage() {
         conversations={conversations}
         currentId={currentConversationId}
         onNewChat={() => {
+          flushPendingMessages();
           const conv = createConversation();
           setConversations(getConversations());
           setCurrentConversationId(conv.id);
@@ -775,6 +819,7 @@ export default function ChatPage() {
           setActiveCitation(null);
         }}
         onDeleteChat={(id) => {
+          flushPendingMessages();
           deleteConversation(id);
           setConversations(getConversations());
           const current = getCurrentConversation();
@@ -1186,6 +1231,7 @@ export default function ChatPage() {
           modelName={modelConfig.name}
           onInputChange={setInput}
           onSend={() => sendMessage()}
+          onStop={stopGeneration}
           onToggleVoice={toggleVoiceInput}
           onSuggestionClick={(suggestion) => { setInput(suggestion); setSuggestions([]); }}
         />

@@ -20,6 +20,16 @@ export default defineConfig({
       '.cozeproj',
       'dist',
     ],
+    coverage: {
+      provider: 'v8',
+      // Baseline thresholds set just below current coverage to act as regression
+      // gates. Target is 80% lines; low-coverage legacy files (llm-client.ts,
+      // rag/route.ts) are tracked for improvement.
+      thresholds: {
+        'src/server/**/*': { lines: 78, functions: 78, branches: 62 },
+        'src/features/**/*': { lines: 80, functions: 80, branches: 75 },
+      },
+    },
   },
   resolve: {
     alias: {

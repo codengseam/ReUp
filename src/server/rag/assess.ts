@@ -4,24 +4,24 @@
 import type { RAGResult } from './types';
 
 // 置信度评估（纯数值计算，无需LLM）。
-// 阶段 4：改为线性打分（结果数 + 最高分加权） + 0..1 数值 score。
-// 热门问题（已纳入 HOT_QUERIES / QUICK_ENTRIES / EXAMPLE_QUERIES 的问题）即使 RAG 召回一般，
-// 也能由 LLM 凭借通用知识给出可靠回答，直接给高置信度，避免对常见问题误触发"转人工"。
+// 线性打分（结果数 + 最高分加权） + 0..1 数值 score。
+// 热门问题不再直接定 0.9，仅作为置信度的加权因子（×1.1，封顶 1.0）；置信度以真实召回质量为基础。
 export function assessConfidence(
   results: RAGResult[],
   query?: string
 ): { level: 'high' | 'medium' | 'low'; reason?: string; score: number } {
-  if (query && isHotQuery(query)) {
-    return { level: 'high', score: 0.9 };
-  }
+  const hotBoost = query && isHotQuery(query) ? 1.1 : 1.0;
 
   if (results.length === 0) {
-    return { level: 'low', score: 0.1, reason: 'no_results' };
+    const score = Math.min(1, 0.1 * hotBoost);
+    return { level: 'low', score, reason: 'no_results' };
   }
 
   const top = results[0]?.score ?? 0;
   // 线性打分：召回数量 (0..1, topK=5 封顶) × 0.5 + 最高分 × 0.5，结果夹紧到 [0,1]
-  const score = Math.min(1, (results.length / 5) * 0.5 + top * 0.5);
+  const baseScore = Math.min(1, (results.length / 5) * 0.5 + top * 0.5);
+  // 热门问题加权（×1.1，封顶 1.0）；无召回时 baseScore=0.1，加权后仍为 low
+  const score = Math.min(1, baseScore * hotBoost);
 
   if (score >= 0.7) {
     return { level: 'high', score };

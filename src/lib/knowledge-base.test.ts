@@ -15,7 +15,7 @@ const { mockSearch, mockEnsureVectorStoreLoaded } = vi.hoisted(() => ({
   mockEnsureVectorStoreLoaded: vi.fn(),
 }));
 
-vi.mock('./rag-init', () => ({
+vi.mock('../server/rag/rag-init', () => ({
   ensureVectorStoreLoaded: mockEnsureVectorStoreLoaded,
   _resetForTest: vi.fn(),
 }));
@@ -24,7 +24,7 @@ const { mockRerank } = vi.hoisted(() => ({
   mockRerank: vi.fn(),
 }));
 
-vi.mock('./reranker', () => ({
+vi.mock('../server/rag/reranker', () => ({
   rerank: mockRerank,
 }));
 
