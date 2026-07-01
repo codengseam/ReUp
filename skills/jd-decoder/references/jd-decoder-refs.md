@@ -12,7 +12,7 @@
 
 - **作者**: David C. McClelland
 - **年份**: 1973
-- **标题**: Testing for Competence Rather than Intelligence
+- **标题**: Testing for Competence Rather than for Intelligence
 - **来源**: American Psychologist, 28(1), 1-14
 - **关键论点摘要**:
   - 传统智力测验（IQ）与学历不能有效预测工作绩效，应改用"胜任力（competency）"评估。
@@ -22,7 +22,7 @@
 
 ### 2. Spencer & Spencer (1993) — 冰山模型
 
-- **作者**: Lyle M. Spencer, Signe M. Spencer
+- **作者**: Lyle M. Spencer Jr. & Signe M. Spencer
 - **年份**: 1993
 - **标题**: Competence at Work: Models for Superior Performance
 - **来源**: John Wiley & Sons（专著）
@@ -36,7 +36,7 @@
 
 - **作者**: Amy L. Kristof-Brown, Ryan D. Zimmerman, Erin C. Johnson
 - **年份**: 2005
-- **标题**: Consequences of Individuals' Fit at Work: A Meta-Analysis of Person–Job, Person–Organization, Person–Group, and Person–Vocation Fit
+- **标题**: Consequences of Individuals' Fit at Work: A Meta-Analysis of Person–Job, Person–Organization, Person–Group, and Person–Supervisor Fit
 - **来源**: Personnel Psychology, 58(2), 281-342
 - **关键论点摘要**:
   - 对 21 世纪以来的 P-E Fit（人-环境匹配）研究做元分析，证实 Person-Job Fit（P-J Fit，人-岗匹配）与工作绩效、满意度、留任率显著正相关。
@@ -48,8 +48,8 @@
 
 - **作者**: Jeffrey R. Edwards
 - **年份**: 1991
-- **标题**: Person-Job Fit: A Conceptual Integration
-- **来源**: Center for Effective Organizations, University of Southern California（后收入 Person-Environment Fit Theory）
+- **标题**: Person-Job Fit: A Conceptual Integration, Literature Review, and Methodological Critique
+- **来源**: in Cooper & Robertson (Eds.), International Review of Industrial and Organizational Psychology, Vol.6, pp.283-357, Wiley
 - **关键论点摘要**:
   - 整合并澄清了 P-J Fit 的两种方向：Demands-Abilities（D-A，岗位对人的要求 vs 人的能力）与 Needs-Supplies（N-S，人的需求 vs 岗位供给）。
   - 强调 Fit 是"双向"概念，单侧评估（只看人或只看岗）不构成 Fit，必须双侧对照。

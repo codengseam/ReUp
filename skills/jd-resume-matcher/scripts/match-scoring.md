@@ -45,7 +45,7 @@ function rigid_check(resume, jd):
         gaps.append({dim: years, severity: important})   # 降级
      else:
         fatal_count += 1
-        if gap > 3: eliminate = true
+        if gap > 3 and not jd.has_relax_clause: eliminate = true   # 年限差距>3年且无放宽 → 淘汰（与 matching-model.md §1.3 联动）；有放宽则仅 Fatal 封顶45
         gaps.append({dim: years, severity: fatal})
 
   # 必备证书

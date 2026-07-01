@@ -7,7 +7,7 @@
 ### 1.1 JD-简历深度匹配分析
 - 场景：用户的核心诉求是"我的简历与这份 JD 匹配度多高、差在哪、怎么针对性改"。
 - 区分：本 skill 的 ATS 评分仅为可选增强项，不做 JD 维度（硬性要求/职责/重点项）的逐项匹配打分。
-- 路由：走 resume-jd-matching 主入口（基于 `src/features/resume/matcher.ts` 的 `buildMatchReportFromJD`）。
+- 路由：走 jd-resume-matcher 主入口（基于 `src/features/resume/matcher.ts` 的 `buildMatchReportFromJD`）。
 
 ### 1.2 纯排版/语法润色
 - 场景：用户简历内容已定稿，只需调整字体/间距/模板美观度。
@@ -57,8 +57,8 @@
 
 ## 3. 容易混淆的邻近方法论
 
-### 3.1 与 resume-jd-matching 的区分
-| 维度 | resume-evaluator（本 skill） | resume-jd-matching |
+### 3.1 与 jd-resume-matcher 的区分
+| 维度 | resume-evaluator（本 skill） | jd-resume-matcher |
 |------|------------------------------|-------------------|
 | 依赖 JD | 可选（ATS 为增强项） | 必须 |
 | 核心产出 | 8 维诊断 + STAR 重写 | 匹配度分 + 差距分析 + 优先级 |
@@ -84,7 +84,7 @@
 ## 4. 执行前的边界检查清单
 
 AI 在开始诊断前必须核对：
-- [ ] 用户诉求是"诊断简历整体"而非"匹配特定 JD"？（若后者，转 resume-jd-matching）
+- [ ] 用户诉求是"诊断简历整体"而非"匹配特定 JD"？（若后者，转 jd-resume-matcher）
 - [ ] 用户是否要求造假/夸大？（若是，拒绝并提示红线）
 - [ ] 简历是否为图片化/扫描件无法解析文本？（若是，提示改用可解析格式）
 - [ ] 简历语言与目标岗位是否匹配本 skill 默认（中文）？（若英文，切英文模式）

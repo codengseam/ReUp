@@ -5,7 +5,7 @@ description: |
   通过 8 维诊断（结构完整性 / 内容量化度 / STAR 叙事质量 / 时间线连续性 / 关键词密度 / 技能-经历一致性 / 错别字格式 / 差异化亮点）+ ATS 评分 + 胜任力对齐，产出结构化诊断报告与 STAR 重写建议。
   编排三个子 skill：highlight-extractor（亮点挖掘）/ competency-model-alignment（胜任力对齐）/ blind-spot-navigation（盲区规避）。
   语言信号："帮我看看这份简历"、"分析下我的简历"、"简历有什么问题"、"简历诊断"。
-  不适用于：JD-简历匹配的深度匹配分析（走 resume-jd-matching 主入口）、纯排版润色、简历造假包装。
+  不适用于：JD-简历匹配的深度匹配分析（走 jd-resume-matcher 主入口）、纯排版润色、简历造假包装。
 related_skills: [highlight-extractor, competency-model-alignment, blind-spot-navigation]
 tags: [resume, diagnostic, ats, star, competency]
 ---
@@ -51,7 +51,7 @@ tags: [resume, diagnostic, ats, star, competency]
 ### B — 边界 (Boundary)
 
 边界与失败模式详见 `rules/boundaries.md`。核心边界：
-- 不用于 JD-简历匹配的深度匹配分析（那是 resume-jd-matching 的职责）。
+- 不用于 JD-简历匹配的深度匹配分析（那是 jd-resume-matcher 的职责）。
 - 不替用户编造经历或夸大量化数据（诚信红线）。
 - 简历为纯英文/海外岗位时，ATS 规则需切换至对应区域模型，本 skill 默认中文岗位。
 
@@ -90,7 +90,7 @@ tags: [resume, diagnostic, ats, star, competency]
 
 - 与 `highlight-extractor`：本 skill 是宏观诊断器，后者是被编排的微观亮点榨取工具。
 - 与 `competency-model-alignment`：本 skill 评估简历整体，后者专注回答层次升华。
-- 与 resume-jd-matching：本 skill 不依赖 JD 做深度匹配，ATS 评分仅为可选增强项。
+- 与 jd-resume-matcher：本 skill 不依赖 JD 做深度匹配，ATS 评分仅为可选增强项。
 
 ---
 

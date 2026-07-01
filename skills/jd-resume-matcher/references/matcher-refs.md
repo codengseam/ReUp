@@ -8,8 +8,8 @@
 
 - **作者**: Amy L. Kristof-Brown, Ryan D. Zimmerman, Erin C. Johnson
 - **年份**: 2005
-- **标题**: Consequences of Individuals' Fit at Work: A Meta-Analysis of Person-Job, Person-Organization, Person-Group, and Person-Vocation Fit
-- **来源**: Personnel Psychology, 58(2), 289-338
+- **标题**: Consequences of Individuals' Fit at Work: A Meta-Analysis of Person-Job, Person-Organization, Person-Group, and Person-Supervisor Fit
+- **来源**: Personnel Psychology, 58(2), 281-342
 - **关键论点摘要**: 对 172 项独立研究进行元分析，系统检验 P-J / P-O / P-G / P-V 四类匹配的工作后果。核心发现：
   - P-J Fit 与工作绩效（task performance）相关系数约 0.44-0.56，是四类匹配中对绩效预测最强的一类。
   - 各类匹配均与离职意向显著负相关（P-J 约 -0.30）。
@@ -20,8 +20,8 @@
 
 - **作者**: Amy L. Kristof
 - **年份**: 1996
-- **标题**: Person-Organization Fit: An Integrative Review of the Literature
-- **来源**: Research in Personnel and Human Resources Management, 14, 1-49
+- **标题**: Person-Organization Fit: An Integrative Review of Its Conceptualizations, Measurement, and Implications
+- **来源**: Personnel Psychology, 49(1), 1-49
 - **关键论点摘要**: 提出 P-O Fit 的整合框架，区分"补充性匹配（complementary fit）"与"互补性匹配（supplementary fit）"，并把 P-J（D-A/N-S）与 P-O 统一在 P-E Fit 伞形理论下。明确告诫 P-J 与 P-O 不可混测。
 - **对本 skill 的支撑**: 支撑 `../rules/boundaries.md` §2.3"不做 P-O Fit 评分"的边界，避免把文化匹配混入岗位胜任度评分。
 
@@ -29,8 +29,8 @@
 
 - **作者**: Jeffrey R. Edwards
 - **年份**: 1991
-- **标题**: Person-Job Fit: A Conceptual Integration
-- **来源**: Research in Personnel and Human Resources Management, 9, 283-357
+- **标题**: Person-Job Fit: A Conceptual Integration, Literature Review, and Methodological Critique
+- **来源**: in Cooper & Robertson (Eds.), International Review of Industrial and Organizational Psychology, Vol.6, pp.283-357, Wiley
 - **关键论点摘要**: 概念性整合 P-J Fit，明确 D-A 与 N-S 两向度的数学结构，指出线性差分（demands - abilities）与多项式回归两种建模方式，并指出简单差分会掩盖"过度资历"情形。
 - **对本 skill 的支撑**: 支撑 `../rules/boundaries.md` §2.4"不做过度资历惩罚"的边界说明（缺数据标定过度资历-离职曲线，故当前版本不降分）。
 
@@ -47,7 +47,7 @@
 
 - **作者**: David C. McClelland
 - **年份**: 1973
-- **标题**: Testing for Competence Rather Than for Intelligence
+- **标题**: Testing for Competence Rather than for Intelligence
 - **来源**: American Psychologist, 28(1), 1-14
 - **关键论点摘要**: 提出胜任力（competency）理论，主张用行为事例（BEI）识别"冰山以下"的动机/特质，而非依赖智力测试或学历等表面指标。胜任力须有可观测行为佐证。
 - **对本 skill 的支撑**: 支撑 `../rules/matching-model.md` §2.3 软技能"必须有事实支撑，不接受空泛自评"的硬规则，以及软技能维度无 evidence 上限 40 的设计。

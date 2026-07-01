@@ -5,7 +5,7 @@
 ## 1. 理论基础
 
 ### 1.1 McClelland 胜任力理论
-1973 年 McClelland 在《Testing for Competence Rather than Intelligence》中提出：传统的智力测验（IQ/学历）不能有效预测工作绩效，应以"胜任力"（competency）替代——即能区分高绩效者与普通绩效者的可测量个人特征。
+1973 年 McClelland 在《Testing for Competence Rather than for Intelligence》中提出：传统的智力测验（IQ/学历）不能有效预测工作绩效，应以"胜任力"（competency）替代——即能区分高绩效者与普通绩效者的可测量个人特征。
 
 核心论点：
 - 学历/智力是"必要非充分"条件，胜任力才是绩效差异的根因。

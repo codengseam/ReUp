@@ -4,7 +4,7 @@ description: |
   当用户输入一段 JD（职位描述）文本，需要将其结构化拆解为岗位画像、构建能力矩阵、推断隐性要求与考察重点时调用。
   本 skill 是"简历-JD 分析专栏"的 JD 单独分析执行入口，产出物主要供 AI 消费（RAG 检索 + skills-loader 注入 system prompt），人可读为辅。
   语言信号："帮我分析这个 JD"、"这段 JD 看不懂"、"这个岗位到底要什么人"、"JD 里没明说但实际看重什么"。
-  不适用于：已有目标简历、需要做简历-JD 双向匹配（应走 smart-matcher），或 JD 文本过短无法推断（见边界）。
+  不适用于：已有目标简历、需要做简历-JD 双向匹配（应走 jd-resume-matcher），或 JD 文本过短无法推断（见边界）。
 related_skills: [jinsheng-san-yuanze, nengli-sanzhong-jingjie, competency-model-alignment]
 tags: [jd, competency, career, analysis, parsing]
 ---

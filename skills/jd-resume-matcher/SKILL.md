@@ -3,7 +3,7 @@ name: jd-resume-matcher
 description: |
   用户同时提供"简历文本"与"JD 文本"，要求给出"匹配度评分 + 差距分析 + 改进建议 + 面试题预生成"的完整组合诊断报告时调用。
   该技能是简历-JD 分析专栏的"功能三"组合执行入口，把简历侧评估（resume-evaluator）与 JD 侧解析（jd-decoder）组合起来，
-  采用"刚性校验 → 弹性语义匹配 → 多维加权 → 缺口分级 → 改进优先级"五层混合匹配模型，并触发 interview-question-generator 预生成面试题。
+  采用"刚性校验 → 弹性语义匹配 → 多维加权"三层混合匹配模型，下游接缺口分级与改进优先级，并触发 interview-question-generator 预生成面试题。
   语言信号："我的简历匹配这个 JD 吗"、"帮我看看差距在哪"、"按这个岗位改简历"、"这个岗位我能投吗"。
   不适用于：只分析简历（无 JD，走 resume-evaluator）、只解读 JD（无简历，走 jd-decoder）、纯面试题生成（走 interview-question-generator）。
 tags: [resume, jd, matching, gap-analysis, interview]
@@ -14,6 +14,7 @@ related_skills:
   - competency-model-alignment
   - highlight-extractor
   - blind-spot-navigation
+  - p8-lingyu-zhuanjia
 ---
 
 # 简历-JD 组合匹配诊断（薄路由层）
@@ -87,6 +88,7 @@ related_skills:
 ## 相关 skills
 
 - composes-with: `resume-evaluator`（简历侧画像）、`jd-decoder`（JD 侧画像）、`interview-question-generator`（面试题预生成）
+- composes-with (conditional): `p8-lingyu-zhuanjia`（P8+ 高阶岗位领域深度评估；触发条件：JD 职级 P8+ 时在弹性语义匹配阶段触发，评估领域专家纵深）
 - reuses: `highlight-extractor`（亮点榨取）、`competency-model-alignment`（素质模型对齐）、`blind-spot-navigation`（盲区防守）
 - contrasts-with: 现有 8 个 skills 均为"单一方法论"，本 skill 是"组合编排入口"，不新增独立方法论，只做路由与加权聚合
 
