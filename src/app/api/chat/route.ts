@@ -135,7 +135,7 @@ const SKILL_RULES = `
 
 ## 知识库使用规则（RAG增强 - Grounded Generation）
 你会收到从知识库检索到的参考资料，请严格遵循：
-1. **忠实性要求**：所有事实性声明必须来自参考资料，不得编造
+1. **忠实性要求**：所有事实性声明必须来自参考资料，不得编造。忠实引用原文段落不算编造，反而鼓励——只要原文 relevant 就应逐字引用。
 2. 如果参考资料与用户问题不相关，可以忽略，但不要编造替代内容
 3. 参考资料中没有相关内容时，写"原文中暂无相关知识点"，不可编造
 4. **禁止幻觉**：不要将参考资料中的概念张冠李戴或断章取义
@@ -148,7 +148,7 @@ const SKILL_RULES = `
 
 ## 【框架技能+原文知识点】
 **调用的 Skill**: [Skill中文名]
-**原文知识点**: 从知识库中检索相关原文，用引用块 > 展示核心内容
+**原文知识点**: 逐字引用参考资料中的关键原文段落（每段 50-150 字），用 > 引用块展示，保留原文措辞，不要改写或概述。每个调用的 Skill 必须配 1-2 段原文引用；若参考资料相关则必须引用，不得仅概述。
 无原文时写"原文中暂无相关知识点"，不可编造
 若涉及多个 Skill，依次列出每组 **调用的 Skill** + **原文知识点**
 
@@ -157,6 +157,12 @@ const SKILL_RULES = `
 
 ## 【开始引导】
 2-3个提问，引导用户深入思考
+
+## 全面性要求
+- 四大板块需充实展开，避免一两句带过
+- 【我的分析】至少 3 个关键判断点
+- 【框架技能+原文知识点】每个 Skill 配原文引用
+- 【开始引导】2-3 个有深度的提问
 
 ## 格式约束
 - ❌ 禁止用单行 # 作为段落分隔符
@@ -226,7 +232,6 @@ function buildSkillPrompt(ragResults: RAGResult[]): string {
 
 // 默认兜底话术
 const BLOCKED_RESPONSE = '抱歉，您的问题涉及敏感内容，我无法回答。请尝试提出与职场晋升或面试相关的问题。';
-const LOW_CONFIDENCE_RESPONSE = '我对这个问题的把握不够大。建议您咨询专业的职业顾问或HR获取更准确的建议。';
 const OFF_TOPIC_RESPONSE = '我是职场晋升与面试顾问，专注于职场相关问题。请提出与晋升、面试、职业发展相关的问题，我会尽力帮您分析。';
 
 /**
@@ -695,16 +700,11 @@ export async function POST(request: NextRequest) {
         // ===== 置信度评估 & 转人工 =====
         // 传入 latestUserMessage：热门问题作为加权因子（×1.1）参与置信度计算，置信度仍以召回质量为基础
         const confidence = assessConfidence(ragResults as RAGResult[], latestUserMessage);
-        const shouldTransferToHuman = confidence.level === 'low';
+        console.log(`[Chat] Confidence: ${confidence.level} (score=${confidence.score.toFixed(2)}, reason=${confidence.reason ?? 'none'})`);
         safeEnqueue(controller, `data: ${JSON.stringify({
             confidence: confidence.level,
             confidenceScore: confidence.score,
             confidenceReason: confidence.reason,
-            transferToHuman: shouldTransferToHuman,
-            ...(shouldTransferToHuman ? {
-              transferReason: '当前问题置信度较低，建议转接人工顾问获取更精准的指导',
-              conversationContext: messages.slice(-6).map(m => m.role + ': ' + m.content).join('\n')
-            } : {})
           })}\n\n`);
 
         safeEnqueue(controller, 'data: [DONE]\n\n');

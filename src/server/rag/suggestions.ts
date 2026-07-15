@@ -21,7 +21,7 @@ function formatContext(results: RAGResult[]): string {
 function buildCitations(results: RAGResult[]): Citation[] {
   return results.map((r, i) => ({
     id: i + 1,
-    content: r.content.substring(0, 200) + (r.content.length > 200 ? '...' : ''),
+    content: r.content.substring(0, 400) + (r.content.length > 400 ? '...' : ''),
     source: r.source || '未知来源',
     skillName: r.skillName,
     category: r.category,

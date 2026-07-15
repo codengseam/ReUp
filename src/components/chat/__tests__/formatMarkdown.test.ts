@@ -144,10 +144,10 @@ describe('formatMarkdown', () => {
     expect(result).toContain('晋升底层逻辑');
   });
 
-  it('renders quote block with f6fef9 background (style A)', () => {
+  it('renders quote block with primary-container background (style A)', () => {
     const input = '> 先精通当前级别，再做下一级别的事。';
     const result = formatMarkdown(input, mockPurify);
-    expect(result).toContain('bg-[#f6fef9]');
+    expect(result).toContain('bg-primary-container');
     expect(result).toContain('border-l-[3px]');
     expect(result).toContain('rounded-r-lg');
     expect(result).toContain('先精通当前级别');

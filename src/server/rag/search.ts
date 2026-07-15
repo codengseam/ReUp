@@ -24,7 +24,7 @@ function getLLMClient(): LLMClient {
 async function semanticSearch(
   query: string,
   topK: number = 5,
-  minScore: number = 0.2,
+  minScore: number = 0.15,
   categoryFilter?: string
 ): Promise<RAGResult[]> {
   try {
@@ -77,7 +77,7 @@ function mapChunkToRAGResult(chunk: ScoredChunk): RAGResult {
 async function keywordAugmentedSearch(
   query: string,
   topK: number = 3,
-  minScore: number = 0.15
+  minScore: number = 0.12
 ): Promise<RAGResult[]> {
   try {
     // 使用本地关键词提取替代 LLM 调用，避免每次检索都触发一次大模型请求。
@@ -304,7 +304,7 @@ ${docList}
 }
 
 // ========== 6. 上下文压缩 ==========
-function compressContext(results: RAGResult[], maxChars: number = 3000): RAGResult[] {
+function compressContext(results: RAGResult[], maxChars: number = 5000): RAGResult[] {
   let totalChars = 0;
   const compressed: RAGResult[] = [];
 
