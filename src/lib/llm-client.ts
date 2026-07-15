@@ -9,6 +9,13 @@
 // - Config: 读 env-var 作为缺省；显式传入覆盖
 
 import { z } from 'zod';
+import {
+  getDefaultModelCandidates,
+  BUILTIN_MODEL_REGISTRY,
+  isModelExpired,
+  type BuiltinModelId,
+} from './runtime-config';
+import { DEFAULT_MODEL_ID } from '@/shared/config/models';
 
 // ===== Public types =====
 
@@ -161,7 +168,9 @@ const StreamFrameSchema = z.object({
 
 // ===== Defaults (kept as constants for testability + JSDoc) =====
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-const DEFAULT_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
+// 默认模型取自共享清单（BUILTIN_MODELS[0]，过期最早的）。
+// 当该模型过期时，resolveCandidatesAsync 会自动轮换到下一个未过期模型。
+const DEFAULT_CHAT_MODEL = DEFAULT_MODEL_ID;
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 /** Strip a trailing `/v1` or `/v1/` from the base URL. */
@@ -268,13 +277,24 @@ export class LLMClient {
   }
 
   /**
-   * Normalize InvokeOptions → ModelCandidate[] 列表。
+   * 解析候选模型列表（异步，支持过期感知轮换）。
    * - opts.models 直接返回
-   * - 否则用 [opts.model ?? this.model, this.baseUrl, this.apiKey] 包装成单元素
+   * - opts.model 指定 → 单候选
+   * - 否则用 this.model：若 this.model 是注册表内已过期模型，则启用轮换，
+   *   通过 getDefaultModelCandidates() 返回所有未过期模型（先消耗快过期的），
+   *   实现「每过期一个模型，自动换下一个」；其余情况退化为单候选。
    */
-  private resolveCandidates(opts?: InvokeOptions): ModelCandidate[] {
+  private async resolveCandidatesAsync(opts?: InvokeOptions): Promise<ModelCandidate[]> {
     if (opts?.models && opts.models.length > 0) return opts.models;
-    return [{ model: opts?.model ?? this.model, baseUrl: this.baseUrl, apiKey: this.apiKey }];
+    if (opts?.model !== undefined) {
+      return [{ model: opts.model, baseUrl: this.baseUrl, apiKey: this.apiKey }];
+    }
+    const entry = BUILTIN_MODEL_REGISTRY[this.model as BuiltinModelId];
+    if (entry && isModelExpired(entry.expiresAt)) {
+      const rotated = await getDefaultModelCandidates();
+      if (rotated.length > 0) return rotated;
+    }
+    return [{ model: this.model, baseUrl: this.baseUrl, apiKey: this.apiKey }];
   }
 
   /**
@@ -283,7 +303,7 @@ export class LLMClient {
    * Single-candidate mode preserves the original error type (backward compat).
    */
   async invoke(messages: Message[], opts?: InvokeOptions): Promise<LLMResponse> {
-    const candidates = this.resolveCandidates(opts);
+    const candidates = await this.resolveCandidatesAsync(opts);
     if (candidates.length === 1) {
       // Single-candidate: throw underlying error directly (backward compat with single-model tests)
       return this.invokeOnce(messages, candidates[0]!, opts);
@@ -393,7 +413,7 @@ export class LLMClient {
    * Multi-candidate: throws LLMAllCandidatesFailedError when no candidate produced any chunk.
    */
   async *stream(messages: Message[], opts?: InvokeOptions): AsyncIterable<LLMChunk> {
-    const candidates = this.resolveCandidates(opts);
+    const candidates = await this.resolveCandidatesAsync(opts);
     if (candidates.length === 1) {
       // Single-candidate: yield directly (errors propagate naturally)
       yield* this.streamOnce(messages, candidates[0]!, opts);

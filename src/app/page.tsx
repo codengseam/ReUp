@@ -82,7 +82,8 @@ export default function ChatPage() {
   const [thumbsDownCount, setThumbsDownCount] = useState<number>(0); // 保留字段名（ChatMessage 仍按此读取）；语义现为"反馈总数"
   const [regenerateCount, setRegenerateCount] = useState<number>(0);
 
-  // 客户端水合后从 localStorage 同步模型配置，避免 SSR 水合不匹配
+  // 客户端水合后同步模型配置，避免 SSR 水合不匹配
+  // 优先级：用户手选 (boss_model_config) > 管理后台默认 (/api/config/model) > 清单第一个
   useEffect(() => {
     const getCustomProviders = (): CustomProvider[] => {
       try {
@@ -98,52 +99,62 @@ export default function ChatPage() {
       setCustomProviders(allCustom);
     }
 
+    // 按 id 应用模型配置（内置或自定义），返回是否成功
+    const applyModelId = (id: string): boolean => {
+      const found = AVAILABLE_MODELS.find(m => m.id === id);
+      if (found) { setModelConfig(found); setAdminDefaultLabel(found.name); return true; }
+      const customFound = allCustom.find(c => c.id === id);
+      if (customFound) {
+        setModelConfig({
+          id: customFound.id,
+          name: customFound.name,
+          description: `${customFound.providerType} · ${customFound.modelId}`,
+          providerType: customFound.providerType,
+          endpoint: customFound.endpoint,
+          apiKey: customFound.apiKey,
+          modelId: customFound.modelId,
+        });
+        setAdminDefaultLabel(customFound.name);
+        return true;
+      }
+      return false;
+    };
+
+    // 1) 用户手选模型优先（不覆盖）
     try {
       const saved = localStorage.getItem('boss_model_config');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const found = AVAILABLE_MODELS.find(m => m.id === parsed.id);
-        if (found) { setModelConfig(found); return; }
-        const customFound = allCustom.find(c => c.id === parsed.id);
-        if (customFound) {
-          setModelConfig({
-            id: customFound.id,
-            name: customFound.name,
-            description: `${customFound.providerType} · ${customFound.modelId}`,
-            providerType: customFound.providerType,
-            endpoint: customFound.endpoint,
-            apiKey: customFound.apiKey,
-            modelId: customFound.modelId,
-          });
-          return;
-        }
+        if (parsed?.id && applyModelId(parsed.id)) return;
       }
     } catch { /* ignore */ }
+
+    // 2) 同步应用缓存的后台默认（瞬时显示，避免闪烁）
+    let cachedAdminId: string | undefined;
     try {
       const adminConfig = localStorage.getItem('boss_admin_model_config');
       if (adminConfig) {
         const parsed = JSON.parse(adminConfig);
-        const found = AVAILABLE_MODELS.find(m => m.id === parsed.defaultModelId);
-        if (found) {
-          setModelConfig(found);
-          setAdminDefaultLabel(found.name);
-          return;
-        }
-        const customFound = allCustom.find(c => c.id === parsed.defaultModelId);
-        if (customFound) {
-          setModelConfig({
-            id: customFound.id,
-            name: customFound.name,
-            description: `${customFound.providerType} · ${customFound.modelId}`,
-            providerType: customFound.providerType,
-            endpoint: customFound.endpoint,
-            apiKey: customFound.apiKey,
-            modelId: customFound.modelId,
-          });
-          setAdminDefaultLabel(customFound.name);
-          return;
+        if (parsed?.defaultModelId && applyModelId(parsed.defaultModelId)) {
+          cachedAdminId = parsed.defaultModelId;
         }
       }
+    } catch { /* ignore */ }
+
+    // 3) 异步拉取最新后台默认，覆盖缓存（修复：后台切换默认模型后用户端即时生效）
+    try {
+      void (async () => {
+        try {
+          const res = await fetch('/api/config/model', { cache: 'no-store' });
+          if (!res.ok) return;
+          const data = (await res.json()) as { defaultModelId?: string };
+          const id = data?.defaultModelId;
+          if (!id) return;
+          // 与缓存一致则无需重设（避免无谓渲染）
+          if (id !== cachedAdminId) applyModelId(id);
+          localStorage.setItem('boss_admin_model_config', JSON.stringify({ defaultModelId: id }));
+        } catch { /* ignore */ }
+      })();
     } catch { /* ignore */ }
   }, []);
 

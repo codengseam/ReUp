@@ -19,6 +19,7 @@ import {
   evaluateContextRelevancy,
 } from './ragas';
 import { detectHallucination } from './hallucination-detector';
+import { DEFAULT_MODEL_ID } from '@/shared/config/models';
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_CONCURRENT = 2;
@@ -161,7 +162,7 @@ async function processJob(job: { id: number; request_id: string }): Promise<Proc
     const overallScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
 
     const latency = Date.now() - start;
-    const judgeModel = 'qwen3.6-plus-2026-04-02';
+    const judgeModel = DEFAULT_MODEL_ID;
 
     const resultError = hallu.error ?? null;
 
