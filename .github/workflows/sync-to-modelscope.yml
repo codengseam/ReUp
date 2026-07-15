@@ -20,14 +20,18 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       # 部署约定（写死在 workflow 里，防止遗忘）：
-      # - GitHub 主分支未来会改为 master；目前同时支持 main 和 master
-      # - 魔搭空间 re_up 默认部署分支：master（无法修改，且受保护禁止 force push）
+      # - 魔搭空间 re_up 默认部署分支：master
       # - 当前触发 push 的分支（GITHUB_REF_NAME）被同步到魔搭 master
-      # - 历史分叉时，用 --allow-unrelated-histories 合并魔搭 master 后再 push
-      # - 项目从 gitee → github → modelscope 演化，两边历史独立，必须允许无关历史合并
+      # - 项目从 gitee → github → modelscope 演化，两边历史独立，曾长期分叉
       # - 不预先 fetch 整个魔搭仓库（27MB skill-vectors.json + 全历史会触发 curl 18 RPC 中断）
-      # - push 失败时只 shallow fetch master（--depth=1），merge 后再 push
-      # - 魔搭上的 main 分支是历史残留，尝试删除
+      # - 只 shallow fetch master（--depth=1）用于判断分叉与 merge
+      # - 魔搭上的 main / coze 分支是历史残留，尝试删除
+      #
+      # 同步策略（三级降级，避免每次 5 次无意义 non-fast-forward 重试）：
+      # 1) 普通 push：魔搭 master 是 GitHub master 祖先时直接 fast-forward 成功
+      # 2) force-with-lease：历史分叉时用 GitHub master 覆盖魔搭 master 对齐历史
+      #    （一次性解决循环分叉；若魔搭禁止 force 则失败，回退到 merge）
+      # 3) merge fallback：--allow-unrelated-histories -X ours + 带重试 push（保底）
       - name: Sync to ModelScope
         env:
           MODELSCOPE_TOKEN: ${{ secrets.MODELSCOPE_TOKEN }}
@@ -39,10 +43,11 @@ jobs:
           git remote add modelscope https://oauth2:${MODELSCOPE_TOKEN}@www.modelscope.cn/studios/codengseam/re_up.git
 
           # 带重试的 push 函数：魔搭 Git 服务器偶发 502 / RPC 断连
+          # 用法: push_with_retry <refspec...>
           push_with_retry() {
             local max=5 delay=10
             for i in $(seq 1 $max); do
-              if git push modelscope "${GITHUB_REF_NAME}:master"; then
+              if git push modelscope "$@"; then
                 echo "Push succeeded on attempt $i"
                 return 0
               fi
@@ -54,21 +59,29 @@ jobs:
             return 1
           }
 
-          # 普通 push 同步 GitHub 当前分支到魔搭 master（不用 --force，master 受保护）
-          # GITHUB_REF_NAME 是当前触发 workflow 的分支名（main 或 master）
-          if ! push_with_retry; then
-            echo "Push rejected, shallow-fetching modelscope/master and merging with unrelated histories..."
-            # 只 shallow fetch master 一个分支，避免拉取整个魔搭仓库历史
-            git fetch modelscope master --depth=1
-            # 项目从 gitee → github → modelscope 演化，两边历史独立
-            # 必须用 --allow-unrelated-histories 才能合并
+          # 先 shallow fetch 魔搭 master（用于 force-with-lease 与 merge 判断）
+          git fetch modelscope master --depth=1
+
+          # 1) 普通 push：若魔搭 master 是 GitHub master 祖先则 fast-forward 成功（最干净）
+          if git push modelscope HEAD:master 2>/dev/null; then
+            echo "Fast-forward push succeeded"
+
+          # 2) force-with-lease：历史分叉时用 GitHub master 覆盖魔搭 master 对齐历史
+          #    lease 基于刚 fetch 的 modelscope/master，若远程在此期间变化则拒绝（安全）
+          #    成功后以后均可 fast-forward，彻底解决循环分叉
+          elif git push modelscope --force-with-lease=modelscope/master HEAD:master 2>/dev/null; then
+            echo "Force-with-lease push succeeded, histories aligned"
+
+          # 3) merge fallback：force 被禁或 lease 失效时保底
+          else
+            echo "Push rejected, merging with unrelated histories..."
+            # 项目从 gitee → github → modelscope 演化，两边历史独立，必须允许无关历史合并
             # -X ours：冲突时保留 GitHub 版本（魔搭自动初始化的 README.md 等会被覆盖）
             git merge --no-edit --allow-unrelated-histories -X ours modelscope/master
-            push_with_retry
+            push_with_retry HEAD:master
           fi
 
-          # 删除魔搭空间上的 main 分支（如果存在）
-          # 该分支是旧配置残留，魔搭空间实际使用 master 作为默认分支
+          # 删除魔搭空间上的 main 分支（历史残留，魔搭实际使用 master 作为默认分支）
           git push modelscope --delete main || true
 
           # 删除其他可能存在的废弃分支
