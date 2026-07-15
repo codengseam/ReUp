@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, Search, Square } from 'lucide-react';
+import { Send, Mic, MicOff, Search, Loader2 } from 'lucide-react';
 
 interface ChatInputProps {
   input: string;
@@ -57,7 +57,7 @@ export default function ChatInput({
               <button
                 key={i}
                 onClick={() => onSuggestionClick(s)}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm text-muted-foreground flex items-center gap-2"
+                className="w-full text-left px-3 py-2 rounded-lg border border-border bg-card shadow-sm hover:border-primary hover:bg-primary-container/40 transition-colors text-sm text-muted-foreground flex items-center gap-2"
               >
                 <Search className="w-3.5 h-3.5 shrink-0" />
                 {s}
@@ -66,7 +66,7 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-muted rounded-2xl px-3 py-2">
+        <div className="flex items-end gap-2 bg-card border border-border shadow-card rounded-2xl px-3 py-2 focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary transition-all">
           <textarea
             ref={textareaRef}
             value={input}
@@ -74,15 +74,15 @@ export default function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder="输入你的职场问题..."
             rows={1}
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none max-h-[150px] py-1.5"
+            className="flex-1 border-0 outline-none bg-transparent focus:ring-0 text-sm text-foreground placeholder:text-muted-foreground resize-none max-h-[150px] py-1.5"
             disabled={isLoading}
           />
 
           {/* 语音输入 */}
           <button
             onClick={onToggleVoice}
-            className={`p-2 rounded-xl transition-colors ${
-              isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-muted-foreground/10 text-muted-foreground'
+            className={`shrink-0 p-2 rounded-full transition-colors ${
+              isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'hover:bg-muted text-muted-foreground'
             }`}
             title={isListening ? '停止录音' : '语音输入'}
           >
@@ -95,19 +95,27 @@ export default function ChatInput({
             disabled={!isLoading && !input.trim()}
             aria-label={isLoading ? '停止生成' : '发送'}
             title={isLoading ? '停止生成' : '发送'}
-            className={`p-2.5 rounded-xl transition-all ${
+            className={`shrink-0 p-2.5 rounded-full transition-all ${
               isLoading || input.trim()
-                ? 'bg-primary text-primary-foreground hover:opacity-90'
-                : 'bg-muted-foreground/10 text-muted-foreground/40'
+                ? 'bg-gradient-to-br from-primary to-emerald-600 text-white shadow-sm hover:shadow-md hover:scale-105 active:scale-95'
+                : 'bg-muted text-muted-foreground/40'
             }`}
           >
-            {isLoading ? <Square className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-          AI 回复仅供参考，不构成专业建议 · 当前模型: {modelName}
-        </p>
+        <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground mt-2">
+          <span>AI 回复仅供参考，不构成专业建议</span>
+          <span>·</span>
+          <span>当前模型: {modelName}</span>
+          {estimatedSeconds !== null && estimatedSeconds > 0 && (
+            <>
+              <span>·</span>
+              <span>预计 ~{estimatedSeconds}s</span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

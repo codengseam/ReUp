@@ -27,24 +27,35 @@ interface WelcomeScreenProps {
 
 export default function WelcomeScreen({ onQuickEntry }: WelcomeScreenProps) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-6">
-        <Briefcase className="w-8 h-8 text-primary-foreground" />
+    <div className="flex flex-col items-center justify-center min-h-[70vh] py-10">
+      {/* Hero 区 */}
+      <div className="text-center mb-10 px-4">
+        <h1 className="text-5xl md:text-6xl font-bold tracking-tight bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">
+          ReUp
+        </h1>
+        <p className="text-base md:text-lg text-foreground mt-3 font-medium">
+          资深 HR + 总裁视角的职场晋升与面试顾问
+        </p>
+        <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto leading-relaxed">
+          从晋升答辩到面试演练，为你提供总裁级的策略洞察与可落地的话术
+        </p>
       </div>
-      <h2 className="text-xl font-semibold text-foreground mb-2">你好，我是你的职场顾问</h2>
-      <p className="text-sm text-muted-foreground mb-8 text-center">以资深 HR + 总裁视角，帮你解决晋升和面试问题</p>
 
-      {/* 场景卡片：2x2 移动端 / 4x1 桌面端 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl px-4">
+      {/* 快捷入口卡片网格：2 列（移动端 1 列） */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl px-4">
         {SCENES.map(scene => {
           const Icon = scene.icon;
           const card = (
-            <Card className="shadow-none border-border/40 hover:border-primary transition-colors p-4 gap-2 h-full rounded-xl">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Icon className="w-4 h-4 text-primary" />
+            <Card className="rounded-2xl border-border shadow-card p-5 hover:-translate-y-1 hover:shadow-float transition-all duration-200 h-full">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shadow-sm">
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-foreground">{scene.title}</div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-snug">{scene.description}</p>
+                </div>
               </div>
-              <div className="font-medium text-sm text-foreground mt-2">{scene.title}</div>
-              <p className="text-xs text-muted-foreground leading-snug">{scene.description}</p>
             </Card>
           );
           return scene.href ? (
@@ -65,7 +76,7 @@ export default function WelcomeScreen({ onQuickEntry }: WelcomeScreenProps) {
       </div>
 
       {/* 优秀提问案例库：精选 3 个，卡片式网格 */}
-      <div className="w-full max-w-2xl mt-10 px-4">
+      <div className="w-full max-w-3xl mt-10 px-4">
         <div className="flex items-center justify-center gap-2 mb-4">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           <p className="text-xs font-medium text-muted-foreground">试试这样问</p>
@@ -75,7 +86,7 @@ export default function WelcomeScreen({ onQuickEntry }: WelcomeScreenProps) {
             <button
               key={`${group.category}-${idx}`}
               onClick={() => onQuickEntry(group.goodExample)}
-              className="group text-left p-4 rounded-xl bg-surface-container border border-border/20 hover:border-primary/30 hover:bg-surface-container-high hover:shadow-sm transition-all"
+              className="group text-left p-4 rounded-xl border border-border bg-card shadow-sm hover:border-primary hover:bg-primary-container/40 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">

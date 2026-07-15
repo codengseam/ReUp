@@ -52,8 +52,8 @@ export async function retrieve(
   // 缓存依赖未注入时退回到与原行为一致的「无缓存」模式
   const effectiveCache: RetrieveCache | null = cache ?? null;
 
-  const minScore = (params?.minScore as number) ?? 0.2;
-  const maxChars = (params?.maxChars as number) ?? 3000;
+  const minScore = (params?.minScore as number) ?? 0.15;
+  const maxChars = (params?.maxChars as number) ?? 5000;
   const semanticWeight = (params?.semanticWeight as number) ?? 0.7;
   // 默认关闭 HyDE / LLM Rerank：这两步都会额外触发一次大模型调用，
   // 是聊天输出前延迟的主要来源。管理员仍可通过 ragParams 显式开启。
