@@ -55,7 +55,7 @@ describe('LLMClient', () => {
     // Ensure env defaults don't leak between tests
     process.env.DASHSCOPE_API_KEY = 'test-key';
     process.env.DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
+    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-flash';
   });
 
   afterEach(() => {
@@ -125,7 +125,7 @@ describe('LLMClient', () => {
       const client = new LLMClient();
       await client.invoke([{ role: 'user', content: 'q' }]);
       const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
-      expect(body.model).toBe('qwen3.6-plus-2026-04-02');
+      expect(body.model).toBe('qwen3.6-flash');
     });
 
     it('throws LLMAuthError on 401 response', async () => {

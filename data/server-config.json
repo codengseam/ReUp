@@ -1,6 +1,6 @@
 {
   "updatedAt": "2026-06-20T10:27:17.807Z",
-  "defaultModelId": "qwen3.6-plus-2026-04-02",
+  "defaultModelId": "qwen3.6-flash",
   "customModels": [],
   "ragParams": {
     "topK": 7,

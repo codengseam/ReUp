@@ -20,20 +20,19 @@ import {
 import { isSafeEndpoint } from '@/shared/utils/url-safety';
 import { getCustomPrompt, getRAGParams, getModelConfig } from '@/server/server-config';
 import { getModelCandidates } from '@/server/runtime-config';
-import { BUILTIN_MODEL_IDS } from '@/shared/config/models';
-
-// 模型白名单字面量类型（与 src/lib/models.ts 的 BUILTIN_MODELS 保持一致）
-// 如果新增/删除内置模型，需要同时更新 models.ts 和这里的字面量联合
-// 实际值从 BUILTIN_MODEL_IDS 派生（编译期常量 union 由 TS 自动收敛）
-type AllowedModelId = (typeof BUILTIN_MODEL_IDS)[number];
+import { BUILTIN_MODEL_IDS, DEFAULT_MODEL_ID } from '@/shared/config/models';
 
 const ALLOWED_MODEL_IDS = BUILTIN_MODEL_IDS;
-const DEFAULT_MODEL_ID: AllowedModelId = 'qwen3.6-plus-2026-04-02';
 
-function validateModel(modelId: string | undefined): AllowedModelId {
-  if (modelId && (ALLOWED_MODEL_IDS as readonly string[]).includes(modelId)) {
-    return modelId as AllowedModelId;
-  }
+/**
+ * 校验并解析要使用的内置模型 id。
+ * 优先级：请求显式指定 > 管理后台默认 (serverConfig.defaultModelId) > 清单默认 (DEFAULT_MODEL_ID)。
+ * 修复点：此前回退到硬编码 'qwen3.6-plus-2026-04-02'，导致后台切换默认模型对用户端不生效。
+ */
+function validateModel(modelId: string | undefined, serverDefault?: string): string {
+  const allowed = ALLOWED_MODEL_IDS as readonly string[];
+  if (modelId && allowed.includes(modelId)) return modelId;
+  if (serverDefault && allowed.includes(serverDefault)) return serverDefault;
   return DEFAULT_MODEL_ID;
 }
 
@@ -372,7 +371,8 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
 
   // 选择模型（白名单校验 + 用户自定义）
-  const selectedModel = validateModel(model);
+  // 优先用请求指定模型，否则回退到管理后台默认模型，再否则清单默认
+  const selectedModel = validateModel(model, serverConfig.defaultModelId);
 
   // Helper: safe enqueue that catches errors when stream is already closed
   const safeEnqueue = (controller: ReadableStreamDefaultController, data: string) => {
@@ -628,8 +628,8 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // 内置模型：使用 LLMClient + 自动 fallback 链
-          // （qwen3.6-plus-2026-04-02 → qwen3.6-plus；GLM 单独走 zhipu 链）
+          // 内置模型：使用 LLMClient + 过期感知轮换 fallback 链
+          // getModelCandidates 返回 [selectedModel(若未过期), ...其余未过期模型按过期升序]
           const candidates: ModelCandidate[] = await getModelCandidates(selectedModel);
           if (candidates.length === 0) {
             safeEnqueue(controller, `data: ${JSON.stringify({ error: `未配置 ${selectedModel} 所需的 API Key，请到管理后台「API Keys」配置` })}\n\n`);
