@@ -44,15 +44,8 @@ async function semanticSearch(
       .filter((c) => c.score >= minScore)
       .map((chunk) => mapChunkToRAGResult(chunk));
 
-    if (categoryFilter && categoryFilter !== 'all') {
-      const filtered = results.filter(r =>
-        !r.category || r.category === categoryFilter ||
-        (categoryFilter === 'promotion' && r.category === '晋升类') ||
-        (categoryFilter === 'interview' && r.category === '面试类')
-      );
-      if (filtered.length > 0) return filtered;
-    }
-
+    // category 过滤已由 vector-store 的 passesFilter (CATEGORY_ALIASES) 在
+    // knowledgeBase.semanticSearch 内完成，这里无需二次过滤。
     return results;
   } catch (error) {
     console.warn(
@@ -80,6 +73,13 @@ const FALLBACK_STOPWORDS = new Set([
   '也', '到', '说', '要', '会', '着', '看', '好', '这', '那', '你', '他',
   '她', '它', '吗', '呢', '吧', '啊', '与', '及', '或', '把', '被', '让',
   '给', '从', '对', '但', '而', '为', '以', '于', '之', '其', '此', '所',
+  // 补充常见中文虚词/单字，避免单字参与命中率计算拉低有效 chunk 分数
+  '如', '何', '准', '备', '还', '又', '才', '只', '可', '能', '想', '做',
+  '问', '答', '错', '坏', '多', '少', '大', '小', '高', '低', '长', '短',
+  '新', '旧', '早', '晚', '前', '后', '左', '右', '下', '里', '外', '中',
+  '间', '哪', '个', '些', '每', '各', '另', '该', '某', '本', '们', '人',
+  '自', '己', '谁', '什', '么', '怎', '样', '因', '然', '虽', '且', '则',
+  '若', '果', '没', '无', '非', '未', '别', '莫', '勿', '休',
 ]);
 
 async function fallbackTextSearch(

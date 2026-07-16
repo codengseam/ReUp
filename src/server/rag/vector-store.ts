@@ -66,16 +66,24 @@ export interface VectorStore {
 }
 
 const CATEGORY_ALIASES: Record<string, Set<string>> = {
+  // 运行时过滤命名空间 = data/skill-vectors.json 中 metadata.category 的实际取值，
+  // 同时纳入 category-rules.ts 的 TopicCategory 取值（deriveCategory 输出），
+  // 使离线 backfill 产出的分类名也能被运行时检索命中。两套命名空间须在此合并保持一致。
+  // '通用'（deriveCategory 兜底）刻意不入任一集合：无明确主题的 chunk 不参与 promotion/interview 过滤。
   promotion: new Set([
     'promotion',
     '职级体系', '晋升入门', '晋升材料', '晋升陈述', '晋升答辩',
     '晋升逻辑', '晋升认知', '能力模型', '提名词写作', '学习方法',
+    // TopicCategory（晋升类）：deriveCategory 输出值，与上面 skill-vectors.json 实际值并列兼容
+    '晋升流程', '晋升原则', '技术能力',
   ]),
   interview: new Set([
     'interview',
     '考察标准', '面试概览', '面试答疑', '面试流程', '面试准备',
     '自我介绍', '表达技巧', '项目表达', '简历经历', '反向提问',
     '薪资谈判', '自我认知', '心态调整', '职业规划', '源素材',
+    // TopicCategory（面试类）：deriveCategory 输出值
+    '简历优化', '经历包装', '招聘方视角',
   ]),
 };
 
