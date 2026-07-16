@@ -5,9 +5,11 @@
 
 import { LLMClient } from '@/lib/llm-client';
 import { getModelCandidates } from '@/lib/runtime-config';
+import { DEFAULT_MODEL_ID } from '@/shared/config/models';
 import { extractJson } from './ragas';
 
-const HALLUCINATION_MODEL = 'qwen3.6-plus-2026-04-02';
+// 评估用模型：取共享清单默认值（过期最早的），失败自动轮换到下一个未过期模型。
+const HALLUCINATION_MODEL = DEFAULT_MODEL_ID;
 const HALLUCINATION_TIMEOUT_MS = 20_000;
 
 export interface HallucinationDetection {

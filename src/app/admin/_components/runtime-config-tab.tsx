@@ -27,13 +27,13 @@ interface RuntimeConfigResponse {
 
 const PROVIDER_META: Record<ProviderId, { label: string; envVar: string; helpUrl: string; defaultEndpoint: string }> = {
   dashscope: {
-    label: '阿里云 DashScope (Qwen 3.6 Plus)',
+    label: '阿里云 DashScope (百炼免费额度)',
     envVar: 'DASHSCOPE_API_KEY',
     helpUrl: 'https://dashscope.console.aliyun.com/apiKey',
     defaultEndpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   },
   zhipu: {
-    label: '智谱 GLM (GLM-4.7-Flash)',
+    label: '智谱 GLM (可选)',
     envVar: 'ZHIPU_API_KEY',
     helpUrl: 'https://bigmodel.cn/usercenter/proj-key',
     defaultEndpoint: 'https://open.bigmodel.cn/api/paas/v4',

@@ -82,7 +82,8 @@ export default function ChatPage() {
   const [thumbsDownCount, setThumbsDownCount] = useState<number>(0); // 保留字段名（ChatMessage 仍按此读取）；语义现为"反馈总数"
   const [regenerateCount, setRegenerateCount] = useState<number>(0);
 
-  // 客户端水合后从 localStorage 同步模型配置，避免 SSR 水合不匹配
+  // 客户端水合后同步模型配置，避免 SSR 水合不匹配
+  // 优先级：用户手选 (boss_model_config) > 管理后台默认 (/api/config/model) > 清单第一个
   useEffect(() => {
     const getCustomProviders = (): CustomProvider[] => {
       try {
@@ -98,52 +99,62 @@ export default function ChatPage() {
       setCustomProviders(allCustom);
     }
 
+    // 按 id 应用模型配置（内置或自定义），返回是否成功
+    const applyModelId = (id: string): boolean => {
+      const found = AVAILABLE_MODELS.find(m => m.id === id);
+      if (found) { setModelConfig(found); setAdminDefaultLabel(found.name); return true; }
+      const customFound = allCustom.find(c => c.id === id);
+      if (customFound) {
+        setModelConfig({
+          id: customFound.id,
+          name: customFound.name,
+          description: `${customFound.providerType} · ${customFound.modelId}`,
+          providerType: customFound.providerType,
+          endpoint: customFound.endpoint,
+          apiKey: customFound.apiKey,
+          modelId: customFound.modelId,
+        });
+        setAdminDefaultLabel(customFound.name);
+        return true;
+      }
+      return false;
+    };
+
+    // 1) 用户手选模型优先（不覆盖）
     try {
       const saved = localStorage.getItem('boss_model_config');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const found = AVAILABLE_MODELS.find(m => m.id === parsed.id);
-        if (found) { setModelConfig(found); return; }
-        const customFound = allCustom.find(c => c.id === parsed.id);
-        if (customFound) {
-          setModelConfig({
-            id: customFound.id,
-            name: customFound.name,
-            description: `${customFound.providerType} · ${customFound.modelId}`,
-            providerType: customFound.providerType,
-            endpoint: customFound.endpoint,
-            apiKey: customFound.apiKey,
-            modelId: customFound.modelId,
-          });
-          return;
-        }
+        if (parsed?.id && applyModelId(parsed.id)) return;
       }
     } catch { /* ignore */ }
+
+    // 2) 同步应用缓存的后台默认（瞬时显示，避免闪烁）
+    let cachedAdminId: string | undefined;
     try {
       const adminConfig = localStorage.getItem('boss_admin_model_config');
       if (adminConfig) {
         const parsed = JSON.parse(adminConfig);
-        const found = AVAILABLE_MODELS.find(m => m.id === parsed.defaultModelId);
-        if (found) {
-          setModelConfig(found);
-          setAdminDefaultLabel(found.name);
-          return;
-        }
-        const customFound = allCustom.find(c => c.id === parsed.defaultModelId);
-        if (customFound) {
-          setModelConfig({
-            id: customFound.id,
-            name: customFound.name,
-            description: `${customFound.providerType} · ${customFound.modelId}`,
-            providerType: customFound.providerType,
-            endpoint: customFound.endpoint,
-            apiKey: customFound.apiKey,
-            modelId: customFound.modelId,
-          });
-          setAdminDefaultLabel(customFound.name);
-          return;
+        if (parsed?.defaultModelId && applyModelId(parsed.defaultModelId)) {
+          cachedAdminId = parsed.defaultModelId;
         }
       }
+    } catch { /* ignore */ }
+
+    // 3) 异步拉取最新后台默认，覆盖缓存（修复：后台切换默认模型后用户端即时生效）
+    try {
+      void (async () => {
+        try {
+          const res = await fetch('/api/config/model', { cache: 'no-store' });
+          if (!res.ok) return;
+          const data = (await res.json()) as { defaultModelId?: string };
+          const id = data?.defaultModelId;
+          if (!id) return;
+          // 与缓存一致则无需重设（避免无谓渲染）
+          if (id !== cachedAdminId) applyModelId(id);
+          localStorage.setItem('boss_admin_model_config', JSON.stringify({ defaultModelId: id }));
+        } catch { /* ignore */ }
+      })();
     } catch { /* ignore */ }
   }, []);
 
@@ -524,16 +535,6 @@ export default function ChatPage() {
             safetyWarningData = parsed.safetyWarning as string;
           }
 
-          if (parsed.transferToHuman) {
-            const reason = (parsed.transferReason as string) || '系统评估当前问题需要人工顾问介入';
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === assistantId
-                  ? { ...m, transferToHuman: true, transferReason: reason }
-                  : m
-              )
-            );
-          }
           if (parsed.hallucinationDetected) {
             setMessages(prev =>
               prev.map(m =>
@@ -711,20 +712,6 @@ export default function ChatPage() {
       window.speechSynthesis.speak(utterance);
     }
   }, []);
-
-  // 分享
-  const shareContent = useCallback((content: string) => {
-    if (navigator.share) {
-      navigator.share({
-        title: 'ReUp 职场顾问建议',
-        text: content.substring(0, 200),
-      }).catch(() => {});
-    } else {
-      fallbackCopyText(content);
-      setCopiedId('share-fallback');
-      setTimeout(() => setCopiedId(null), 1500);
-    }
-  }, [fallbackCopyText]);
 
   // 导出对话
   const exportConversation = useCallback(() => {
@@ -1098,9 +1085,9 @@ export default function ChatPage() {
       {/* ===== 主内容区 ===== */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 顶栏 */}
-        <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0">
+        <header className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0 backdrop-blur-md bg-background/80 sticky top-0 z-20">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-emerald-600 shadow-sm flex items-center justify-center">
               <Briefcase className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
@@ -1141,7 +1128,7 @@ export default function ChatPage() {
 
         {/* 消息区 */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[680px] mx-auto px-6 py-6">
+          <div className="max-w-[720px] mx-auto px-6 py-8">
             {/* 欢迎态 */}
             {messages.length === 0 && !isLoading && (
               <WelcomeScreen onQuickEntry={handleQuickEntry} />
@@ -1173,7 +1160,6 @@ export default function ChatPage() {
                   onRetry={retry}
                   onCopy={copyContent}
                   onSpeak={speakContent}
-                  onShare={shareContent}
                   onCitationClick={(citation) => setActiveCitation(citation)}
                   onThumbsDown={async () => {
                     setThumbsDownCount(prev => prev + 1);
@@ -1202,10 +1188,10 @@ export default function ChatPage() {
             {/* 状态指示器 */}
             {(isLoading && status && statusText[status]) || (status && !isLoading) ? (
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 mr-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-emerald-600 shadow-sm flex items-center justify-center shrink-0 mr-3">
                   <Briefcase className="w-4 h-4 text-primary-foreground" />
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted border border-border shadow-card">
                   {statusIcon[status] ?? <Mic className="w-3.5 h-3.5 text-muted-foreground" />}
                   <span className="text-sm text-muted-foreground">
                     {statusText[status] ?? status}

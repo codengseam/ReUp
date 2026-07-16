@@ -4,6 +4,7 @@
 import { LLMClient, type InvokeOptions } from '@/server/llm/llm-client';
 import { createKnowledgeBase } from '@/server/rag/knowledge-base';
 import { createEmbedder } from '@/server/rag/embedder';
+import { categoryMatches, tokenize, type VectorRecord } from '@/server/rag/vector-store';
 import type { ScoredChunk } from '@/server/rag/reranker';
 import type { RAGResult } from './types';
 
@@ -24,7 +25,7 @@ function getLLMClient(): LLMClient {
 async function semanticSearch(
   query: string,
   topK: number = 5,
-  minScore: number = 0.2,
+  minScore: number = 0.15,
   categoryFilter?: string
 ): Promise<RAGResult[]> {
   try {
@@ -43,20 +44,93 @@ async function semanticSearch(
       .filter((c) => c.score >= minScore)
       .map((chunk) => mapChunkToRAGResult(chunk));
 
-    if (categoryFilter && categoryFilter !== 'all') {
-      const filtered = results.filter(r =>
-        !r.category || r.category === categoryFilter ||
-        (categoryFilter === 'promotion' && r.category === '晋升类') ||
-        (categoryFilter === 'interview' && r.category === '面试类')
-      );
-      if (filtered.length > 0) return filtered;
-    }
-
+    // category 过滤已由 vector-store 的 passesFilter (CATEGORY_ALIASES) 在
+    // knowledgeBase.semanticSearch 内完成，这里无需二次过滤。
     return results;
   } catch (error) {
-    console.error('[RAG] Semantic search failed:', error instanceof Error ? error.message : String(error));
-    return [];
+    console.warn(
+      '[RAG] Semantic search failed, degrading to text fallback:',
+      error instanceof Error ? error.message : String(error)
+    );
+    try {
+      return await fallbackTextSearch(query, topK, minScore, categoryFilter);
+    } catch (fbErr) {
+      console.error(
+        '[RAG] Fallback text search also failed:',
+        fbErr instanceof Error ? fbErr.message : String(fbErr)
+      );
+      return [];
+    }
   }
+}
+
+// ========== 1b. 纯文本降级检索（embedder 不可用时兜底） ==========
+// 当 BGE-M3 模型缓存缺失导致 embed() 抛错时，semanticSearch 的 catch 块会
+// 调用本函数：对所有 chunk 做关键词命中率打分，应用与 semanticSearch 相同的
+// category 过滤，按命中分排序取 topK，返回结构一致的 RAGResult[]。
+const FALLBACK_STOPWORDS = new Set([
+  '的', '了', '是', '在', '我', '有', '和', '就', '不', '都', '一', '上',
+  '也', '到', '说', '要', '会', '着', '看', '好', '这', '那', '你', '他',
+  '她', '它', '吗', '呢', '吧', '啊', '与', '及', '或', '把', '被', '让',
+  '给', '从', '对', '但', '而', '为', '以', '于', '之', '其', '此', '所',
+  // 补充常见中文虚词/单字，避免单字参与命中率计算拉低有效 chunk 分数
+  '如', '何', '准', '备', '还', '又', '才', '只', '可', '能', '想', '做',
+  '问', '答', '错', '坏', '多', '少', '大', '小', '高', '低', '长', '短',
+  '新', '旧', '早', '晚', '前', '后', '左', '右', '下', '里', '外', '中',
+  '间', '哪', '个', '些', '每', '各', '另', '该', '某', '本', '们', '人',
+  '自', '己', '谁', '什', '么', '怎', '样', '因', '然', '虽', '且', '则',
+  '若', '果', '没', '无', '非', '未', '别', '莫', '勿', '休',
+]);
+
+async function fallbackTextSearch(
+  query: string,
+  topK: number,
+  minScore: number,
+  categoryFilter?: string
+): Promise<RAGResult[]> {
+  if (topK <= 0) return [];
+  const allTokens = tokenize(query);
+  const queryTokens = allTokens.filter((t) => !FALLBACK_STOPWORDS.has(t));
+  if (queryTokens.length === 0) return [];
+
+  const records: VectorRecord[] = await knowledgeBase.getAllRecords();
+  if (records.length === 0) return [];
+
+  const wantCategory =
+    categoryFilter === 'promotion' || categoryFilter === 'interview' ? categoryFilter : undefined;
+
+  const scored: Array<{ record: VectorRecord; score: number }> = [];
+  for (const record of records) {
+    if (wantCategory && !categoryMatches(wantCategory, record.category)) continue;
+    const textTokens = new Set(tokenize(record.text));
+    if (textTokens.size === 0) continue;
+    let hits = 0;
+    for (const t of queryTokens) {
+      if (textTokens.has(t)) hits++;
+    }
+    const score = hits / queryTokens.length;
+    if (score >= minScore) {
+      scored.push({ record, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  const limit = Math.min(topK, scored.length);
+  const results: RAGResult[] = new Array(limit);
+  for (let i = 0; i < limit; i++) {
+    const { record, score } = scored[i];
+    const skillName =
+      typeof record.metadata.skillName === 'string' ? record.metadata.skillName : '';
+    results[i] = {
+      content: record.text,
+      score,
+      docId: record.id,
+      source: record.id || '知识库',
+      category: record.category,
+      skillName,
+    };
+  }
+  return results;
 }
 
 function mapChunkToRAGResult(chunk: ScoredChunk): RAGResult {
@@ -77,7 +151,7 @@ function mapChunkToRAGResult(chunk: ScoredChunk): RAGResult {
 async function keywordAugmentedSearch(
   query: string,
   topK: number = 3,
-  minScore: number = 0.15
+  minScore: number = 0.12
 ): Promise<RAGResult[]> {
   try {
     // 使用本地关键词提取替代 LLM 调用，避免每次检索都触发一次大模型请求。
@@ -304,7 +378,7 @@ ${docList}
 }
 
 // ========== 6. 上下文压缩 ==========
-function compressContext(results: RAGResult[], maxChars: number = 3000): RAGResult[] {
+function compressContext(results: RAGResult[], maxChars: number = 5000): RAGResult[] {
   let totalChars = 0;
   const compressed: RAGResult[] = [];
 

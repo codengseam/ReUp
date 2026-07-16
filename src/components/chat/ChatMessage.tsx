@@ -3,15 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Search, BookOpen, Lightbulb, MessageCircle,
-  RotateCcw, Volume2, Copy, Share2, Quote, AlertTriangle, Check,
-  ThumbsDown, UserRound, Brain, ChevronDown, ChevronRight, AlertCircle, RefreshCw
+  RotateCcw, Volume2, Copy, Quote, AlertTriangle, Check,
+  ThumbsDown, Brain, ChevronDown, ChevronRight, AlertCircle, RefreshCw
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { Message, CitationData, ThinkingStep } from './types';
 
 // ========== ThinkingPanel 组件 ==========
 function ThinkingPanel({ steps, streamStatus }: { steps: ThinkingStep[]; streamStatus?: string }) {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function ThinkingPanel({ steps, streamStatus }: { steps: ThinkingStep[]; streamS
   const sortedSteps = [...steps].sort((a, b) => a.step - b.step);
 
   return (
-    <div className="mb-4 border border-[#e8e8e8] rounded-2xl p-6 bg-white">
+    <div className="mb-4 border border-border rounded-2xl p-6 bg-card shadow-card">
       <button
         type="button"
         onClick={toggleAll}
@@ -61,10 +61,10 @@ function ThinkingPanel({ steps, streamStatus }: { steps: ThinkingStep[]; streamS
             <div key={s.step} className="relative flex gap-3 pb-3.5 last:pb-0">
               {/* 时间线节点 */}
               <div
-                className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ring-4 ring-surface-container transition-colors ${
+                className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium shrink-0 ring-4 ring-surface-container transition-all ${
                   s.status === 'completed'
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-surface-container border-2 border-primary text-primary animate-pulse'
+                    : 'bg-surface-container border-2 border-primary text-primary animate-pulse shadow-[0_0_0_4px_rgba(16,185,129,0.15)]'
                 }`}
               >
                 {s.status === 'completed' ? <Check className="w-3.5 h-3.5" /> : s.step}
@@ -140,12 +140,12 @@ export function formatMarkdown(
   // 3. 压缩所有连续空行为单个换行，避免渲染出多余空行
   html = html.replace(/\n{2,}/g, '\n');
   // 3.1. 调用的 Skill 标签：必须在加粗替换之前处理，否则 **调用的 Skill** 会被转成 strong
-  html = html.replace(/\*\*调用的 Skill\*\*:\s*(.+)/g, '<span class="inline-flex items-center px-3 py-1 rounded-full bg-primary-container text-primary text-xs font-medium border border-[#d1fae5]">$1</span>');
+  html = html.replace(/\*\*调用的 Skill\*\*:\s*(.+)/g, '<span class="inline-flex items-center px-3 py-1 rounded-full bg-primary-container text-primary text-xs font-medium border border-primary/20">$1</span>');
   // 3.2. 原文知识点标签（末尾追加换行，确保后续 > 引用能在行首被 blockquote 正则匹配）
   html = html.replace(/\*\*原文知识点\*\*:\s*/g, '<div class="text-xs text-muted-foreground font-medium mt-2.5 mb-1">原文知识点</div>\n');
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>');
-  // 引用块：方案 A - Claude 简约优雅风（bg-[#f6fef9] 清新底色）
-  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-[3px] border-primary bg-[#f6fef9] pl-4 py-3 pr-3 rounded-r-lg text-foreground leading-relaxed">$1</blockquote>');
+  // 引用块：方案 A - Claude 简约优雅风（bg-primary-container/40 清新底色）
+  html = html.replace(/^>\s*(.+)$/gm, '<blockquote class="border-l-[3px] border-primary bg-primary-container/40 pl-4 py-3 pr-3 rounded-r-lg text-foreground leading-relaxed">$1</blockquote>');
   // 3.5. Skill key 替换：英文 key → 中文名
   for (const [en, cn] of Object.entries(SKILL_KEY_MAP)) {
     html = html.replace(new RegExp(en, 'g'), cn);
@@ -158,7 +158,7 @@ export function formatMarkdown(
   // data-citation 触发 CitationDrawer（page.tsx 的事件委托）
   html = html.replace(/\[(\d+)\]/g, (match, num) => {
     const msgAttr = messageId ? ` data-message-id="${messageId}"` : '';
-    return `<sup><button type="button" class="citation-ref cursor-pointer text-primary font-semibold hover:underline" data-citation="${num}"${msgAttr}>[${num}]</button></sup>`;
+    return `<sup><button type="button" class="citation-ref cursor-pointer text-primary font-semibold hover:underline px-1.5 py-0.5 rounded-full bg-primary-container/60 hover:bg-primary-container transition-colors text-[0.7em]" data-citation="${num}"${msgAttr}>[${num}]</button></sup>`;
   });
   html = html.replace(/\n/g, '<br/>');
   if (purify) {
@@ -193,7 +193,7 @@ function renderAIContent(
     if (!section.trim()) return null;
 
     // 卡片容器样式（方案 A：Claude 简约优雅风 - 线框卡片）
-    const cardClass = 'border border-[#e8e8e8] rounded-2xl p-6 mb-4 bg-white hover:shadow-sm transition-shadow';
+    const cardClass = 'border border-border rounded-2xl p-6 mb-4 bg-card shadow-card hover:shadow-float hover:-translate-y-0.5 transition-all duration-200';
 
     if (section.includes('【我的分析】')) {
       const isExpanded = expandedAnalysis.has(messageId);
@@ -216,10 +216,10 @@ function renderAIContent(
                 return next;
               });
             }}
-            className="w-full flex items-center justify-between text-left rounded-xl bg-[#fafafa] border border-[#e8e8e8] px-5 py-4 hover:bg-gray-100 transition-colors"
+            className="w-full flex items-center justify-between text-left rounded-xl bg-muted border border-border px-5 py-4 hover:bg-muted/80 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 shadow-sm flex items-center justify-center shrink-0">
                 <Search className="w-4 h-4 text-white" />
               </div>
               <span className="font-semibold text-sm text-foreground">思考过程</span>
@@ -255,7 +255,7 @@ function renderAIContent(
     if (section.includes('【框架技能')) {
       return (
         <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
+          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
               <BookOpen className="w-4 h-4 text-white" />
             </div>
@@ -272,7 +272,7 @@ function renderAIContent(
     if (section.includes('【底层心法】')) {
       return (
         <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
+          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
               <Lightbulb className="w-4 h-4 text-white" />
             </div>
@@ -289,7 +289,7 @@ function renderAIContent(
     if (section.includes('【开始引导】')) {
       return (
         <div key={idx} className={cardClass}>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#f0f0f0]">
+          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-border">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shrink-0">
               <MessageCircle className="w-4 h-4 text-white" />
             </div>
@@ -326,7 +326,6 @@ interface ChatMessageProps {
   onRetry: (failedAssistantId: string) => void;
   onCopy: (content: string, id: string) => void;
   onSpeak: (content: string) => void;
-  onShare: (content: string) => void;
   onCitationClick: (citation: CitationData) => void;
   onThumbsDown: () => void;
 }
@@ -343,24 +342,33 @@ function ChatMessage({
   onRetry,
   onCopy,
   onSpeak,
-  onShare,
   onCitationClick,
   onThumbsDown,
 }: ChatMessageProps) {
   const [expandedAnalysis, setExpandedAnalysis] = useState<Set<string>>(new Set());
+
+  // 「我的分析」默认展开（裁判可直观看推理链），保留可折叠交互
+  useEffect(() => {
+    setExpandedAnalysis(prev => {
+      if (prev.has(message.id)) return prev;
+      const next = new Set(prev);
+      next.add(message.id);
+      return next;
+    });
+  }, [message.id]);
 
   return (
     <div
       className={`mb-6 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
     >
       {message.role === 'assistant' && (
-        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 mr-3 mt-0.5">
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-emerald-600 shadow-md flex items-center justify-center shrink-0 mr-3 mt-0.5 ring-2 ring-primary-container/60">
           <Briefcase className="w-4 h-4 text-primary-foreground" />
         </div>
       )}
       <div className={`${message.role === 'user' ? 'max-w-[85%] order-1' : 'flex-1 min-w-0 max-w-[680px]'}`}>
         {message.role === 'user' ? (
-          <div className="rounded-2xl px-4 py-3 bg-primary text-primary-foreground rounded-br-md">
+          <div className="rounded-2xl px-4 py-3 bg-gradient-to-br from-primary to-emerald-600 text-primary-foreground rounded-br-md shadow-sm">
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             {message.correctedFrom && (
               <p className="text-[10px] text-primary-foreground/60 mt-1">已纠正为：{message.content}</p>
@@ -411,16 +419,6 @@ function ChatMessage({
         {/* AI消息操作按钮 */}
         {message.role === 'assistant' && message.content && !isLoading && (
           <div className="flex items-center gap-1 mt-2 ml-1">
-            {/* 置信度标识 */}
-            {message.confidence && message.confidence !== 'high' && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${
-                message.confidence === 'low' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
-              }`}>
-                <AlertTriangle className="w-3 h-3" />
-                {message.confidence === 'low' ? '低置信度' : '中置信度'}
-              </span>
-            )}
-
             <button
               onClick={onRegenerate}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors"
@@ -446,14 +444,6 @@ function ChatMessage({
             >
               <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
-            <button
-              onClick={() => onShare(message.content)}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              title="分享"
-            >
-              <Share2 className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-
             {/* 引文角标入口 */}
             {message.citations && message.citations.length > 0 && (
               <button
@@ -491,42 +481,6 @@ function ChatMessage({
             <div>
               <span className="font-medium">内容校验提示：</span>部分回答可能超出知识库范围，请结合实际情况判断。以上分析仅供参考。
             </div>
-          </div>
-        )}
-
-        {/* 转人工提示 */}
-        {message.transferToHuman && (
-          <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
-            <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
-              <UserRound className="w-4 h-4" />
-              建议转接人工顾问
-            </div>
-            <p className="text-xs text-blue-600 mb-2">{message.transferReason || '系统评估当前问题需要人工顾问介入'}</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
-          </div>
-        )}
-
-        {/* 点踩触发转人工 */}
-        {message.role === 'assistant' && thumbsDownCount >= 2 && isLastMessage && (
-          <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
-            <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
-              <UserRound className="w-4 h-4" />
-              建议转接人工顾问
-            </div>
-            <p className="text-xs text-blue-600 mb-2">多次点踩，建议转接人工顾问</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
-          </div>
-        )}
-
-        {/* 重新生成触发转人工 */}
-        {message.role === 'assistant' && regenerateCount >= 3 && isLastMessage && (
-          <div className="mt-3 border border-blue-200 rounded-lg p-3 bg-blue-50">
-            <div className="flex items-center gap-2 text-blue-700 font-medium text-sm mb-1">
-              <UserRound className="w-4 h-4" />
-              建议转接人工顾问
-            </div>
-            <p className="text-xs text-blue-600 mb-2">多次重新生成，建议转接人工顾问</p>
-            <p className="text-xs text-blue-500">系统已记录您的对话上下文，人工顾问将基于完整记录继续为您服务。</p>
           </div>
         )}
       </div>

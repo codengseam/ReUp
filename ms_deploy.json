@@ -5,7 +5,7 @@
   "port": 7860,
   "environment_variables": [
     {"name": "DASHSCOPE_BASE_URL", "value": "https://dashscope.aliyuncs.com/compatible-mode"},
-    {"name": "DASHSCOPE_CHAT_MODEL", "value": "qwen3.6-plus-2026-04-02"},
+    {"name": "DASHSCOPE_CHAT_MODEL", "value": "qwen3.6-flash"},
     {"name": "DASHSCOPE_EMBEDDING_MODEL", "value": "text-embedding-v3"},
     {"name": "LLM_PROVIDER", "value": "dashscope"},
     {"name": "NODE_ENV", "value": "production"},

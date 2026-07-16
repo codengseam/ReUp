@@ -195,7 +195,7 @@ describe.skip('resume optimization chain (phase 5 I4)', () => {
     vi.setConfig({ testTimeout: 15000 });
     process.env.DASHSCOPE_API_KEY = 'test-key';
     process.env.DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
-    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-plus-2026-04-02';
+    process.env.DASHSCOPE_CHAT_MODEL = 'qwen3.6-flash';
     delete process.env.NEXT_PUBLIC_PRIVACY_MODE;
 
     fetchMock = createFetchMock([]);
