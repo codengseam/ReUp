@@ -662,7 +662,14 @@ export async function POST(request: NextRequest) {
         }
 
         // ===== 输出门禁 =====
-        const outputSafety = await outputGuard(fullOutput);
+        // 8s 超时兜底：outputGuard 内部 2 次 LLM invoke 默认 60s，超时后降级放行（不阻断已流出的答案）
+        let outputSafety: Awaited<ReturnType<typeof outputGuard>>;
+        try {
+          outputSafety = await withTimeout(outputGuard(fullOutput), 8000, 'outputGuard');
+        } catch (err) {
+          console.warn('[Chat] outputGuard timeout, degrading to safe:', err instanceof Error ? err.message : String(err));
+          outputSafety = { safe: true, reason: 'outputGuard timeout', riskLevel: 'low' };
+        }
         if (!outputSafety.safe) {
           console.warn('[Chat] Output safety check failed:', outputSafety.reason);
           void recordOutputGuardBlocked();
@@ -676,7 +683,14 @@ export async function POST(request: NextRequest) {
         // fail-closed：faithful===false 涵盖"检出幻觉"与"检查工具故障(check-error)"两种情况。
         // 不阻断已生成的答案流，仅在末尾追加 hallucination_warning 并标记低置信。
         if (ragContext) {
-          const hallucinationResult = await hallucinationCheck(fullOutput, ragContext);
+          // 8s 超时兜底：hallucinationCheck 内部 LLM invoke 默认 60s，超时后 fail-closed（与 check-error 语义一致）
+          let hallucinationResult: Awaited<ReturnType<typeof hallucinationCheck>>;
+          try {
+            hallucinationResult = await withTimeout(hallucinationCheck(fullOutput, ragContext), 8000, 'hallucinationCheck');
+          } catch (err) {
+            console.warn('[Chat] hallucinationCheck timeout, fail-closed:', err instanceof Error ? err.message : String(err));
+            hallucinationResult = { hasHallucination: false, faithful: false, reason: 'check-error', error: 'timeout', ungroundedParts: [] };
+          }
           if (!hallucinationResult.faithful) {
             // check-error / unparseable 均为"校验工具未能完成"，区别于"确认幻觉"
             const isCheckError = hallucinationResult.reason === 'check-error' || hallucinationResult.reason === 'unparseable';

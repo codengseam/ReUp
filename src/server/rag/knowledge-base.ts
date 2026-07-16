@@ -19,7 +19,7 @@
 // self-referential `hybridSearch` so tests can `vi.spyOn(kb, 'semanticSearch')`
 // and verify delegation (the spy replaces the property at call time).
 
-import { type VectorStore, type SearchResult, type SearchOptions } from './vector-store';
+import { type VectorStore, type SearchResult, type SearchOptions, type VectorRecord } from './vector-store';
 import { ensureVectorStoreLoaded } from './rag-init';
 import { rerank as defaultRerank, type Chunk, type ScoredChunk } from './reranker';
 
@@ -41,6 +41,7 @@ export interface SemanticSearchOptions extends SearchOptions {
 export interface KnowledgeBase {
   semanticSearch(query: string, topK: number, opts?: SemanticSearchOptions): Promise<ScoredChunk[]>;
   hybridSearch(query: string, topK: number, opts?: SemanticSearchOptions): Promise<ScoredChunk[]>;
+  getAllRecords(): Promise<VectorRecord[]>;
 }
 
 function toChunk(r: SearchResult): Chunk {
@@ -157,6 +158,10 @@ export function createKnowledgeBase(config: KnowledgeBaseConfig): KnowledgeBase 
     semanticSearch,
     async hybridSearch(query, topK, opts) {
       return kb.semanticSearch(query, topK, opts);
+    },
+    async getAllRecords() {
+      const store = await getStore();
+      return store.getAllRecords();
     },
   };
 
