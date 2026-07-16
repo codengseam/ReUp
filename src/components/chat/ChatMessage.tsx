@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Search, BookOpen, Lightbulb, MessageCircle,
-  RotateCcw, Volume2, Copy, Share2, Quote, AlertTriangle, Check,
+  RotateCcw, Volume2, Copy, Quote, AlertTriangle, Check,
   ThumbsDown, Brain, ChevronDown, ChevronRight, AlertCircle, RefreshCw
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -326,7 +326,6 @@ interface ChatMessageProps {
   onRetry: (failedAssistantId: string) => void;
   onCopy: (content: string, id: string) => void;
   onSpeak: (content: string) => void;
-  onShare: (content: string) => void;
   onCitationClick: (citation: CitationData) => void;
   onThumbsDown: () => void;
 }
@@ -343,7 +342,6 @@ function ChatMessage({
   onRetry,
   onCopy,
   onSpeak,
-  onShare,
   onCitationClick,
   onThumbsDown,
 }: ChatMessageProps) {
@@ -446,14 +444,6 @@ function ChatMessage({
             >
               <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
-            <button
-              onClick={() => onShare(message.content)}
-              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-              title="分享"
-            >
-              <Share2 className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-
             {/* 引文角标入口 */}
             {message.citations && message.citations.length > 0 && (
               <button

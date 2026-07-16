@@ -713,20 +713,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  // 分享
-  const shareContent = useCallback((content: string) => {
-    if (navigator.share) {
-      navigator.share({
-        title: 'ReUp 职场顾问建议',
-        text: content.substring(0, 200),
-      }).catch(() => {});
-    } else {
-      fallbackCopyText(content);
-      setCopiedId('share-fallback');
-      setTimeout(() => setCopiedId(null), 1500);
-    }
-  }, [fallbackCopyText]);
-
   // 导出对话
   const exportConversation = useCallback(() => {
     if (messages.length === 0) return;
@@ -1174,7 +1160,6 @@ export default function ChatPage() {
                   onRetry={retry}
                   onCopy={copyContent}
                   onSpeak={speakContent}
-                  onShare={shareContent}
                   onCitationClick={(citation) => setActiveCitation(citation)}
                   onThumbsDown={async () => {
                     setThumbsDownCount(prev => prev + 1);

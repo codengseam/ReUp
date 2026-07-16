@@ -7,6 +7,17 @@
 //   - 兜底分类 `'通用'`，表示 chunk 没有更细的语义标签
 //   - 规则按声明顺序匹配，命中后即返回（priority 相同时取先声明的）
 //   - 第二层「doc_title hint」把每章封面/介绍页按章节主题归档（用于 hit-rate ≥ 95%）
+//
+// 命名空间关系（重要）：
+//   - TopicCategory（deriveCategory 输出）= 离线 backfill 脚本 (scripts/backfill-metadata.mjs)
+//     写入 data/skill-vectors.json 的 metadata.category 值；运行时 src 代码不调用 deriveCategory。
+//   - 运行时检索过滤走 vector-store.ts 的 categoryMatches / CATEGORY_ALIASES，直接读
+//     skill-vectors.json 的 metadata.category 做匹配，不经过本文件。
+//   - 两套命名空间必须保持一致：CATEGORY_ALIASES 必须包含 deriveCategory 可输出的所有值，
+//     否则 backfill 重跑后 promotion/interview 过滤会失效。
+//   - 当前 skill-vectors.json 实际取值（25 个，如 '晋升入门'/'晋升认知'）与 TopicCategory
+//     （19+通用，如 '晋升流程'）部分重叠但不完全相同——数据由早期规则集生成；
+//     CATEGORY_ALIASES 已同时纳入两套取值兼容。若调整本文件规则，请同步更新 CATEGORY_ALIASES。
 
 // ---------------- 类型定义 ----------------
 

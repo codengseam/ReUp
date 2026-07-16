@@ -150,6 +150,7 @@ function makeFakeStore(dim: number, count: number): VectorStore {
   return {
     load: async () => undefined,
     search: () => [],
+    getAllRecords: () => [],
     getVectorBuffer: () => buf,
     getLastDenseScores: () => new Map(),
     getVectorByIndex: () => Array.from(buf.slice(0, dim)),
