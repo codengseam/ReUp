@@ -80,6 +80,8 @@ logs/
 
 # 文档类也默认加入
 *.pdf
+# 例外: theme-factory skill 的主题预览 PDF (skill 文档引用)
+!agent-skills/theme-factory/theme-showcase.pdf
 *.docx
 *.doc
 *.xlsx
@@ -97,6 +99,8 @@ logs/
 .env.*.local
 .trae/*
 !.trae/skills
+!.trae/rules
+!.trae/checklists
 .cozeproj/
 admin-stats.json
 feedback.json

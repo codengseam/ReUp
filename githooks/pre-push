@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# ReUp pre-push hook — 推送前项目级校验
+# 参考 DreamTale githooks/pre-push, 适配 ReUp 的 Node.js/pnpm 工具链
+#
+# 设计:
+# - 推送 master/main 时提醒将触发魔搭空间同步 (.github/workflows/sync-to-modelscope.yml)
+# - 运行 ts-check + lint + test, 任一失败即阻止 push
+# - 严格模式 (REUP_STRICT_MASTER_GUARD=1): 直接 push master/main 被禁止, 必须走 PR
+# - 跳过: git push --no-verify (紧急情况绕过, 不推荐)
+#
+# 安装: bash scripts/install-git-hooks.sh
+
+set -Eeuo pipefail
+
+# 从 stdin 读取推送引用: local_ref local_sha remote_ref remote_sha
+refs_to_push=()
+master_push=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  refs_to_push+=("$remote_ref")
+  case "$remote_ref" in
+    refs/heads/master|refs/heads/main) master_push=1 ;;
+  esac
+done
+
+# 没有推送分支 (如仅删 tag) 则跳过
+if [ "${#refs_to_push[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+# 推断项目根目录 (hook 位于 .git/hooks/pre-push, 仓库根在两级之上)
+ROOT="$(git rev-parse --git-common-dir 2>/dev/null || echo ".git")"
+ROOT="$(cd "$(dirname "$ROOT")" && pwd)"
+cd "$ROOT"
+
+echo ""
+echo "================================================"
+echo " [pre-push] ReUp 项目级校验开始"
+echo "  推送目标: ${refs_to_push[*]}"
+if [ "$master_push" -eq 1 ]; then
+  echo "  警告: 推送 master/main 将触发魔搭空间同步部署"
+  if [ "${REUP_STRICT_MASTER_GUARD:-0}" = "1" ]; then
+    echo "  [ERROR] REUP_STRICT_MASTER_GUARD=1, 禁止直接 push master/main"
+    echo "          请通过 Pull Request 合并代码, 触发 CI 后再同步到魔搭"
+    exit 1
+  fi
+  echo "  提示: 建议通过 PR 合并; 紧急直推可用 git push --no-verify 绕过"
+fi
+echo "================================================"
+
+# 校验函数: 失败即退出, 阻止 push
+run_check() {
+  local label="$1"; shift
+  echo ""
+  echo ">>> $label"
+  if ! "$@"; then
+    echo ""
+    echo "[ERROR] $label 失败, push 已被阻止"
+    echo "        修复后重试, 或紧急情况用 git push --no-verify 绕过"
+    exit 1
+  fi
+}
+
+# 1) TypeScript 类型检查 (TS strict, no implicit any)
+run_check "TypeScript 类型检查 (pnpm ts-check)" pnpm ts-check
+
+# 2) ESLint (lint:build 安静模式)
+run_check "ESLint (pnpm lint:build)" pnpm lint:build
+
+# 3) Vitest (允许无测试通过, 不阻断纯文档/配置变更)
+run_check "Vitest (pnpm test)" pnpm test --passWithNoTests
+
+# 4) 提交信息规范 (仅检查推送范围内的非 merge 提交)
+if [ "${REUP_SKIP_COMMIT_MSG_CHECK:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
+  # 对每个推送的分支, 校验 origin/<branch>..HEAD 范围内的提交信息
+  for ref in "${refs_to_push[@]}"; do
+    branch="${ref#refs/heads/}"
+    range="origin/${branch}..HEAD"
+    if git rev-parse --verify "origin/${branch}" >/dev/null 2>&1; then
+      echo ""
+      echo ">>> 提交信息校验 ($range)"
+      if ! python3 scripts/validate_commit_messages.py "$range"; then
+        echo "[ERROR] 提交信息不符合规范, push 已被阻止"
+        echo "        可设 REUP_SKIP_COMMIT_MSG_CHECK=1 跳过此项"
+        exit 1
+      fi
+    fi
+  done
+fi
+
+echo ""
+echo "================================================"
+echo " [pre-push] 所有校验通过, 允许 push"
+echo "================================================"
